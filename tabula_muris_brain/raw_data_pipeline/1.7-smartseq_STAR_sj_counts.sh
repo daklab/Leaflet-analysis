@@ -3,10 +3,10 @@
 #SBATCH -N 1 # Ensure that all cores are on one machine
 #SBATCH -p pe2
 #SBATCH -c 2
-#SBATCH --mem=32G
-#SBATCH -t 1-00:00 # Runtime in D-HH:MM
-#SBATCH -J SS_STAR # <-- name of job
-#SBATCH --array=1-39345%32 # <-- number of jobs to run 
+#SBATCH --mem=128G
+#SBATCH -t 2-00:00 # Runtime in D-HH:MM
+#SBATCH --array=1-39345%64 # <-- number of jobs to run 
+#SBATCH -J "SmartSeq_STAR"
 
 #load required modules
 module purge                                                                                                                                                                         
@@ -49,29 +49,59 @@ cellID=$(basename "$CELL_BAM" _merged.mus.Aligned.out.sorted.CB.bam)
 echo $cellID
 
 # sort the bam file first to ensure that paired-end reads are always consecutive lines 
-sambamba sort -n -M -p $CELL_BAM -o ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
-bam_input=${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
+# check if sorted bam file exists, if not, create it
 
-star --genomeDir $star_index \
+# only run code below if SJ.out.tab file does not exist
+if [ ! -f "${output_dir}/SJ_files2/${TISSUE}/${cellID}.SJ.out.tab" ]; then
+
+    echo "Something went wrong last time, so re-running full workflow"
+
+    echo "Re-make sorted BAM file"
+    
+    samtools sort -n $CELL_BAM -o ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
+    samtools fixmate -r ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam ${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam
+    sambamba sort -n -M -p ${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam -o ${output_dir}/resorted_BAM2/$cellID.PE.fixed.sorted.bam
+
+    #samtools sort -n $CELL_BAM -o ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
+    #samtools sort -n AR_PE.bam AR_PE.sorted
+    echo "Fix mate information"
+    
+    echo "Sort again"
+
+    echo "Sorted bam file with fixed mates created and saved as input for STAR"
+    bam_input=${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam
+
+    echo "STAR SJ output doesn't exist, running STAR first pass"
+    # run STAR to generate SJ.out.tab file
+    star --genomeDir $star_index \
      --readFilesType SAM PE --readFilesCommand samtools view --readFilesIn "$bam_input" \
      --outFileNamePrefix "${output_dir}/SJ_files2/${TISSUE}/${cellID}." \
      --outSAMtype None  --limitBAMsortRAM 44006670219 \
      --runThreadN 4 \
      --outSJtype Standard
 
-# now do second pass for TranscriptomeSAM 
-star --runThreadN 4 --genomeDir $star_index --quantMode TranscriptomeSAM \
+     echo "done STAR first pass, now running second pass for TranscriptomeSAM" 
+
+    # now do second pass for TranscriptomeSAM 
+    star --runThreadN 4 --genomeDir $star_index --quantMode TranscriptomeSAM \
     --sjdbFileChrStartEnd "${output_dir}/SJ_files2/${TISSUE}/${cellID}.SJ.out.tab" \
     --readFilesType SAM PE --readFilesCommand samtools view --readFilesIn "$bam_input" \
-   --outSAMtype None \
-   --outFileNamePrefix "${output_dir}/SJ_files2/${TISSUE}/${cellID}."
+    --outSAMtype None \
+    --outFileNamePrefix "${output_dir}/SJ_files2/${TISSUE}/${cellID}."
 
-# remove some files that we don't need (log)
-rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.out"
-rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.progress.out"
-rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.final.out"
-# remove folder with cell STARgenome
-rm -r "${output_dir}/SJ_files2/${TISSUE}/${cellID}._STARgenome"
+    echo "done STAR second pass, removing intermediate files"
+
+    # remove some files that we don't need (log)
+    rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.out"
+    rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.progress.out"
+    rm "${output_dir}/SJ_files2/${TISSUE}/${cellID}.Log.final.out"
+    # remove folder with cell STARgenome
+    rm -r "${output_dir}/SJ_files2/${TISSUE}/${cellID}._STARgenome"
+
+    echo "Done re-doing everything!"
+else
+    echo "Everything worked last time!"
+fi
 
 #---------------------------------------------------------
 #generate index first (only need to do this once [done])
