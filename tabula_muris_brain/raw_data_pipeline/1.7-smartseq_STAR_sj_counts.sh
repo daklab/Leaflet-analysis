@@ -60,7 +60,7 @@ if [ ! -f "${output_dir}/SJ_files2/${TISSUE}/${cellID}.SJ.out.tab" ]; then
     
     samtools sort -n $CELL_BAM -o ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
     samtools fixmate -r ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam ${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam
-    sambamba sort -n -M -p ${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam -o ${output_dir}/resorted_BAM2/$cellID.PE.fixed.sorted.bam
+    sambamba sort -n -M ${output_dir}/resorted_BAM2/$cellID.PE.sorted.fixed.bam -o ${output_dir}/resorted_BAM2/$cellID.PE.fixed.sorted.bam
 
     #samtools sort -n $CELL_BAM -o ${output_dir}/resorted_BAM2/$cellID.PE.sorted.bam
     #samtools sort -n AR_PE.bam AR_PE.sorted

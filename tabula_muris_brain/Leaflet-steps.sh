@@ -13,8 +13,10 @@ input_set_up=/gpfs/commons/home/kisaev/Leaflet/src/beta-binomial-lda/01_prepare_
 
 # set up paths for data files and also for parameters
 gtf_file="/gpfs/commons/groups/knowles_lab/data/tabula_muris/reference-genome/MM10-PLUS/genes/genes.gtf"
-junc_files="/gpfs/commons/groups/knowles_lab/data/tabula_muris/smart_seq/Leaflet/junctions"
-output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/clustered_junctions" 
+
+# Make junc files for just the brain data
+junc_files="/gpfs/commons/groups/knowles_lab/data/tabula_muris/smart_seq/Leaflet/junctions/Brain"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions" 
 setting="anno_free"
 sequencing_type="single_cell"
 singleton="False"
@@ -27,21 +29,36 @@ junc_suffix="*.juncswbarcodes"
 filter_low_juncratios_inclust="no"
 strict_filter=True
 
-sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --min_intron=$min_intron --max_intron=$max_intron --min_junc_reads=$min_junc_reads --threshold_inc=0.1 --junc_bed_file $junc_bed_file --keep_singletons $singleton --junc_suffix $junc_suffix --min_num_cells_wjunc $min_num_cells_wjunc --filter_low_juncratios_inclust $filter_low_juncratios_inclust --strict_filter $strict_filter" --mem 64G -p pe2
+# what I used in the bulk astrocytes sample 
+#python $clustering_script --junc_files $junc_files --gtf_file $gtf_file --sequencing_type "bulk" --setting "anno_free"
 
+# THis is the command for running clustering across ALL mouse tissues 
+sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust" --mem 64G -p pe2
 echo "done"
+
+# should do this just on astrocytes for comparison with bulk 
+junc_suffix="*.juncswbarcodes"
+junc_files="/gpfs/commons/groups/knowles_lab/Karin/data/BulkRNAseq_Brain/TM_astrocyte_pseudobulk/Leaflet"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/data/BulkRNAseq_Brain/TM_astrocyte_pseudobulk/Leaflet" 
+cd /gpfs/commons/groups/knowles_lab/Karin/data/BulkRNAseq_Brain/TM_astrocyte_pseudobulk/Leaflet
+sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --junc_suffix $junc_suffix" --mem 32G -p pe2
 
 ## 2. get input files for BB-mixture model using Leaflet 
 ## ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-cluster_file=""
-output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain//BBmixture_TM_brain"
+cluster_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions_anno_free_50_500000_5_5_0.01_single_cell.gz"
+#test="test.clusters"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/BBmixture_TM"
 
-python $input_set_up --intron_clusters $cluster_file_str --output_file $output_file --has_genes "no" --chunk_size 10000
+sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "no" --chunk_size 20000 --train_val_test "yes"" --mem 1024G -p bigmem -J "BBmixInput"
+
 echo "done"
 
 ## 3. run BB-mixture model using Leaflet
 ## ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+## Run on just Brain or just Marrow... 
+## Run on ALL cell types across Tabula Muris... 
 
 
 ## 4. visualize gene expression based UMAP with cell states overlayed 
