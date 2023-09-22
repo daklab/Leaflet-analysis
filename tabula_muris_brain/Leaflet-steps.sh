@@ -16,17 +16,17 @@ gtf_file="/gpfs/commons/groups/knowles_lab/data/tabula_muris/reference-genome/MM
 
 # Make junc files for just the brain data
 junc_files="/gpfs/commons/groups/knowles_lab/data/tabula_muris/smart_seq/Leaflet/junctions/Brain"
-output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions" 
-setting="anno_free"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions_for_simulation" 
+setting="canonical"
 sequencing_type="single_cell"
 singleton="False"
 junc_bed_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/clustered_junctions.bed"
-min_junc_reads=2
-min_num_cells_wjunc=5
+min_junc_reads=10
+min_num_cells_wjunc=10
 min_intron=50
-max_intron=200000
+max_intron=500000
 junc_suffix="*.juncswbarcodes"
-filter_low_juncratios_inclust="no"
+filter_low_juncratios_inclust="yes"
 strict_filter=True
 
 # what I used in the bulk astrocytes sample 
@@ -64,3 +64,14 @@ echo "done"
 ## 4. visualize gene expression based UMAP with cell states overlayed 
 ## ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+## Leaflet file for simulations 
+cluster_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions_for_simulation_anno_free_50_500000_5_5_0.01_single_cell.gz"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/BBmixture_TM_forsimulation"
+sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "no" --chunk_size 20000 --train_val_test "no"" --mem 1024G -p bigmem -J "BBmixInput"
+echo "done"
+
+## Leaflet file for simulations but annotated 
+cluster_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions_for_simulation_canonical_50_500000_5_5_0.01_single_cell.gz"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/BBmixture_TM_forsimulationAnnot"
+sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "yes" --chunk_size 20000 --train_val_test "no"" --mem 1024G -p bigmem -J "BBmixInput"
+echo "done"
