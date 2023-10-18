@@ -35,11 +35,23 @@ strict_filter=True
 sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust" --mem 64G -p pe2
 echo "done"
 
+# Here with no GTF file 
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/MLCB_Brain_trueANNOfree" 
+setting="anno_free"
+sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust" --mem 64G -p pe2
+echo "done"
+
 ## ==================================================================================================
 ## [3.] Run Leaflet input set up script to generate data for training and evaluating the final model
 ## ==================================================================================================
 
 cluster_file="MLCB_Brain_true_canonical_50_500000_5_5_0.01_single_cell.gz"
 output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/MLCB_Brain_true/BBmixture_TM"
-sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "yes" --chunk_size 20000 --train_val_test "yes"" --mem 1024G -p bigmem -J "BBmixInput"
+sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "yes" --chunk_size 20000 --train_val_test "no"" --mem 128G -p pe2 -J "BBmixInput"
+echo "done"
+
+# annotaiton free 
+cluster_file="MLCB_Brain_trueANNOfree_anno_free_50_500000_5_5_0.01_single_cell.gz"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/MLCB_Brain_trueANNOfree/BBmixture_TM"
+sbatch --wrap "python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "no" --chunk_size 20000 --train_val_test "yes"" --mem 1024G -p bigmem -J "BBmixInput"
 echo "done"
