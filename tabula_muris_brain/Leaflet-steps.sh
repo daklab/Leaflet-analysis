@@ -17,7 +17,6 @@ gtf_file="/gpfs/commons/groups/knowles_lab/data/tabula_muris/reference-genome/MM
 # Make junc files for just the brain data
 junc_files="/gpfs/commons/groups/knowles_lab/data/tabula_muris/smart_seq/Leaflet/junctions/Brain"
 output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/Brain_clustered_junctions_for_simulation" 
-setting="canonical"
 sequencing_type="single_cell"
 singleton="False"
 junc_bed_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/clustered_junctions.bed"
@@ -33,7 +32,7 @@ strict_filter=True
 #python $clustering_script --junc_files $junc_files --gtf_file $gtf_file --sequencing_type "bulk" --setting "anno_free"
 
 # THis is the command for running clustering across ALL mouse tissues 
-sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --setting $setting --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust" --mem 64G -p pe2
+sbatch --wrap "python $clustering --gtf_file $gtf_file --junc_files $junc_files --output_file $output_file --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust" --mem 64G -p pe2
 echo "done"
 
 # should do this just on astrocytes for comparison with bulk 

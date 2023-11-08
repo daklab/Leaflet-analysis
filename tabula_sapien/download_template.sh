@@ -18,6 +18,7 @@ cd $1
 shift
 for s3_path in "$@"
 do
+    echo "starting download of $s3_path"
     aws s3 sync $s3_path . --exclude "*" --include "*.bam" --include "*.bam.bai"
 done
 
