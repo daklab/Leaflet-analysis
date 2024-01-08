@@ -6,7 +6,37 @@ cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisBrain/
 
 # paths to Leaflet scripts for all steps 
 clustering=/gpfs/commons/home/kisaev/Leaflet/src/clustering/Leaflet_intron_clustering.py
-input_set_up=/gpfs/commons/home/kisaev/Leaflet/src/beta-binomial-lda/01_prepare_input_coo.py
+input_set_up=/gpfs/commons/home/kisaev/Leaflet/src/clustering//Leaflet_prep_clusters_for_model.py
+
+## 1. get intron clusters using Leaflet 
+## ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+# Muscle 
+cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisMuscle/
+
+# set up paths for data files and also for parameters
+gtf_file="/gpfs/commons/groups/knowles_lab/data/tabula_muris/reference-genome/MM10-PLUS/genes/genes.gtf"
+
+# Make junc files for just the brain data
+junc_files="/gpfs/commons/groups/knowles_lab/data/tabula_muris/smart_seq/Leaflet/junctions/Muscle"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisMuscle/Brain_clustered_junctions_for_simulation" 
+sequencing_type="single_cell"
+singleton="False"
+junc_bed_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisMuscle/clustered_junctions.bed"
+min_junc_reads=10
+min_num_cells_wjunc=10
+min_intron=50
+max_intron=500000
+junc_suffix="*.juncswbarcodes"
+filter_low_juncratios_inclust="yes"
+strict_filter=True
+
+python $clustering --junc_files $junc_files --gtf_file $gtf_file --sequencing_type $sequencing_type --junc_suffix $junc_suffix --filter_low_juncratios_inclust $filter_low_juncratios_inclust --strict_filter $strict_filter 
+
+## Leaflet file for simulations but annotated 
+cluster_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisMuscle/intron_clusters.txt_50_500000_5_1_0.005_single_cell.gz"
+output_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaMurisMuscle/BBmixture_TM_Annot"
+python $input_set_up --intron_clusters $cluster_file --output_file $output_file --has_genes "yes" --chunk_size 20000 
 
 ## 1. get intron clusters using Leaflet 
 ## ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
