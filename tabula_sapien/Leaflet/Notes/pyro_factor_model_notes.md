@@ -37,18 +37,19 @@ Number of junctions: 3762
 Number of clusters: 1254
 
 
+![Alt text](image-9.png)
 
-
-
-
-
-
-# 
-
-#### 3. Original code (unoptimized) results for real mouse brain data
+![Alt text](image-10.png)
 
 
 # 
+
+#### 3. Modified code results for mouse muscle tissue simulations 
+
+
+
+#
+
 
 #### 4. Modified code results for real mouse brain data
 
@@ -61,18 +62,37 @@ Number of junctions: 4824
 Number of clusters: 1608
 
 ![Alt text](image-2.png)
-
 ![Alt text](image-5.png)
-
 ![Alt text](image-4.png)
+![Alt text](image-12.png)
+![Alt text](image-13.png)
+![Alt text](image-14.png)
+![Alt text](image-17.png)
+![Alt text](image-18.png)
+![Alt text](image-19.png)
+![Alt text](image-21.png)
+
 
 # 
 
-#### 5. Original code (unoptimized) results for real mouse muscle data
+#### 5. Modified code results for real mouse muscle data
 
-# 
+![Alt text](image-11.png)
+![Alt text](image-22.png)
+![Alt text](image-23.png)
+![Alt text](image-24.png)
+![Alt text](image-25.png)
+![Alt text](image-26.png)
 
-#### 6. Modified code results for real mouse muscle data
+If we run PCA on standradized factor assignment matrix 
+![Alt text](image-27.png)
+- we see a few outliers 
+- not sure where they are coming from
+
+We can also plot the max factor value for each cell where we see in this case compared to mouse brain, many more values are > 0.9 suggesting that the learned factors are more discrete in this case 
+![Alt text](image-28.png)
+
+What do the results look like for basic mixture model in this case? do the assignments overlap between the two methods? mixture model doesn't seem to work on this particular dataset in terms of even assigning cells to the same cell states across runs that often because they are probably not specific enough in terms of splicing pattern alone 
 
 #
 
@@ -81,6 +101,8 @@ Number of clusters: 1608
 - In a multi-modal autoencoder, both gene expression and splicing data are treated as input modalities, and the model learns to encode and decode each modality separately. 
 - The encoder network maps each modality to a shared latent space, and the decoder network reconstructs each modality from this shared representation.
 - In a traditional factor model, you may have separate factors or latent variables for each modality, and the relationship between the observed data and the latent factors can be linear or follow specific probabilistic models.
+
+
 
 #
 
