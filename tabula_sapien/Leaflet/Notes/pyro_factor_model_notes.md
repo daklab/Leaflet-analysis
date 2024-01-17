@@ -88,6 +88,7 @@ If we run PCA on standradized factor assignment matrix
 ![Alt text](image-27.png)
 - we see a few outliers 
 - not sure where they are coming from
+- try a different random seed, how similar are the results and is it the same points that come out as outliers, maybe gets stuck in some local optima where cells are represtned as outliers 
 
 We can also plot the max factor value for each cell where we see in this case compared to mouse brain, many more values are > 0.9 suggesting that the learned factors are more discrete in this case 
 ![Alt text](image-28.png)
