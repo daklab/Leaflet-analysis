@@ -20,7 +20,7 @@ leaflet_clustering=/gpfs/commons/home/kisaev/Leaflet/src/clustering/Leaflet_intr
 sequencing_type="single_cell"
 gtf_file="/gpfs/commons/groups/knowles_lab/Karin/genome_files/gencode.v43.basic.annotation.gtf"
 min_junc_reads=2
-keep_singletons=False
+keep_singletons=True
 junc_suffix="*.juncswbarcodes"
 min_num_cells_wjunc=1
 
@@ -85,7 +85,7 @@ sbatch --wrap "python $leaflet_clustering --junc_files $junc_files --junc_bed_fi
 # Organ specific params
 organ="Muscle"
 junc_files="/gpfs/commons/projects/CZI-tabula-sapiens/SS2_cell_junctions/TSP4/Muscle,/gpfs/commons/projects/CZI-tabula-sapiens/SS2_cell_junctions/TSP1/Muscle,/gpfs/commons/projects/CZI-tabula-sapiens/SS2_cell_junctions/TSP2/Muscle"
-output_file="/gpfs/commons/projects/CZI-tabula-sapiens/Leaflet-Analysis/Leaflet-Intron-Clusters/${organ}"
+output_file="/gpfs/commons/projects/CZI-tabula-sapiens/Leaflet-Analysis/Leaflet-Intron-Clusters/${organ}_wsingleton"
 junc_bed_file="/gpfs/commons/projects/CZI-tabula-sapiens/Leaflet-Analysis/Leaflet-Intron-Clusters/${organ}.bed"
 # Run
 sbatch --wrap "python $leaflet_clustering --junc_files $junc_files --junc_bed_file $junc_bed_file --output_file $output_file --sequencing_type $sequencing_type --gtf_file $gtf_file --min_junc_reads $min_junc_reads --keep_singletons $keep_singletons --junc_suffix $junc_suffix --min_num_cells_wjunc $min_num_cells_wjunc" --mem=40000M --time=5-00:00 --job-name=$organ
