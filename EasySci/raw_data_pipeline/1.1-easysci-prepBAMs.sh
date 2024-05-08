@@ -15,7 +15,7 @@ module load samtools
 
 WD=/gpfs/commons/groups/knowles_lab/data/sc/rockefeller_2022
 cells=/gpfs/commons/groups/knowles_lab/data/sc/rockefeller_2022/cell_ids_to_type_conversion.txt
-output_dir=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci/
+output_dir=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/
 
 # Calculate the index folder
 index_folder=$((SLURM_ARRAY_TASK_ID - 1))
@@ -43,11 +43,18 @@ for bam_file in "${bam_files[@]}"; do
     cell_type=$(grep -w "$cell_id" $cells | cut -f3)
 
     # Make a directory for the cell type if it doesn't exist in the output directory
-    mkdir -p "$output_dir/$cell_type"
+    if [ ! -d "$output_dir/$cell_type" ]; then
+        mkdir -p "$output_dir/$cell_type"
+    fi 
+
+    # make a directory within called RH 
+    if [ ! -d "$output_dir/$cell_type/RH" ]; then
+        mkdir -p "$output_dir/$cell_type/RH"
+    fi 
 
     # Check if symlink already exists and if not then make it 
-    if [ ! -f "$output_dir/$cell_type/$cell_id.RH.bam" ]; then
-        ln -s "$bam_file" "$output_dir/$cell_type/$cell_id.RH.bam"
+    if [ ! -f "$output_dir/$cell_type/RH/$cell_id.RH.bam" ]; then
+        ln -s "$bam_file" "$output_dir/$cell_type/RH/$cell_id.RH.bam"
         echo "Made symlink for $cell_id"
     fi
 done
@@ -75,11 +82,18 @@ for bam_file in "${bam_files[@]}"; do
     cell_type=$(grep -w "$cell_id" $cells | cut -f3)
 
     # Make a directory for the cell type if it doesn't exist in the output directory
-    mkdir -p "$output_dir/$cell_type"
+    if [ ! -d "$output_dir/$cell_type" ]; then
+        mkdir -p "$output_dir/$cell_type"
+    fi
+
+    # make a directory within called DT
+    if [ ! -d "$output_dir/$cell_type/DT" ]; then
+        mkdir -p "$output_dir/$cell_type/DT"
+    fi
 
     # Check if symlink already exists and if not then make it 
-    if [ ! -f "$output_dir/$cell_type/$cell_id.DT.bam" ]; then
-        ln -s "$bam_file" "$output_dir/$cell_type/$cell_id.DT.bam"
+    if [ ! -f "$output_dir/$cell_type/DT/$cell_id.DT.bam" ]; then
+        ln -s "$bam_file" "$output_dir/$cell_type/DT/$cell_id.DT.bam"
         echo "Made symlink for $cell_id"
     fi
 done

@@ -1,0 +1,77 @@
+import os
+import glob
+configfile: "config_tabula_senis.yaml"
+
+# Function to map sample IDs to their BAM file paths
+def get_sample_ids():
+    sample_bam_map = {}
+    search_pattern = os.path.join(config["raw_dir"], "*", "results_gencode_ercc", "*.gencode.vM19.ERCC.Aligned.out.sorted.bam")
+    for bam_file in glob.glob(search_pattern):
+        sample_name = os.path.basename(bam_file).split(".")[0]
+        sample_bam_map[sample_name] = bam_file
+    return sample_bam_map
+
+sample_bam_map = get_sample_ids()
+
+rule all:
+    input:
+        expand("{results_dir}/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam.bai", 
+               results_dir=config["results_dir"], sample=sample_bam_map.keys()),
+        expand("{results_dir}/{sample}/junctions_with_barcodes.bed", 
+               results_dir=config["results_dir"], sample=sample_bam_map.keys())
+
+# Ensure bam file has a CB: field and if not add CB to BAM file based on file_name assuming it correspond to cell ID 
+rule add_CB_to_bam:
+    input:
+        bam = lambda wildcards: sample_bam_map[wildcards.sample]
+    output:
+        bam_use = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.bam"
+    shell:
+        """
+        echo "Processing BAM file: {input.bam}"
+        echo "Output will be: {output.bam_use}"
+        samtools view -h {input.bam} |
+        awk -v OFS='\t' '{{if ($1 ~ /^@/) {{print $0}} else {{print $0"\tCB:Z:"{wildcards.sample}"}}}}' |
+        samtools view -bS - > {output.bam_use}
+        """
+
+# Rule to mark duplicates with samtools
+rule mark_duplicates:
+    input:
+        bam = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.bam"
+    output:
+        bam_dedup = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam",
+        metrics = config["results_dir"] + "/{sample}/markdup_metrics.txt"
+    log:
+        log_file = config["results_dir"] + "/{sample}/markdup.log"
+    shell:
+        """
+        samtools markdup -r {input.bam} {output.bam_dedup} > {output.metrics} 2>&1 | tee {log.log_file}
+        """
+
+# Rule to index the final BAM files
+rule index_bam:
+    input:
+        bam_dedup = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam"
+    output:
+        bai = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam.bai"
+    shell:
+        "sambamba index {input.bam_dedup}"
+
+# Rule to extract junctions using regtools and combine them with barcodes
+rule extract_junctions_with_barcodes:
+    input:
+        bam_use = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam",
+        bai = config["results_dir"] + "/{sample}/gencode.vM19.ERCC.Aligned.out.sorted.CB.dupmarked.bam.bai"
+    output:
+        juncs = config["results_dir"] + "/{sample}/junctions.bed",
+        barcodes = config["results_dir"] + "/{sample}/barcodes.txt",
+        juncswbarcodes = config["results_dir"] + "/{sample}/junctions_with_barcodes.bed"
+    params:
+        regtools_path = config["regtools_path"] 
+    shell:
+        """
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam_use} -o {output.juncs} -s XS -b {output.barcodes}
+        # Combine junctions and barcodes
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        """

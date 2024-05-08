@@ -1,0 +1,6 @@
+raw_dir: "/gpfs/commons/groups/knowles_lab/data/sc/pbmc/fastq_files/PBMC1"
+results_dir: "/gpfs/commons/groups/knowles_lab/data/sc/pbmc/results/PBMC1"
+star_index_dir: "/gpfs/commons/groups/knowles_lab/data/sc/pbmc/genome_files/star_index"
+genome_fasta: "/gpfs/commons/groups/knowles_lab/data/sc/pbmc/genome_files/GRCh38.primary_assembly.genome.fa"
+gtf_file: "/gpfs/commons/groups/knowles_lab/data/sc/pbmc/genome_files/gencode.v45.annotation.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"

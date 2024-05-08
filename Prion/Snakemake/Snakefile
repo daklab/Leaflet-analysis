@@ -1,0 +1,134 @@
+import os
+import glob
+
+configfile: "config_prion.yaml"
+
+# Function to get sample IDs based on the presence of fastq files
+def get_sample_ids():
+    sample_ids = []
+    search_path = os.path.join(config["raw_dir"], "SRR*")  # Assume all directories start with 'SRR'
+    for dirpath in glob.glob(search_path):
+        sample_id = os.path.basename(dirpath)
+        sample_ids.append(sample_id)
+        print(sample_id)
+    return sample_ids
+
+sample_ids = get_sample_ids()
+
+# Print debug information
+print("raw_dir:", config["raw_dir"])
+print("sample_ids:", sample_ids)
+
+rule all:
+    input:
+        expand("{results_dir}/{sample}_junctions_with_barcodes.bed", 
+               results_dir=config["results_dir"], sample=sample_ids)
+
+# Rule to generate STAR index
+rule generate_star_index:
+    output:
+        directory(config["star_index_dir"]),
+        flag = touch(config["star_index_dir"] + "/index_complete.flag")
+    params:
+        genome_fasta = config["genome_fasta"],
+        gtf_file = config["gtf_file"]
+    shell:
+        """
+        star --runThreadN 4 \
+             --runMode genomeGenerate \
+             --genomeDir {output[0]} \
+             --genomeFastaFiles {params.genome_fasta} \
+             --sjdbGTFfile {params.gtf_file}
+        """
+
+# Rule to reorder fastq files read names by read name
+rule reorder_fastq:
+    input:
+        fastq1=os.path.join(config["raw_dir"], "{sample}", "{sample}_1.fastq"),
+        fastq2=os.path.join(config["raw_dir"], "{sample}", "{sample}_2.fastq")
+    output:
+        fastq1_reorder=os.path.join(config["raw_dir"], "{sample}", "{sample}_1.reorder.fastq"),
+        fastq2_reorder=os.path.join(config["raw_dir"], "{sample}", "{sample}_2.reorder.fastq")
+    shell:
+        """
+        echo "Reordering fastq files: {input.fastq1} and {input.fastq2}"
+        paste - - - - < {input.fastq1} | sort -k1,1 | tr '\t' '\n' > {output.fastq1_reorder}
+        paste - - - - < {input.fastq2} | sort -k1,1 | tr '\t' '\n' > {output.fastq2_reorder}
+        """
+
+# Need to check split-seq pipeline to see how to extract the CB (cell barcodes) from read 
+
+# Rule to run STAR alignment
+rule run_star:
+    input:
+        fastq1=os.path.join(config["raw_dir"], "{sample}", "{sample}_1.reorder.fastq"),
+        fastq2=os.path.join(config["raw_dir"], "{sample}", "{sample}_2.reorder.fastq"),
+        index_flag=os.path.join(config["star_index_dir"], "index_complete.flag")
+    output:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam")
+    params:
+        star_index_dir=config['star_index_dir'],
+        output_prefix=os.path.join(config["bam_files"], "{sample}/")
+    shell:
+        """
+        star --genomeDir {params.star_index_dir} \
+             --readFilesIn {input.fastq1} {input.fastq2} \
+             --readFilesCommand cat \
+             --runMode alignReads \
+             --outSAMattributes XS \
+             --outSAMstrandField intronMotif \
+             --outFilterMismatchNmax 5 \
+             --outFilterMismatchNoverLmax 0.05 \
+             --limitBAMsortRAM 44006670219 \
+             --outSAMtype BAM SortedByCoordinate \
+             --runThreadN 4 \
+             --outFilterScoreMinOverLread 0.3 \
+             --outFilterMatchNminOverLread 0.3 \
+             --outFileNamePrefix {params.output_prefix}
+        """
+
+# Rule to add CB tag to BAM file
+# Note in the prion dataset, some fastq files are coming from bulk-RNA sequencing
+rule add_cb_tag:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam")
+    output:
+        bam_CB=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
+    params:
+        sample=lambda wildcards: wildcards.sample
+    shell:
+        """
+        echo "Adding CB tag to BAM file: {input.bam}"
+        samtools view -h {input.bam} | awk -v cb={params.sample} 'BEGIN {{OFS="\t"}} {{$NF = $NF"\tCB:Z:"cb; print}}' | samtools view -bS - > {output.bam_CB}
+        """
+
+# Rule to index BAM file
+rule index_bam:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
+    output:
+        bai=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai")
+    shell:
+        """
+        echo "Indexing BAM file: {input.bam}"
+        samtools index {input.bam}
+        """
+
+# Rule to extract junctions with barcodes
+rule extract_junctions:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
+        bai=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai")
+    output:
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed"),
+        barcodes=os.path.join(config["results_dir"], "{sample}_barcodes.txt"),
+        juncswbarcodes=os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed")
+    params:
+        regtools_path=config["regtools_path"]
+    shell:
+        """
+        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        echo "Done extracting junctions with barcodes"
+        """

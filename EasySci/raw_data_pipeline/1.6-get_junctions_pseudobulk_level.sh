@@ -3,10 +3,10 @@
 #SBATCH -N 1 # Ensure that all cores are on one machine
 #SBATCH -p pe2
 #SBATCH -c 4
-#SBATCH --mem=32000M
+#SBATCH --mem=64000M
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
 #SBATCH -J get_junctions # <-- name of job
-#SBATCH --array=1-310%14  # <-- number of files in the input directory RH and DT
+#SBATCH --array=1-554%32  # <-- number of files in the input directory RH and DT
 
 # load required modules
 module purge                                                                                                                                                                         
@@ -26,7 +26,7 @@ num_files_DT=$(ls $input_dir_DT | wc -l)
 echo "Number of files in the input directory RH: $num_files_RH"
 echo "Number of files in the input directory DT: $num_files_DT"
 
-output_dir="/gpfs/commons/projects/knowles_singlecell_splicing/EasySci/Leaflet/junctions"
+output_dir="/gpfs/commons/projects/knowles_singlecell_splicing/EasySci/Pseudobulks/junctions"
 
 # Make directory in $output_dir for RH and for DT
 mkdir -p $output_dir/RH
@@ -51,13 +51,10 @@ echo $sample_name
 
 # Set the output pseudobulk BAM file name
 output_file_RH="${output_dir}/RH/${sample_name}.juncs"
-output_barcodes_RH="${output_dir}/RH/${sample_name}.barcodes"
-output_juncswbarcodes_RH="${output_dir}/RH/${sample_name}.juncswbarcodes"
 
-"echo Extracting junctions with regtools!"
+"echo Extracting junctions pseudobulk level with regtools!"
 
-$regtools_run junctions extract -a 6 -m 50 -M 500000 $bam -o $output_file_RH -s XS -b $output_barcodes_RH
-paste --delimiters='\t' $output_file_RH $output_barcodes_RH > $output_juncswbarcodes_RH
+$regtools_run junctions extract -a 6 -m 50 -M 500000 $bam -o $output_file_RH -s XS
 echo "Finished getting junctions for all RH pseudobulks!"
 
 ## ----------------- Get junctions for DT pseudobulks ----------------- ##
@@ -80,8 +77,7 @@ output_file_DT="${output_dir}/DT/${sample_name}.juncs"
 output_barcodes_DT="${output_dir}/DT/${sample_name}.barcodes"
 output_juncswbarcodes_DT="${output_dir}/DT/${sample_name}.juncswbarcodes"
 
-"echo Extracting junctions with regtools!"
+"echo Extracting junctions pseudobulk level with regtools!"
 
-$regtools_run junctions extract -a 6 -m 50 -M 500000 $bam -o $output_file_DT -s XS -b $output_barcodes_DT
-paste --delimiters='\t' $output_file_DT $output_barcodes_DT > $output_juncswbarcodes_DT
+$regtools_run junctions extract -a 6 -m 50 -M 500000 $bam -o $output_file_DT -s XS 
 echo "Finished getting junctions for all DT pseudobulks!"

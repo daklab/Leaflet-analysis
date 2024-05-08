@@ -1,0 +1,100 @@
+import os
+import glob
+configfile: "config_pbmc.yaml"
+
+# Function to get sample IDs based on directories in the raw data folder
+def get_sample_ids():
+    sample_dirs = [d for d in os.listdir(config['raw_dir']) if os.path.isdir(os.path.join(config['raw_dir'], d))]
+    valid_samples = []
+    for d in sample_dirs:
+        # Adjust the pattern as necessary to match your FASTQ files
+        fastq_files = glob.glob(os.path.join(config['raw_dir'], d, "*.fastq"))
+        if fastq_files:  # If the list is not empty
+            #print(f"Found {len(fastq_files)} FASTQ files for sample {d}")
+            valid_samples.append(d)
+    return valid_samples
+
+# Main rule specifying the final outputs
+rule all:
+    input:
+        expand("{results_dir}/{sample}/Aligned.sortedByCoord.out.marked.bam.bai", 
+               results_dir=config["results_dir"], sample=get_sample_ids()),
+        expand("{results_dir}/{sample}/junctions_with_barcodes.bed", 
+               results_dir=config["results_dir"], sample=get_sample_ids())
+
+# Rule to generate the STAR genome index
+rule generate_star_index:
+    output:
+        directory(config["star_index_dir"]),
+        flag = touch(config["star_index_dir"] + "/index_complete.flag")
+    params:
+        genome_fasta = config["genome_fasta"],
+        gtf_file = config["gtf_file"]
+    shell:
+        """
+        star --runThreadN 4 \
+             --runMode genomeGenerate \
+             --genomeDir {output[0]} \
+             --genomeFastaFiles {params.genome_fasta} \
+             --sjdbGTFfile {params.gtf_file} \
+        """
+
+# Rule for aligning reads with STAR
+rule run_star:
+    input:
+        fastq=config["raw_dir"] + "/{sample}/{sample}.fastq",
+        index_flag=config["star_index_dir"] + "/index_complete.flag"
+    output:
+        bam=config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.bam"
+    shell:
+        """
+        star --genomeDir {config[star_index_dir]} \
+             --readFilesIn {input.fastq} \
+             --readFilesCommand cat \
+             --runMode alignReads \
+             --outSAMattributes XS \
+             --outSAMstrandField intronMotif \
+             --limitBAMsortRAM 44006670219 \
+             --outSAMtype BAM SortedByCoordinate \
+             --runThreadN 4 \
+             --outFileNamePrefix {config[results_dir]}/{wildcards.sample}/
+        """
+
+# Rule to mark duplicates with samtools
+rule mark_duplicates:
+    input:
+        bam = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.bam"
+    output:
+        bam_dedup = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.marked.bam",
+        metrics = config["results_dir"] + "/{sample}/markdup_metrics.txt"
+    shell:
+        """
+        samtools markdup -r {input.bam} {output.bam_dedup} > {output.metrics} 2>&1
+        """
+
+# Rule to index the final BAM files
+rule index_bam:
+    input:
+        bam_dedup = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.marked.bam"
+    output:
+        bai = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.marked.bam.bai"
+    shell:
+        "sambamba index {input.bam_dedup}"
+
+# Rule to extract junctions using regtools and combine them with barcodes
+rule extract_junctions_with_barcodes:
+    input:
+        bam_use = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.marked.bam",
+        bai = config["results_dir"] + "/{sample}/Aligned.sortedByCoord.out.marked.bam.bai"
+    output:
+        juncs = config["results_dir"] + "/{sample}/junctions.bed",
+        barcodes = config["results_dir"] + "/{sample}/barcodes.txt",
+        juncswbarcodes = config["results_dir"] + "/{sample}/junctions_with_barcodes.bed"
+    params:
+        regtools_path = config["regtools_path"] 
+    shell:
+        """
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam_use} -o {output.juncs} -s XS -b {output.barcodes}
+        # Combine junctions and barcodes
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        """

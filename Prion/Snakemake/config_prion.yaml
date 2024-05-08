@@ -1,0 +1,7 @@
+raw_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/prion_disease_model/fastq/mouse"
+bam_files: "/gpfs/commons/projects/knowles_singlecell_splicing/prion_disease_model/mouse/bam"
+results_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/prion_disease_model/mouse/junctions"
+star_index_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/prion_disease_model/star"
+genome_fasta: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/fasta/genome.fa"
+gtf_file: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"

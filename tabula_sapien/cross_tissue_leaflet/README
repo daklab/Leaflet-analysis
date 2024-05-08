@@ -1,0 +1,5 @@
+In this analysis:
+- run intron clustering across all tabula sapien tissues 
+- run leaflet models to see if we see basic seperation by tissue origin 
+- or do we see any clusters composed of similar cell types coming from different tissues (like immune cell populations)
+- also evaluate ability of Leaflet pipeline to run on so many cell-junction pairs (does it scale?)
