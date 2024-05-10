@@ -21,10 +21,10 @@ module load sambamba
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/human-cortex-mtg/snakemake
 
-slurm_out=/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/slurm/08052024
+slurm_out=/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/slurm/09052024
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 32 --cluster-config cluster.json --cluster "sbatch -N 1 -p pe2 -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake -j 32 --cluster-config cluster.json --forcerun run_star --cluster "sbatch -N 1 -p pe2 -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 
 echo "Snakemake workflow submitted"
 

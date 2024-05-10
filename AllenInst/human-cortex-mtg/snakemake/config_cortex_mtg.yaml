@@ -1,5 +1,5 @@
 raw_dir: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/data"
-bam_files: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/aligned"
+bam_files: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/aligned/mini_allen_MTG"
 results_dir: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/Leaflet"
 star_index_dir: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/star"
 genome_fasta: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa"
