@@ -1,0 +1,7 @@
+raw_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/male_whole_cortex/fastq"
+bam_files: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/male_whole_cortex/BAMs"
+results_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/male_whole_cortex/Leaflet"
+star_index_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/reference-genome/star"
+genome_fasta: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/reference-genome/GRCm39.genome.fa"
+gtf_file: "/gpfs/commons/projects/knowles_singlecell_splicing/CZhang_2018_mouse_dev/reference-genome/gencode.vM34.basic.annotation.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"
