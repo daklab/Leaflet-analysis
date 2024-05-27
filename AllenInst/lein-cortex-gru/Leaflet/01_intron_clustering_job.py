@@ -6,7 +6,7 @@ import os
 import pandas as pd 
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import numpy as np 
 from LeafletSC.clustering.find_intron_clusters import main as find_intron_clusters
 from LeafletSC.clustering.prepare_model_input import main as prep_model_input
 from LeafletSC.clustering.find_intron_clusters import visualize_local_events
@@ -29,11 +29,14 @@ gtf_file="/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/g
 cells_ge = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/mtg_nuclei_gene_expression_leiden_clusters.csv"
 
 # published metadata
-metacells = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortex-mtg/mtg_facs_metadata.csv"
+metacells = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-cortical-taxonomy/General/metadata.csv"
 
 # %%
 # read in metacells 
 cells_pub = pd.read_csv(metacells)
+
+# Find outliers and remove those 
+cells_pub = cells_pub[cells_pub["outlier_call"] == False]
 
 # %%
 # define additional parameters 
@@ -45,8 +48,8 @@ junc_bed_file= output_path + "human_cortex_lein_leaflet.bed" # you can load this
 min_intron_length = 50
 max_intron_length = 500000
 threshold_inc = 0.1 
-min_junc_reads = 50
-min_num_cells_wjunc = 1000
+min_junc_reads = 10
+min_num_cells_wjunc = 30
 keep_singletons = False # ignore junctions that do not share splice sites with any other junction (likely const)
 junc_suffix = "*_with_barcodes.bed" # depends on how you ran regtools 
 
@@ -55,11 +58,19 @@ junc_suffix = "*_with_barcodes.bed" # depends on how you ran regtools
 junc_suffix_end = junc_suffix.split("*")[1]
 junc_files = [f for f in os.listdir(juncs_path) if f.endswith(junc_suffix_end)]
 
+# sample 5000 random files 
+rand_indices = np.random.choice(range(len(junc_files)), 3000)
+
+selected_files = [junc_files[i] for i in rand_indices]
+
+# ensure the sample names associated wtih junc_files are in cells_pub
+selected_files = [f for f in selected_files if f.split("_junctions_with_barcodes.bed")[0] in cells_pub["sample_name"].values]
+
 # add junc_path to each file in front of it
-junc_files = [juncs_path + f for f in junc_files]
+junc_files_with_path = [os.path.join(juncs_path, f) for f in selected_files]
 
 # %%
-all_juncs_df = find_intron_clusters(junc_files=junc_files, gtf_file=gtf_file, output_file=output_file, 
+all_juncs_df = find_intron_clusters(junc_files=junc_files_with_path, gtf_file=gtf_file, output_file=output_file, 
                        sequencing_type=sequencing_type, junc_bed_file=junc_bed_file, 
                        threshold_inc=threshold_inc, min_intron = min_intron_length,
                        max_intron=max_intron_length, min_junc_reads=min_junc_reads,
