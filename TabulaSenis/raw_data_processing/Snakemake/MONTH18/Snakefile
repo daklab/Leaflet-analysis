@@ -1,0 +1,67 @@
+import os
+import glob
+
+configfile: "config_tabula_senis_18MO.yaml"
+
+# Function to map sample IDs to their BAM file paths
+def get_sample_ids():
+    sample_bam_map = {}
+    search_pattern = os.path.join(config["raw_dir"], "*", "results_gencode_ercc", "*.gencode.vM19.ERCC.Aligned.out.sorted.bam")
+    for bam_file in glob.glob(search_pattern):
+        sample_name = os.path.basename(bam_file).split(".")[0]
+        sample_bam_map[sample_name] = bam_file
+    return sample_bam_map
+
+sample_bam_map = get_sample_ids()
+
+rule all:
+    input:
+        expand("{results_dir}/{sample}/junctions_with_barcodes.bed", 
+               results_dir=config["results_dir"], sample=sample_bam_map.keys())
+
+# Rule to add CB tag to BAM files
+rule add_cb_tag:
+    input:
+        bam = lambda wildcards: sample_bam_map[wildcards.sample]
+    output:
+        bam_CB = config["results_dir"] + "/{sample}/CB.bam"
+    shell:
+        """
+        echo "Adding CB tag to BAM file: {input.bam}"
+        samtools view -h {input.bam} | awk -v cb={wildcards.sample} 'BEGIN {{OFS="\t"}} {{$NF = $NF"\tCB:Z:"cb; print}}' | samtools view -bS - > {output.bam_CB}
+        """
+
+# rule index the bam file
+rule index_bam:
+    input:
+        bam = rules.add_cb_tag.output.bam_CB
+    output:
+        bai = config["results_dir"] + "/{sample}/CB.bam.bai"
+    shell:
+        """
+        echo "Indexing BAM file: {input.bam}"
+        samtools index {input.bam}
+        """
+
+# Rule to extract junctions with barcodes
+rule extract_junctions:
+    input:
+        bam = rules.add_cb_tag.output.bam_CB,
+        bai = rules.index_bam.output.bai
+    output:
+        juncs = config["results_dir"] + "/{sample}/junctions.bed",
+        barcodes = config["results_dir"] + "/{sample}/barcodes.txt",
+        juncswbarcodes = config["results_dir"] + "/{sample}/junctions_with_barcodes.bed"
+    params:
+        regtools_path = config["regtools_path"]
+    shell:
+        """
+        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+        # Combine junctions and barcodes
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        # Delete input bam file no longer needed 
+        rm {input.bam}
+        rm {input.bai}
+        echo "Done extracting junctions with barcodes"
+        """

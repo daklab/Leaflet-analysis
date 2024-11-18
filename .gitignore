@@ -27,6 +27,8 @@ share/python-wheels/
 MANIFEST
 TabulaSenis/gencode_mm10.db
 TabulaSenis/temp/*
+TabulaSenis/date_figures/*
+TabulaSenis/figures/*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

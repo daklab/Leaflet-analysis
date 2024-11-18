@@ -1,0 +1,6 @@
+raw_dir: "/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data/AWS/Plate_seq/21_month"
+results_dir: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/junctions/21_month"
+star_index_dir: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/star"
+genome_fasta: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/fasta/genome.fa"
+gtf_file: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"
