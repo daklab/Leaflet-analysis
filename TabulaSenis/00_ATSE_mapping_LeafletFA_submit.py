@@ -152,12 +152,6 @@ adata_path = f"{prefix}_{current_time}.h5ad"
 combined_adata.write_h5ad(adata_path, compression='gzip')
 print(f"AnnData object saved as {adata_path}")
 
-# old code prior to batching the junction files...
-# cell_by_junction_matrix, cell_by_cluster_matrix, cells, junctions, cell_idx, junc_idx, cluster_idx, cluster_idx_flip = process_files_and_build_matrices_parallel(portion_in_list2, relevant_junction_ids, intron_clusts, sequencing_type="smart_seq")
-# Save as Anndata object!
-# print("Save Anndata object!")
-# create_anndata_object(cell_by_junction_matrix, cell_by_cluster_matrix, cell_idx, junc_idx, metadata_subset, intron_clusts, save_file=True, prefix="ATSE_Anndata_noGTF_Object")
-
 ## to submit:
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet
 # conda activate LeafletSC
