@@ -29,6 +29,7 @@ TabulaSenis/gencode_mm10.db
 TabulaSenis/temp/*
 TabulaSenis/date_figures/*
 TabulaSenis/figures/*
+TabulaSenis/LeafletFA_analysis/gencode.vM19
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
