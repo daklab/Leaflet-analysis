@@ -1,43 +1,51 @@
 #!/bin/bash
-#
 #SBATCH -J SRA_download
-#SBATCH --mem=128G
+#SBATCH --mem=250G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
+#SBATCH --cpus-per-task=20  # Match the maximum CPUs available per node
+#SBATCH --ntasks=1          # Single task using all CPUs
+#SBATCH -p bigmem
 
 # conda activate python3ENV
 
-# Load any required modules here
+# Load the necessary modules
 module load sratoolkit
 
+# Define variables
 output_dir="/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/SRA/data"
+sra_file="/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/SRA/SRR_Acc_List.txt"
 
-# Read the SRAs from the file
-sra_file="SRR_Acc_List.txt"
+# Ensure the output directory exists
+mkdir -p "$output_dir"
 
-# Function to download one SRA
+# Function to download a single SRA
 download_sra() {
-    sra=$1
-    sra_dir="$output_dir/$sra"
-    
-    # Check if the directory exists and is non-empty
+    local sra=$1
+    local sra_dir="$output_dir/$sra"
+
     if [ -d "$sra_dir" ] && [ "$(ls -A "$sra_dir")" ]; then
-        echo "Directory for $sra already exists and is not empty, skipping download."
+        echo "Directory for $sra already exists and is not empty. Skipping download."
     else
         echo "Downloading $sra"
-        
-        # Create directory if it doesn't exist
         mkdir -p "$sra_dir"
 
-        # Download the SRA files using fastq-dump into the created directory
-        fastq-dump --outdir "$sra_dir" --gzip --split-files "$sra"
+        # Use fastq-dump with gzip
+        fastq-dump --outdir "$sra_dir" --gzip --split-files "$sra" || {
+            echo "Download failed for $sra. Retrying..."
+            rm -rf "$sra_dir"
+            return 1
+        }
     fi
 }
 
+# Export necessary variables and functions for parallel processing
 export -f download_sra
 export output_dir
 
-# Use xargs to run 30 downloads in parallel
-cat "$sra_file" | xargs -n 1 -P 30 -I {} bash -c 'download_sra "$@"' _ {}
+# Use GNU Parallel for better parallelization and error handling
+parallel --jobs 30 download_sra :::: "$sra_file"
 
 # scp SRR_Acc_List.txt kisaev@pe2cc3-042://gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/SRA
 
+# check top 50 most recent folders to ensure both fastq files are present 
+# ls -lt --group-directories-first | grep '^d' | head -n 50

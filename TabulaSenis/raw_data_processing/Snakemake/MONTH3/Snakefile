@@ -43,6 +43,30 @@ rule index_bam:
         samtools index {input.bam}
         """
 
+###############################################################################
+# Rule: MarkDuplicates with Picard 
+# havent fix this yet
+###############################################################################
+rule markduplicates:
+    input:
+        bam = rules.add_cb_tag.output.bam_CB
+        bai = rules.index_bam.output.bai
+    output:
+        bam_dedup = config["results_dir"] + "/{sample}/CB_dedup.bam",
+        metrics   = config["results_dir"] + "/{sample}/dedup_metrics.txt"
+    shell:
+        """
+        echo "Marking duplicates with Picard for: {input.bam}"
+        java -jar {params.picard_jar} MarkDuplicates \
+            I={input.bam} \
+            O={output.bam_dedup} \
+            M={output.metrics} \
+            CREATE_INDEX=true \
+            VALIDATION_STRINGENCY=LENIENT \
+            REMOVE_DUPLICATES=false
+        echo "Done marking duplicates"
+        """
+
 # Rule to extract junctions with barcodes
 rule extract_junctions:
     input:
@@ -63,5 +87,35 @@ rule extract_junctions:
         # Delete input bam file no longer needed 
         rm {input.bam}
         rm {input.bai}
+        echo "Done extracting junctions with barcodes"
+        """
+
+###############################################################################
+# Rule: Extract junctions (using the deduplicated BAM)
+###############################################################################
+rule extract_junctions:
+    input:
+        bam = rules.markduplicates.output.bam_dedup,
+        # the MarkDuplicates step creates .bai automatically if CREATE_INDEX=true,
+        # but if you prefer to specify:
+        # bai = rules.markduplicates.output.bam_dedup.replace(".bam", ".bai")
+    output:
+        juncs         = config["results_dir"] + "/{sample}/junctions.bed",
+        barcodes      = config["results_dir"] + "/{sample}/barcodes.txt",
+        juncswbarcodes = config["results_dir"] + "/{sample}/junctions_with_barcodes.bed"
+    params:
+        regtools_path = config["regtools_path"]
+    shell:
+        """
+        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} \
+            -o {output.juncs} -s XS -b {output.barcodes}
+        # Combine junctions and barcodes
+        paste --delimiters='\\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        
+        # Remove the deduplicated BAM and index if you no longer need them
+        # rm {input.bam}
+        # rm {input.bam}.bai
+        
         echo "Done extracting junctions with barcodes"
         """

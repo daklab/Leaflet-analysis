@@ -19,10 +19,9 @@ from prep_anndata_object import *
 importlib.reload(prep_anndata_object)
 
 # Paths
-juncs_path = "/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LEAFLET"
-output_path = "/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LeafletFA/ATSEs"
+juncs_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/RH"
+output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEs/RH"
 gtf_file = None
-# gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
 using_annotations = "NO"
 
 # Get all files in juncs_path that end in *junctions_with_barcodes.bed
@@ -34,11 +33,11 @@ junc_files = [os.path.join(juncs_path, x) for x in os.listdir(juncs_path) if x.e
 # -----------------------------------------------------
 
 # Define additional parameters
-output_file = os.path.join(output_path, "iPSC_human_cells" )
+output_file = os.path.join(output_path, "EasySci_RH_Metacells" )
 
 # Get today's date and add to junc_bed_file
 today = datetime.datetime.now()
-junc_bed_file = os.path.join(output_path, "iPSC_human_cells_ATSEs_junctions")
+junc_bed_file = os.path.join(output_path, "EasySci_RH_Metacells_ATSEs_junctions")
 junc_bed_file = junc_bed_file + "_" + today.strftime("%Y%m%d")
 
 # For output file combine iPSC_human_cells iwth using_annotations status 
@@ -52,8 +51,8 @@ else:
 sequencing_type = "single_cell"
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 100 
-min_num_cells_wjunc = 100
+min_junc_reads = 10 
+min_num_cells_wjunc = 2
 max_workers = 10
 batch_size = 100
 run_clustering = True
@@ -68,7 +67,7 @@ intron_clusts_file = find_intron_clusters_v2.main(
             output_file=output_file,
             sequencing_type=sequencing_type,
             junc_bed_file=junc_bed_file,
-            threshold_inc=0.05,
+            threshold_inc=0.1,
             min_intron=min_intron,
             max_intron=max_intron,
             min_junc_reads=min_junc_reads,
@@ -81,7 +80,7 @@ intron_clusts_file = find_intron_clusters_v2.main(
 
 
 ## to submit:
-# cd /gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LeafletFA/ATSEs
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEs/RH
 # conda activate LeafletSC
-# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362/LeafletFA_analysis/00_ATSE_mapping.py
-# sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J iPSChuman 
+# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_mapping/RH/00_ATSE_mapping.py
+# sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J EasySciRH

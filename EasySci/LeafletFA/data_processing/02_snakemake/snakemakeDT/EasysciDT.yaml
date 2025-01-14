@@ -1,0 +1,4 @@
+bam_files: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/DT"
+results_dir: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/DT"
+gtf_file: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode.vM27.basic.annotation.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"

@@ -395,6 +395,7 @@ def logistic_regression_feature_prediction(
     feature: str,
     K: int = 50,
     n_pcs: int = 50,
+    covariate_column = 'tissue',
     test_size: float = 0.2,
     random_state: int = 42
 ):
@@ -429,8 +430,8 @@ def logistic_regression_feature_prediction(
     
     # Step 3: One-hot encode the "tissue" covariate
     tissue_encoder = OneHotEncoder()
-    tissue_covariate = tissue_encoder.fit_transform(splice_adata.obs[['tissue']])
-    tissue_columns = [f'tissue_{cat}' for cat in tissue_encoder.categories_[0]]
+    tissue_covariate = tissue_encoder.fit_transform(splice_adata.obs[[covariate_column]])
+    tissue_columns = [f'{covariate_column}_{cat}' for cat in tissue_encoder.categories_[0]]
     
     # Convert tissue covariate to DataFrame
     X_tissue = pd.DataFrame(tissue_covariate.toarray(), index=splice_adata.obs_names, columns=tissue_columns)
@@ -632,5 +633,5 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
     # Show the plot
     plt.show()
 
-# Example usage:
-# plot_clustermap(coefficients_age, highlighted_factors=['factor_17', 'factor_18', 'factor_19'])
+    # Example usage:
+    # plot_clustermap(coefficients_age, highlighted_factors=['factor_17', 'factor_18', 'factor_19'])

@@ -8,6 +8,8 @@
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
 #SBATCH --output=snakemake_master_%j.log
 
+# conda activate python3ENV
+
 # Load necessary modules
 module purge
 module load gcc/9.2.0 
@@ -17,6 +19,7 @@ module unload htslib/1.9
 module load star/2.7.10b    
 module load snakemake
 module load sambamba
+module load picard
 
 # Note: the TabulaSenis BAM files were already aligned with STAR using intron motifs to get XS strand info 
 

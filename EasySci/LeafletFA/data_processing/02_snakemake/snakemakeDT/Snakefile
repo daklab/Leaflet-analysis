@@ -1,0 +1,71 @@
+import os
+
+configfile: "EasysciDT.yaml"
+
+# Function to extract sample IDs dynamically
+def get_sample_ids():
+    bam_directory = config["bam_files"]
+    sample_ids = set()
+    
+    # Iterate through BAM files in the directory
+    for subdir, _, files in os.walk(bam_directory):
+        for file in files:
+            if file.endswith(".bam"):
+                sample_id = os.path.splitext(file)[0]  # Remove .bam extension
+                sample_ids.add(sample_id)
+    return sorted(sample_ids)
+
+# Extract sample IDs for dynamic rule creation
+sample_ids = get_sample_ids()
+
+# Rule to process all samples
+rule all:
+    input:
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids)
+
+# Rule to add CB tags to BAM files
+rule add_cb_tag:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "{sample}.bam")
+    output:
+        bam_CB=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam")
+    params:
+        sample="{sample}"  # Use wildcards directly for the sample name
+    shell:
+        """
+        echo "Adding CB tag to BAM file: {input.bam}"
+        samtools view -h {input.bam} | \
+        awk -v cb={params.sample} 'BEGIN {{OFS="\t"}} {{$NF = $NF"\tCB:Z:"cb; print}}' | \
+        samtools view -bS - > {output.bam_CB}
+        """
+
+# Rule to index the BAM file
+rule index_bam:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam")
+    output:
+        bai=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam.bai")
+    shell:
+        """
+        echo "Indexing BAM file: {input.bam}"
+        samtools index {input.bam}
+        """
+
+# Rule to extract junctions using regtools
+rule extract_junctions:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam"),
+        bai=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam.bai")
+    output:
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed"),
+        barcodes=os.path.join(config["results_dir"], "{sample}_barcodes.txt"),
+        juncswbarcodes=os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed")
+    params:
+        regtools_path=config["regtools_path"]
+    shell:
+        """
+        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        echo "Done extracting junctions with barcodes."
+        """
