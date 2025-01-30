@@ -6,13 +6,13 @@ from scipy.sparse import csr_matrix, coo_matrix
 import anndata as ad
 import numpy as np
 import sys 
+import datetime
 
 sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/clustering')
 import find_intron_clusters_v2
 # Reload the module if you've made changes and want to update it
 import importlib
 importlib.reload(find_intron_clusters_v2)
-import datetime
 
 import prep_anndata_object
 from prep_anndata_object import *
@@ -67,8 +67,10 @@ random.shuffle(portion_in_list2)
 
 print(len(portion_in_list2))
 
+# -----------------------------------------
 # testing! 
-# portion_in_list2 = portion_in_list2[0:10000]
+#portion_in_list2 = portion_in_list2[0:10]
+#-----------------------------------------
 
 # Define additional parameters
 output_file = os.path.join(output_path, "tabula_senis_annotationFREE_intron_clusters")
@@ -77,10 +79,10 @@ sequencing_type = "single_cell"
 min_intron = 50
 max_intron = 500000
 min_junc_reads = 100 
-min_num_cells_wjunc = 100
+min_num_cells_wjunc = 20
 max_workers = 10
 batch_size = 100
-run_clustering = False
+run_clustering = True
 
 # Check if output files already exist to skip
 print("Running intron clustering for test data...")
@@ -88,7 +90,7 @@ print("Running intron clustering for test data...")
 if run_clustering:
     intron_clusts_file = find_intron_clusters_v2.main(
             junc_files=portion_in_list2,
-            gtf_file=None, #annotation free 
+            gtf_file=gtf_file, #annotation free 
             output_file=output_file,
             sequencing_type=sequencing_type,
             junc_bed_file=junc_bed_file,
@@ -106,54 +108,56 @@ if run_clustering:
 
 else:
     # Read intron clusts file 
-    intron_clusts_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/tabula_senis_annotationFREE_intron_clusters_50_500000_100_20241102_single_cell.gz"
-
-print("Reading in obtained intron cluster (ATSE file!)")
-intron_clusts = pd.read_csv(intron_clusts_file, sep="}")
-relevant_junction_ids = set(intron_clusts['junction_id'])
-
-# Extract single cell junction and cluster counts 
-print("Process single cell junction counts and assemble sparse matrices!")
-
-# Initialize an empty list to store individual AnnData objects
-anndatas = []
-
-# Determine the batch size
-batch_size = 500
-num_batches = len(portion_in_list2) // batch_size + (1 if len(portion_in_list2) % batch_size > 0 else 0)
-
-for i in range(num_batches):
+    intron_clusts_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/tabula_senis_annotationFREE_intron_clusters_50_500000_100_20250123_single_cell.gz"
     
-    print(f"Processing Batch Number {i+1}")
+    print("Reading in obtained intron cluster (ATSE file!)")
+    intron_clusts = pd.read_csv(intron_clusts_file, sep="}")
+    relevant_junction_ids = set(intron_clusts['junction_id'])
 
-    # Get the current batch of cells
-    start_idx = i * batch_size
-    end_idx = min((i + 1) * batch_size, len(portion_in_list2))
-    cell_batch = portion_in_list2[start_idx:end_idx]
+    # Extract single cell junction and cluster counts 
+    print("Process single cell junction counts and assemble sparse matrices!")
 
-    # Process the current batch
-    cell_by_junction_matrix, cell_by_cluster_matrix, cells, junctions, cell_idx, junc_idx, cluster_idx, cluster_idx_flip = process_files_and_build_matrices_parallel(
-            cell_batch, relevant_junction_ids, intron_clusts, sequencing_type="smart_seq")
-        
-    # Create the AnnData object for this batch
-    adata = create_anndata_object(cell_by_junction_matrix, cell_by_cluster_matrix, cell_idx, junc_idx, metadata_subset, intron_clusts)
-    anndatas.append(adata)
+    # Initialize an empty list to store individual AnnData objects
+    anndatas = []
 
-# Combine all anndatas into one and save... 
-combined_adata = ad.concat(anndatas, axis=0) # This code makes var dissapear...
-# Ensure the combined_adata.var is consistent by taking it from the first AnnData in the list
-combined_adata.var = anndatas[0].var
-combined_adata.obs.reset_index(drop=True, inplace=True)
-prefix="ATSE_Anndata_noGTF_Object"
+    # Determine the batch size
+    batch_size = 500
+    num_batches = len(portion_in_list2) // batch_size + (1 if len(portion_in_list2) % batch_size > 0 else 0)
 
-current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-adata_path = f"{prefix}_{current_time}.h5ad"
-# Save the AnnData object to the h5ad file with gzip compression
-combined_adata.write_h5ad(adata_path, compression='gzip')
-print(f"AnnData object saved as {adata_path}")
+    for i in range(num_batches):
+
+        print(f"Processing Batch Number {i+1}")
+
+        # Get the current batch of cells
+        start_idx = i * batch_size
+        end_idx = min((i + 1) * batch_size, len(portion_in_list2))
+        cell_batch = portion_in_list2[start_idx:end_idx]
+
+        # Process the current batch
+        cell_by_junction_matrix, cell_by_cluster_matrix, cells, junctions, cell_idx, junc_idx, cluster_idx, cluster_idx_flip = process_files_and_build_matrices_parallel(
+                cell_batch, relevant_junction_ids, intron_clusts, sequencing_type="smart_seq")
+
+        # Create the AnnData object for this batch
+        adata = create_anndata_object(cell_by_junction_matrix, cell_by_cluster_matrix, cell_idx, junc_idx, metadata_subset, intron_clusts)
+        anndatas.append(adata)
+
+    # Combine all anndatas into one and save... 
+    combined_adata = ad.concat(anndatas, axis=0) # This code makes var dissapear...
+    
+    # Ensure the combined_adata.var is consistent by taking it from the first AnnData in the list
+    combined_adata.var = anndatas[0].var
+    combined_adata.obs.reset_index(drop=True, inplace=True)
+    prefix="ATSE_Anndata_noGTF_Object"
+
+    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    adata_path = f"{prefix}_{current_time}.h5ad"
+
+    # Save the AnnData object to the h5ad file with gzip compression
+    combined_adata.write_h5ad(adata_path, compression='gzip')
+    print(f"AnnData object saved as {adata_path}")
 
 ## to submit:
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet
 # conda activate LeafletSC
-# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/Leaflet_intron_clustering_submit.py
-# sbatch --wrap="python $script_path" --mem=350G --time=3-00:00:00 -J TMSLeafletFA -p bigmem
+# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/LeafletFA_analysis/00_ATSE_mapping_LeafletFA_submit.py
+# sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J TMSLeafletFA -p bigmem

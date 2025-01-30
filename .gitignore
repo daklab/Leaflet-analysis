@@ -32,6 +32,7 @@ TabulaSenis/figures/*
 TabulaSenis/LeafletFA_analysis/gencode.vM19
 PRJEB14362/LeafletFA_analysis/notebooks/gencode.v45
 TabulaSapien_2025-01-08/*
+TabulaSenis/ATSEs/gencodeVM19
 
 # Add all /.snakemake folders
 **/.snakemake
