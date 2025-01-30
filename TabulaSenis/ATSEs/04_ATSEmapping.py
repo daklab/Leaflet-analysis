@@ -32,6 +32,7 @@ min_junc_reads = 100
 min_num_cells_wjunc = 10
 batch_size = 32
 num_workers = 10
+annot_status = "unanno_also"
 
 # Load pkl file with junctions
 pkl_path = f"{combined_junctions}/final_junctions.pkl"
@@ -52,7 +53,7 @@ filtered_junctions = reader.SJ_QC(combined_junctions)
 genome_db = GenomeDB(db_name="gencodeVM19", gtf_file=gtf_file, fasta_file=fasta_file)
 
 # Initialize junction analyzer
-analyzer = JunctionAnalyzer(fasta_file=fasta_file, db=genome_db.get_db())
+analyzer = JunctionAnalyzer(fasta_file=fasta_file, db=genome_db.get_db(), tolerance=100)
 
 # Ensure that the junctions have canonical splice sites
 junctions = analyzer.check_splice_sites(filtered_junctions)
@@ -62,7 +63,7 @@ canonical_junctions = analyzer.filter_canonical(junctions)
 annotated_junctions = analyzer.check_junction_annotation(canonical_junctions)
 
 # Filter junctions that are not annotated
-filtered_junctions = analyzer.filter_annotated(annotated_junctions, annotation_status_include="either")
+filtered_junctions = analyzer.filter_annotated(annotated_junctions, annotation_status_include=annot_status)
 
 # Initialize the ATSE analyzer
 atse_analyzer = ATSEAnalyzer()
@@ -80,13 +81,13 @@ print(event_counts)
 # Save the ATSEs to a file
 date = datetime.datetime.now().strftime("%Y-%m-%d")
 time = datetime.datetime.now().strftime("%H-%M-%S")
-atse_file = f"TMS_atse_file_{date}_{time}.txt"
+atse_file = f"TMS_atse_file_{annot_status}_{date}_{time}.txt"
 
 output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/ATSEfiles
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/ATSEmapping.py
 # sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J TMSLeafletFA -p bigmem
