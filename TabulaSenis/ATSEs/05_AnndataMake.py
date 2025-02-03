@@ -18,6 +18,8 @@ importlib.reload(prep_anndata_object)
 # Paths
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
 juncs_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/junctions/"
+# Read ATSE map file 
+intron_clusts_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/ATSEfiles/TMS_atse_file_unanno_also_2025-01-30_19-24-18.txt.gz"
 
 # Metadata file
 metadata_path = "/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data/AWS/metadata/tabula-muris-senis-full-metadata.csv"
@@ -59,13 +61,6 @@ portion_in_list2 = [x + "/junctions_with_barcodes.bed" for x in portion_in_list2
 
 # Shuffle the list
 random.shuffle(portion_in_list2)
-
-# Do test run with just 100 files 
-# TEST!!!
-# portion_in_list2 = portion_in_list2[:100]
-
-# Read ATSE map file 
-intron_clusts_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/2025-01-29_TMS_atse_file.txt.gz"
     
 print("Reading in obtained intron cluster (ATSE file!)")
 intron_clusts = pd.read_csv(intron_clusts_file, sep="\t")
@@ -78,7 +73,7 @@ print("Process single cell junction counts and assemble sparse matrices!")
 anndatas = []
 
 # Determine the batch size
-batch_size = 1024
+batch_size = 32
 num_batches = len(portion_in_list2) // batch_size + (1 if len(portion_in_list2) % batch_size > 0 else 0)
 print(f"Number of batches: {num_batches}")
 
@@ -113,7 +108,7 @@ combined_adata.write_h5ad(adata_path, compression='gzip')
 print(f"AnnData object saved as {adata_path}")
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/anndata
 # conda activate LeafletSC
-# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/AnndataMake.py
+# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/05_AnndataMake.py
 # sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J TMSLeafletFA -p bigmem
