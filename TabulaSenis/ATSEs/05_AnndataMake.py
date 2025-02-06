@@ -77,8 +77,11 @@ def main():
         intron_clusts,
         save_file=True,
         meta_cell_column="cell_id",
-        prefix=output_file
-    )
+        prefix=output_file)
+
+    # Print the number of cells that have zero counts across the board
+    zero_cells = (cell_by_cluster_matrix.sum(axis=1) == 0).sum()
+    print(f"Number of cells with zero counts: {zero_cells}")
 
 if __name__ == "__main__":
     main()

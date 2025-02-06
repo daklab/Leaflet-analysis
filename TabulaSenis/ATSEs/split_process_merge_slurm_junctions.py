@@ -5,8 +5,12 @@ import pickle
 import argparse
 from pathlib import Path
 from typing import List, Dict
-from find_intron_clusters_v3 import JunctionReader
 from tqdm import tqdm
+import sys 
+
+# Add path to where find_intron_clusters_v3.py is located 
+sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/clustering')
+from find_intron_clusters_v3 import JunctionReader
 
 def split_file_list(input_file: str, chunks: int, output_dir: str):
     """Split input file list into chunks for Slurm array processing"""
