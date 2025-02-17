@@ -1,5 +1,4 @@
 #!/bin/bash
-# merge_junctions.sh
 #SBATCH --job-name=junction_merge
 #SBATCH --output=logs/junction_merge_%j.out
 #SBATCH --error=logs/junction_merge_%j.err
@@ -7,10 +6,11 @@
 #SBATCH --cpus-per-task=4
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250128
+WD=/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LeafletFA/ATSEs/022025/junction_processing_20250210
 
 # Create base directory with today's date
 cd $WD
+echo "Currently in the directory: $(pwd)"
 
 # Merge results
 python $SCRIPT_PATH \

@@ -15,7 +15,7 @@ main_path = '/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data
 #21_month/ [x]
 #24_month/ [x]
 #3_month/ [x]
-#30_month/ []
+#30_month/ [x]
 
 def download_files(bucket, prefix, main_path):
     paginator = s3.get_paginator('list_objects_v2')

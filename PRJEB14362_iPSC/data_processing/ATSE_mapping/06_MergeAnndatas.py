@@ -93,6 +93,9 @@ def main():
     
     args = parser.parse_args()
     
+    print(f"Input directory: {args.input_dir}")
+    print(f"Output file: {args.output_file}")
+    print(f"Starting to merge anndata files...")
     merge_anndata_files(args.input_dir, args.output_file)
 
 if __name__ == '__main__':
@@ -100,15 +103,10 @@ if __name__ == '__main__':
 
 # To run this script, use the following command:
     
-# SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250128/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/anndata/merged_anndata.h5ad
+# SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362_iPSC/data_processing/ATSE_mapping/06_MergeAnndatas.py
+# INPUT_DIR=/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LeafletFA/ATSEs/022025/junction_processing_20250210/anndatas
+# OUTPUT_FILE=/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/LeafletFA/ATSEs/022025/anndatas/merged_anndata.h5ad
 # 
-# sbatch --wrap="python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE" \
-#        --job-name=merge_anndata \
-#        --output=merge_anndata_%j.out \
-#        --error=merge_anndata_%j.err \
-#        --mem=300G \
-#        --time=12:00:00 \
-#        --cpus-per-task=4 \
-#        -p bigmem
+# python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
+
+# sbatch --wrap "python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE" --mem 600GB --partition=bigmem

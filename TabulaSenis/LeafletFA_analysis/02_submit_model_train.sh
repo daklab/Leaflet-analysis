@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Define possible values for each parameter
-K_USE_VALUES=(30 50 100)
+K_USE_VALUES=(30 100)
 USE_GLOBAL_PRIOR_VALUES=(False True)
 INPUT_CONC_PRIOR_VALUES=("None" "inf")  # Include "inf" as a string
 CELL_TYPE_COLUMN_VALUES=("cell_type_grouped")  # Add None as an option?
 WAYPOINTS_USE_VALUES=(True)  # Include option for waypoints
 RUN_NMF_VALUES=(False)  # Include option for running NMF
 BRAIN_ONLY_VALUES=(False)  # Add brain_only as an option
-max_count=200
+max_count=100
 num_epochs=300
 lr=0.15
 repeats=1  # Repeat each combination 
@@ -17,7 +17,7 @@ repeats=1  # Repeat each combination
 analysis_script=/gpfs/commons/home/kisaev/Leaflet-private/src/beta-dirichlet-factor/full_leafletFA_pipeline_wALBF.py
 
 # Anndata file input file path 
-input_file=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/anndata/merged_with_initializations_20250205_172232.h5ad
+input_file=/gpfs/commons/groups/knowles_lab/Karin/TMS_MODELING/DATA_FILES/ALL_CELLS/022025/TMS_Anndata_ATSE_counts_with_waypoints_20250209_165655.h5ad
 ATSE_file=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/ATSEfiles/TMS_atse_file_unanno_also_2025-01-30_19-24-18.txt.gz
 
 # Initialize a counter
@@ -48,12 +48,8 @@ for K_use in "${K_USE_VALUES[@]}"; do
                                 sbatch <<EOT
 #!/bin/bash
 #SBATCH --job-name=${count}_ALL_${repeat}_real_data
-#SBATCH --output=job_output_%j.log  # %j includes the job ID in the filename
 #SBATCH --time=2-00:00:00
-#SBATCH --mem=250G
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
+#SBATCH --mem=300G
 
 # Load necessary modules or activate your environment
 conda activate LeafletSC  # If using a virtual environment
