@@ -2,7 +2,7 @@
 #SBATCH -J DT_pseudobulk
 #SBATCH --mem=64G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-9982%30 # Number of unique clusters
+#SBATCH --array=1-9724%10 # Number of unique clusters
 
 # conda activate python3ENV 
 module load samtools
@@ -10,12 +10,19 @@ module load samtools
 # Input variables
 CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/DT_cells.csv"   
 ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/" 
-OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/DT" 
-tail -n +2 "$CSV_FILE" | cut -d',' -f3 | sort | uniq > DT_cluster_list.txt
+OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/DT"
+# Make OUTPUT_DIR if it does not exist
+mkdir -p "$OUTPUT_DIR"
+
+tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > DT_cluster_list.txt
 
 # Get the cluster name corresponding to this task ID
 cluster=$(sed -n "${SLURM_ARRAY_TASK_ID}p" DT_cluster_list.txt)
+
 echo "Processing cluster: $cluster"
+
+# If "/" is found within the cluster name, replace it with "_"
+cluster=$(echo "$cluster" | tr '/' '_')
 
 # Create output directory for the cluster
 cluster_dir="$OUTPUT_DIR/$cluster"
@@ -23,7 +30,7 @@ mkdir -p "$cluster_dir"
 
 # Collect and process BAM files for the cluster
 sorted_bam_list=()
-while IFS=',' read -r sample main_cluster main_cluster_wkmeans bam_file; do
+while IFS=',' read -r sample type primer main_cluster main_cluster_wkmeans bam_file; do
     if [[ "$main_cluster_wkmeans" == "$cluster" ]]; then
         bam_path="$ROOT_DIR/${main_cluster}/DT/${bam_file}"
         if [[ -f "$bam_path" ]]; then

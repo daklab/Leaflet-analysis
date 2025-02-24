@@ -175,10 +175,9 @@ print(f"Number of ATSEs remaining at 50th percentile: {atse_scores[atse_scores['
 print(f"Number of ATSEs remaining at 60th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.6)].shape[0]}")
 print(f"Number of ATSEs remaining at 90th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.9)].shape[0]}")
 
-
 # %%
 # For splice_adata object, let's filter out the ATSEs that have a normalized_atse_score below the 10th percentile
-atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.6)]
+atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.75)]
 splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filt.index)]
 
 # %%
@@ -343,4 +342,4 @@ splice_adata.write_h5ad(new_file_path, compression='gzip')
 
 print(f"AnnData saved as {new_file_path}")
 
-# sbatch --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362_iPSC/LeafletFA_analysis/notebooks/01_prep_initialized_AnnData.py" -p bigmem --mem 400G -J prep_initialized_AnnData --time 24:00:00
+# sbatch --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362_iPSC/LeafletFA_analysis/notebooks/01_prep_initialized_AnnData.py" --mem=300G -J prep_initialized_AnnData --time 24:00:00

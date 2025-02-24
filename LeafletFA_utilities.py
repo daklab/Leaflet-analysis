@@ -10,27 +10,24 @@ import anndata as ad
 from scipy.stats import ranksums
 import matplotlib.cm as cm
 from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 import umap
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import OneHotEncoder
 import statsmodels.api as sm
 from statsmodels.stats.multitest import fdrcorrection
 import sys
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
 
-def logistic_regression_feature_prediction_simple(splice_adata, feature, K=50, test_size=0.2, random_state=42):
+def logistic_regression_feature_prediction_simple(splice_adata, feature, test_size=0.2, random_state=42):
     """
     Train and evaluate a multinomial logistic regression model using latent factors
-    from splice_adata to predict the feature of interest. Returns prediction accuracy,
-    trained model, label encoder, coefficients, and p-values.
-    
+    from splice_adata to predict the feature of interest.
+
     Parameters:
     - splice_adata: AnnData object containing the data
-    - feature: str, name of the feature to predict (e.g., 'age', 'cell_type_grouped')
-    - K: int, number of latent factors to use for regression
+    - feature: str, name of the feature to predict (e.g., 'cell_type_grouped', 'age', 'sex')
     - test_size: float, proportion of the data to use for testing
     - random_state: int, seed for reproducibility
     
@@ -38,40 +35,38 @@ def logistic_regression_feature_prediction_simple(splice_adata, feature, K=50, t
     - accuracy: float, prediction accuracy on the test set
     - model: trained LogisticRegression model
     - label_encoder: LabelEncoder instance used to encode the target variable
-    - coefficients_df: Pandas DataFrame with logistic regression coefficients and p-values
+    - coefficients_df: Pandas DataFrame with logistic regression coefficients
     """
 
-    # Step 1: Extract latent factors and target feature
-    data_combined = splice_adata.obs
-    latent_factors = [f'factor_{i}' for i in range(1, K + 1)]
-    X = data_combined[latent_factors]
-
-    # Step 2: Encode the target variable (e.g., 'sex', 'age', 'cell_type_grouped')
+    # Extract latent factor matrix X from obsm
+    X = splice_adata.obsm["X_PHI"]
+    factor_labels = [f"factor_{i}" for i in range(X.shape[1])]
+    
+    # Encode the categorical feature
+    y = splice_adata.obs[feature]
     label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(data_combined[feature])
+    y_encoded = label_encoder.fit_transform(y)
 
-    # Step 3: Split the data into training and testing sets
+    # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=test_size, random_state=random_state)
 
-    # Step 4: Train a multinomial logistic regression model
-    logreg = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=1000)
+    # Train multinomial logistic regression
+    logreg = LogisticRegression(multi_class='multinomial', solver='saga', max_iter=200, n_jobs=-1)
     logreg.fit(X_train, y_train)
 
-    # Step 5: Evaluate the model on the test set
+    # Evaluate accuracy
     y_pred = logreg.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     print(f"{feature.capitalize()} Prediction Accuracy: {accuracy:.4f}")
 
-    # Step 6: Train the model on the full dataset for coefficient analysis
+    # Train model on full dataset for coefficient analysis
     logreg.fit(X, y_encoded)
 
-    # Step 7: Get the logistic regression coefficients
+    # Extract coefficients
     coefficients = logreg.coef_
+    coefficients_df = pd.DataFrame(coefficients.T, index=factor_labels, columns=label_encoder.classes_)
 
-    # Step 9: Create a DataFrame with coefficients and p-values
-    coefficients_df = pd.DataFrame(coefficients, columns=latent_factors, index=label_encoder.classes_)
-    return accuracy, coefficients_df
-
+    return accuracy, logreg, label_encoder, coefficients_df
 
 def get_unique_top_factors_by_group(coefficients_df, top_n=5):
     """
@@ -95,66 +90,71 @@ def get_unique_top_factors_by_group(coefficients_df, top_n=5):
     unique_factors = list(set(top_factors_per_group))
     return unique_factors
 
-
-def plot_top_factor_distributions(splice_adata, top_factors, age_column="age", plot_type="boxenplot", log_scale=False):
+def plot_top_factor_distributions(splice_adata, top_factors, age_column="age", plot_type="boxenplot", log_scale=False, save_plot=False):
     """
-    Plot distributions of cell factor contributions for top N factors with the largest coefficients
-    from multinomial logistic regression across different age groups and save the plot as a PDF file.
+    Plots the distribution of top latent factors across different age groups using boxen plots.
     
     Parameters:
-    - splice_adata: AnnData object containing the cell factor contributions.
-    - top_factors: List of top factors to plot.
-    - age_column: Column in splice_adata.obs representing the age groups (default="age").
-    - plot_type: Type of plot to generate ("boxplot", "violinplot", "stripplot", "boxenplot", or "swarmplot").
-    - log_scale: Boolean, whether to apply a logarithmic scale to the y-axis (default=False).
+        splice_adata: AnnData object containing latent factor activities in `.obsm["X_PHI"]`.
+        top_factors: List of factor indices to plot.
+        age_column: Column name in `.obs` that contains age group labels.
+        plot_type: Type of plot ("boxenplot" or "boxplot").
+        log_scale: Whether to apply logarithmic scaling to y-axis.
+        save_plot: Whether to save the plot as a PDF file.
     """
-
-    # Step 1: Extract factor contributions and age groups from splice_adata.obs
-    data_combined = splice_adata.obs[top_factors + [age_column]]
-
-    # Step 2: Melt the DataFrame for easier plotting
+    
+    # Extract factor activities
+    top_factors_activities = splice_adata.obsm["X_PHI"][:, top_factors]
+    
+    # Create DataFrame
+    factor_labels = [f"factor_{i}" for i in top_factors]
+    data_factors = pd.DataFrame(top_factors_activities, columns=factor_labels)
+    data_age = pd.DataFrame(splice_adata.obs[age_column].values, columns=[age_column])
+    data_combined = pd.concat([data_age, data_factors], axis=1)
+    
+    # Melt DataFrame for Seaborn
     data_melted = pd.melt(data_combined, id_vars=[age_column], var_name="Factor", value_name="Contribution")
-
-    # Step 3: Plot distributions using the selected plot type
-    plt.figure(figsize=(6, 5))
+    
+    # Create plot
+    plt.figure(figsize=(7, 6))
 
     if plot_type == "boxenplot":
-        sns.boxenplot(x="Factor", y="Contribution", hue=age_column, data=data_melted)
+        sns.boxenplot(x="Factor", y="Contribution", hue=age_column, data=data_melted, dodge=True, palette="Set2")
 
-        # Calculate and plot medians as red dots
-        medians = data_melted.groupby(['Factor', age_column])['Contribution'].median().reset_index()
-        # Iterate over each factor and age group and plot the median as a red dot
-        for i, factor in enumerate(top_factors):
-            for j, age in enumerate(medians[age_column].unique()):
-                median_value = medians[(medians['Factor'] == factor) & (medians[age_column] == age)]['Contribution'].values
-                if median_value.size > 0:
-                    # Use plt.scatter to plot the median for each age group on the boxenplot
-                    plt.scatter([i + (j * 0.1)], median_value, color='red', zorder=5, s=20)
+    elif plot_type == "boxplot":
+        sns.boxplot(x="Factor", y="Contribution", hue=age_column, data=data_melted, dodge=True, palette="Set2")
 
-    # Step 4: Apply logarithmic scale if requested
+    # Add median values as red dots
+    medians = data_melted.groupby(['Factor', age_column])['Contribution'].median().reset_index()
+    
+    for i, factor in enumerate(factor_labels):  
+        for j, age in enumerate(medians[age_column].unique()):
+            median_value = medians[(medians['Factor'] == factor) & (medians[age_column] == age)]['Contribution'].values
+            if median_value.size > 0:
+                plt.scatter(i + (j * 0.2 - 0.2), median_value, color='red', zorder=5, s=25)
+
+    # Apply logarithmic scale if needed
     if log_scale:
         plt.yscale("log")
 
-    # Customize font sizes for labels and ticks
-    plt.xlabel("Factors", fontsize=15)
-    plt.ylabel("Factor Cell Activity", fontsize=15)
-    plt.xticks(fontsize=15)
-    plt.yticks(fontsize=15)
-
-    plt.legend(title="Age", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=14)
+    # Formatting
+    plt.xlabel("Factors", fontsize=14)
+    plt.ylabel("Factor Cell Activity", fontsize=14)
+    plt.xticks(fontsize=12, rotation=45)
+    plt.yticks(fontsize=12)
+    plt.legend(title="Age", bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=12)
+    plt.axhline(0, color="black", linestyle="dashed", alpha=0.5)  # Dashed line at 0 for reference
     plt.tight_layout()
 
-    # Step 5: Save plot as a PDF file with current date and factors in the filename
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    factors_str = "_".join(top_factors)
-    filename = f"factor_distributions_{factors_str}_{date_str}.pdf"
-    
-    # Save the figure to a PDF
-    plt.savefig(filename, format='pdf')
+    # Save the plot
+    if save_plot:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        factors_str = "_".join([str(f) for f in top_factors])
+        filename = f"factor_distributions_{factors_str}_{date_str}.pdf"
+        plt.savefig(filename, format='pdf')
+        print(f"Plot saved as {filename}")
 
-    # Display the plot
     plt.show()
-    print(f"Plot saved as {filename}")
 
 # Step 1: Create the age_category column
 def create_age_category(splice_adata):
@@ -164,40 +164,71 @@ def create_age_category(splice_adata):
         '24m': 'old'
     })
 
-# Step 2: Define function to calculate delta medians, average, and median activity scores
 def compare_factors_by_age(splice_adata, factors, cell_type_col="cell_type_grouped"):
+    """
+    Compare the activity of selected latent factors across age groups (young vs. old)
+    within each cell type.
+
+    Parameters:
+    - splice_adata: AnnData object containing latent factor data in `obsm["X_PHI"]`.
+    - factors: List of factor indices to compare (e.g., [0, 1, 2]).
+    - cell_type_col: Column name in `obs` that defines cell type groups.
+
+    Returns:
+    - result_df: DataFrame summarizing factor differences across age categories.
+    """
+    
     results = []
     
+    # Extract factor matrix
+    X_PHI = splice_adata.obsm["X_PHI"]
+    factor_labels = [f"factor_{i}" for i in factors]
+
     # Iterate over unique cell types
     for cell_type in splice_adata.obs[cell_type_col].unique():
-        # Subset cells by cell type
-        cell_type_data = splice_adata[splice_adata.obs[cell_type_col] == cell_type]
+        # Create boolean mask for current cell type
+        cell_mask = splice_adata.obs[cell_type_col] == cell_type
 
-        # Further subset into young and old groups
-        young_cells = cell_type_data[cell_type_data.obs['age_category'] == 'young']
-        old_cells = cell_type_data[cell_type_data.obs['age_category'] == 'old']
+        # Apply mask to get indices
+        cell_indices = splice_adata.obs.index[cell_mask]
+        
+        # Subset X_PHI to only include selected cells
+        cell_type_X = X_PHI[cell_mask, :]
+
+        # Get the corresponding age labels
+        age_labels = splice_adata.obs.loc[cell_indices, "age_category"]
+
+        # Create boolean masks for young and old within the selected cell type
+        young_mask = age_labels == 'young'
+        old_mask = age_labels == 'old'
+
+        if young_mask.sum() == 0 or old_mask.sum() == 0:
+            # Skip if there are no young or old cells for this cell type
+            continue
+
+        young_X = cell_type_X[young_mask, :][:, factors]  # Extract factors for young cells
+        old_X = cell_type_X[old_mask, :][:, factors]      # Extract factors for old cells
+        all_X = cell_type_X[:, factors]                   # Extract factors for all cells in this cell type
 
         # Iterate over factors
-        for factor in factors:
-            # Extract factor activity scores for young and old
-            young_scores = young_cells.obs[factor].values
-            old_scores = old_cells.obs[factor].values
+        for i, factor in enumerate(factor_labels):
+            young_scores = young_X[:, i]
+            old_scores = old_X[:, i]
+            all_scores = all_X[:, i]
 
-            # Compute median for young and old
-            young_median = pd.Series(young_scores).median()
-            old_median = pd.Series(old_scores).median()
-            
-            # Compute the delta in medians
+            # Compute median values
+            young_median = np.median(young_scores)
+            old_median = np.median(old_scores)
             delta_median = old_median - young_median
 
             # Perform Wilcoxon rank-sum test
             _, p_value = ranksums(young_scores, old_scores)
 
-            # Calculate average and median factor activity across all cells in the cell type
-            avg_factor_activity = pd.Series(cell_type_data.obs[factor].values).mean()
-            median_factor_activity = pd.Series(cell_type_data.obs[factor].values).median()
+            # Compute mean and median factor activity across all cells in the cell type
+            avg_factor_activity = np.mean(all_scores)
+            median_factor_activity = np.median(all_scores)
 
-            # Append result to the list
+            # Append results
             results.append({
                 'cell_type': cell_type,
                 'factor': factor,
@@ -211,52 +242,77 @@ def compare_factors_by_age(splice_adata, factors, cell_type_col="cell_type_group
     result_df = pd.DataFrame(results)
     return result_df
 
-
 # Function to plot the distribution of factor activity for young and old mice
 def plot_factor_distribution(splice_adata, cell_type, factor):
-    # Filter data by the given cell type
-    cell_type_data = splice_adata[splice_adata.obs['cell_type_grouped'] == cell_type]
+    """
+    Plots the distribution of a given latent factor for a specific cell type,
+    comparing young vs. old age groups.
+
+    Parameters:
+    - splice_adata: AnnData object containing latent factors in `obsm["X_PHI"]`
+    - cell_type: str, cell type to filter data by
+    - factor: int, index of the latent factor to visualize
+    """
     
-    # Split the data into young and old groups
-    young_data = cell_type_data[cell_type_data.obs['age_category'] == 'young']
-    old_data = cell_type_data[cell_type_data.obs['age_category'] == 'old']
+    # Extract factor matrix and metadata
+    X_PHI = splice_adata.obsm["X_PHI"]
+    factor_labels = [f"factor_{i}" for i in range(X_PHI.shape[1])]
     
-    # Extract factor values for both groups
-    young_scores = young_data.obs[factor].values
-    old_scores = old_data.obs[factor].values
+    # Ensure factor index is valid
+    if factor >= X_PHI.shape[1]:
+        raise ValueError(f"Factor {factor} is out of bounds. Max available factor index: {X_PHI.shape[1] - 1}")
+
+    # Create mask for the selected cell type
+    cell_mask = splice_adata.obs['cell_type_grouped'] == cell_type
+
+    if cell_mask.sum() == 0:
+        raise ValueError(f"No cells found for cell type '{cell_type}'.")
+
+    # Get the corresponding cell indices
+    cell_indices = splice_adata.obs.index[cell_mask]
     
+    # Extract factor values for the selected cell type
+    cell_type_X = X_PHI[cell_mask, :]
+    age_labels = splice_adata.obs.loc[cell_indices, "age_category"]
+
+    # Create masks for young and old
+    young_mask = age_labels == 'young'
+    old_mask = age_labels == 'old'
+
+    if young_mask.sum() == 0 or old_mask.sum() == 0:
+        raise ValueError(f"Missing data: No young or old samples available for '{cell_type}'.")
+
+    # Extract factor scores for young and old
+    young_scores = cell_type_X[young_mask, factor]
+    old_scores = cell_type_X[old_mask, factor]
+
     # Create the plot
-    plt.figure(figsize=(10, 6))
-    
-    # Plot the distribution for young mice
-    sns.kdeplot(young_scores, label="Young", color="blue", shade=True)
-    
-    # Plot the distribution for old mice
-    sns.kdeplot(old_scores, label="Old", color="red", shade=True)
-    
-    # Plot the median for young
-    young_median = pd.Series(young_scores).median()
+    plt.figure(figsize=(8, 5))
+
+    # Plot KDE distributions
+    sns.kdeplot(young_scores, label="Young", color="blue", shade=True, common_norm=False)
+    sns.kdeplot(old_scores, label="Old", color="red", shade=True, common_norm=False)
+
+    # Plot median lines
+    young_median = np.median(young_scores)
+    old_median = np.median(old_scores)
     plt.axvline(young_median, color="blue", linestyle="--", label=f'Young Median: {young_median:.2f}')
-    
-    # Plot the median for old
-    old_median = pd.Series(old_scores).median()
     plt.axvline(old_median, color="red", linestyle="--", label=f'Old Median: {old_median:.2f}')
+
+    # Set labels and title
+    plt.title(f"Factor {factor} Distribution for {cell_type} (Young vs Old)", fontsize=14)
+    plt.xlabel(f"{factor_labels[factor]} Activity Score", fontsize=12)
+    plt.ylabel("Density", fontsize=12)
     
-    # Set plot title and labels
-    plt.title(f"Factor {factor} Distribution for {cell_type} (Young vs Old)", fontsize=16)
-    plt.xlabel(f"{factor} Activity Score", fontsize=14)
-    plt.ylabel("Density", fontsize=14)
-    
-    # Add legend
+    # Add legend and layout fixes
     plt.legend()
-    
-    # Display the plot
     plt.tight_layout()
+    
+    # Show the plot
     plt.show()
 
-
 # Function to plot the distribution of factor activity for 3m, 18m, and 24m age groups
-def plot_factor_distribution_by_age(splice_adata, factor, cell_type=None):
+def plot_factor_distribution_by_age(splice_adata, factor, cell_type=None, save_plot=False):
     
     if cell_type is not None:
         # Filter data by the given cell type
@@ -275,7 +331,7 @@ def plot_factor_distribution_by_age(splice_adata, factor, cell_type=None):
     # Plot the distribution for each age group
     for age in age_groups:
         age_data = cell_type_data[cell_type_data.obs['age'] == age]
-        scores = age_data.obs[factor].values
+        scores = age_data.obsm['X_PHI'][:, factor]
         
         # Plot the distribution (KDE)
         sns.kdeplot(scores, label=f"{age}", color=colors[age], shade=True)
@@ -298,9 +354,9 @@ def plot_factor_distribution_by_age(splice_adata, factor, cell_type=None):
     
     # Display the plot
     plt.tight_layout()
-    plt.savefig(f"Factor_{factor}_{cell_type}_Cell_Distribution_Activity.pdf", format="pdf")  # Save as PDF
+    if save_plot:
+        plt.savefig(f"Factor_{factor}_{cell_type}_Cell_Distribution_Activity.pdf", format="pdf")
     plt.show()
-
 
 def linear_regression_age_prediction(splice_adata, K=50, test_size=0.2, random_state=42):
     """
@@ -358,10 +414,26 @@ def linear_regression_age_prediction(splice_adata, K=50, test_size=0.2, random_s
 
     return rmse, coefficients_df
 
+def plot_factor_medians(result_table, factor_name, save_plot=False):
+    """
+    Plots the delta median (Old - Young) activity for a given factor across cell types.
 
-# Create a bar plot to visualize the delta_median
-def plot_factor_medians(factor_data, factor_name):
-    plt.figure(figsize=(7,6))
+    Parameters:
+    - result_table (pd.DataFrame): DataFrame containing `factor`, `delta_median`, and `cell_type`.
+    - factor_name (str): The name of the factor to plot (e.g., 'factor_20').
+    - save_path (str, optional): File path to save the plot (if None, does not save).
+    """
+
+    # Filter data for the selected factor and sort by delta_median
+    factor_data = result_table[result_table["factor"] == factor_name].sort_values(by="delta_median")
+
+    # Ensure the factor exists in the dataset
+    if factor_data.empty:
+        print(f"Warning: Factor '{factor_name}' not found in the dataset.")
+        return
+
+    # Create figure
+    plt.figure(figsize=(7, 6))
 
     # Create a bar plot with delta_median values
     sns.barplot(
@@ -377,17 +449,90 @@ def plot_factor_medians(factor_data, factor_name):
     plt.xlabel('Delta Median (Old - Young)', fontsize=16)
     plt.ylabel('Cell Type', fontsize=16)
 
-   # Adjust tick font sizes
-    plt.xticks(fontsize=15)
+    # Adjust tick font sizes
+    plt.xticks(fontsize=12)
     plt.yticks(fontsize=11)
 
     # Invert y-axis to display cell types top to bottom in the order of the DataFrame
     plt.gca().invert_yaxis()
 
+    # Adjust layout
     plt.tight_layout()
-    plt.savefig(f"Factor_{factor_name}_Delta_Median_Activity.pdf", format="pdf")  # Save as PDF
+
+    # Save if save_path is provided
+    if save_plot:
+        file_name = f"factor_{factor_name}_delta_median_plot.pdf"
+        plt.savefig(file_name, format='pdf')
+        print(f"Saved plot to '{file_name}'.")
+
+    # Show the plot
     plt.show()
 
+def plot_factors_with_delta(coefficients_with_deltas, highlight_factors=None, save_path=None):
+    """
+    Plots two side-by-side bar plots:
+    1. Coefficients with error bars for aging prediction.
+    2. Factor delta (Old - Young) in cell activity.
+
+    Parameters:
+    - coefficients_with_deltas (pd.DataFrame): DataFrame containing factor coefficients, confidence intervals, and delta values.
+    - highlight_factors (list): List of factors to highlight in red (e.g., ['factor_17', 'factor_2']).
+    - save_path (str, optional): File path to save the plot (if None, does not save).
+    """
+
+    # Set global font size
+    plt.rcParams.update({'font.size': 12})
+
+    # Sort DataFrame by coefficient in descending order
+    coefficients_with_deltas = coefficients_with_deltas.sort_values(by='Coefficient', ascending=False)
+
+    # Calculate Standard Error
+    coefficients_with_deltas["Standard Error"] = (coefficients_with_deltas["CI_Upper"] - coefficients_with_deltas["CI_Lower"]) / 3.92
+
+    # Create figure with two subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 6), gridspec_kw={'width_ratios': [2, 1]}, sharey=True)
+
+    # Plot 1: Coefficients with error bars
+    ax1.errorbar(coefficients_with_deltas['Coefficient'], coefficients_with_deltas['Factor'],
+                 xerr=1.96 * coefficients_with_deltas['Standard Error'], fmt='o', capsize=3, markersize=4, color='lightblue')
+
+    # Add a vertical line at x = 0 for reference
+    ax1.axvline(0, color='gray', linestyle='--')
+
+    # Set axis labels
+    ax1.set_xlabel('Factor Aging Coefficient \n(Linear Regression)', fontsize=14)
+    ax1.set_ylabel('Factors', fontsize=13)
+
+    # Highlight specific factors in red
+    if highlight_factors:
+        y_ticks = ax1.get_yticklabels()
+        for tick in y_ticks:
+            if tick.get_text() in highlight_factors:
+                tick.set_color('red')
+
+    # Plot 2: Delta (Old - Young)
+    ax2.barh(y=coefficients_with_deltas['Factor'], width=coefficients_with_deltas['Delta_OY'],
+             color='lightcoral', label='Delta YO')
+    ax2.axvline(0, color='gray', linestyle='--')
+
+    # Set axis labels and limits for delta plot
+    ax2.set_xlabel('Factor Cell Activity\nDelta (Old - Young)', fontsize=13)
+    ax2.set_xlim(-0.08, 0.08)
+
+    # Adjust tick labels for both axes
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    ax2.tick_params(axis='both', which='major', labelsize=12)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save if save_path is provided
+    if save_path:
+        plt.savefig(save_path, format='pdf')
+        print(f"Plot saved at: {save_path}")
+
+    # Show the plot
+    plt.show()
 
 def logistic_regression_feature_prediction(
     splice_adata,
@@ -395,202 +540,97 @@ def logistic_regression_feature_prediction(
     feature: str,
     K: int = 50,
     n_pcs: int = 50,
-    covariate_column = 'tissue',
+    covariate_column='tissue',
     test_size: float = 0.2,
     random_state: int = 42
 ):
     """
     Train and evaluate multinomial logistic regression models using splicing factors,
     gene expression PCs, tissue covariate, and their combination to predict the feature of interest.
-    
-    Parameters:
-    - splice_adata: AnnData object containing splicing data with latent factors in `obs`.
-    - gene_expression_adata: AnnData object containing gene expression data.
-    - feature: str, name of the feature to predict (e.g., 'age', 'cell_type_grouped').
-    - K: int, number of splicing latent factors to use.
-    - n_pcs: int, number of gene expression PCs to use.
-    - test_size: float, proportion of the data to use for testing.
-    - random_state: int, seed for reproducibility.
-    
+
     Returns:
     - accuracies: dict, accuracy scores for each model.
     - models: dict, trained LogisticRegression models.
     - label_encoder: LabelEncoder instance used to encode the target variable.
     - coefficients_dfs: dict, DataFrames with logistic regression coefficients for each model.
     """
-    
-    # Step 1: Extract splicing latent factors
-    latent_factors = [f'factor_{i}' for i in range(1, K + 1)]
-    X_splicing = splice_adata.obs[latent_factors]
-    
-    # Step 2: Compute gene expression PCs
-    pcs = gene_expression_adata.obsm['X_pca'][:, :n_pcs]
-    pc_columns = [f'PC_{i+1}' for i in range(n_pcs)]
-    X_gene_expression = pd.DataFrame(pcs, index=gene_expression_adata.obs_names, columns=pc_columns)
-    
-    # Step 3: One-hot encode the "tissue" covariate
-    tissue_encoder = OneHotEncoder()
-    tissue_covariate = tissue_encoder.fit_transform(splice_adata.obs[[covariate_column]])
-    tissue_columns = [f'{covariate_column}_{cat}' for cat in tissue_encoder.categories_[0]]
-    
-    # Convert tissue covariate to DataFrame
-    X_tissue = pd.DataFrame(tissue_covariate.toarray(), index=splice_adata.obs_names, columns=tissue_columns)
 
-    # Add tissue covariate to splicing and gene expression datasets
+    ### **Step 1: Extract Splicing Latent Factors**
+    if "X_PHI" not in splice_adata.obsm:
+        raise ValueError("Splicing data is missing 'X_PHI' in obsm.")
+    X_splicing = pd.DataFrame(splice_adata.obsm["X_PHI"], index=splice_adata.obs.index)
+    X_splicing.columns = [f'factor_{i}' for i in range(X_splicing.shape[1])]
+
+    ### **Step 2: Extract Gene Expression Principal Components**
+    if "X_pca" not in gene_expression_adata.obsm:
+        raise ValueError("Gene expression data is missing 'X_pca' in obsm.")
+    pcs = gene_expression_adata.obsm["X_pca"][:, :n_pcs]
+    X_gene_expression = pd.DataFrame(pcs, index=gene_expression_adata.obs.index)
+    X_gene_expression.columns = [f'PC_{i+1}' for i in range(n_pcs)]
+
+    ### **Step 3: Encode Tissue Covariate (if available)**
+    if covariate_column in splice_adata.obs:
+        tissue_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+        tissue_covariate = tissue_encoder.fit_transform(splice_adata.obs[[covariate_column]])
+        tissue_columns = [f'{covariate_column}_{cat}' for cat in tissue_encoder.categories_[0]]
+        X_tissue = pd.DataFrame(tissue_covariate, index=splice_adata.obs.index, columns=tissue_columns)
+    else:
+        print(f"Warning: '{covariate_column}' not found in splice_adata. Skipping tissue covariate.")
+        X_tissue = pd.DataFrame(index=splice_adata.obs.index)  # Empty DataFrame
+
+    ### **Step 4: Merge Features**
     X_splicing = pd.concat([X_splicing, X_tissue], axis=1)
     X_gene_expression = pd.concat([X_gene_expression, X_tissue], axis=1)
-    
-    # Step 4: Prepare combined dataset and scale it
     X_combined = pd.concat([X_splicing, X_gene_expression], axis=1)
+
+    ### **Step 5: Standardize Features**
     scaler = StandardScaler()
     X_combined_scaled = pd.DataFrame(scaler.fit_transform(X_combined), index=X_combined.index, columns=X_combined.columns)
 
-    # Step 5: Encode the target variable
+    ### **Step 6: Encode Target Feature**
+    if feature not in splice_adata.obs:
+        raise ValueError(f"Feature '{feature}' not found in splice_adata.obs.")
+
     label_encoder = LabelEncoder()
-    y = splice_adata.obs[feature].astype(str)  # Ensure the feature is a string type
+    y = splice_adata.obs[feature].astype(str)  # Convert to string before encoding
     y_encoded = label_encoder.fit_transform(y)
-    
-    # Step 6: Split the data
-    X_train_s, X_test_s, y_train, y_test = train_test_split(
-        X_splicing, y_encoded, test_size=test_size, random_state=random_state
-    )
-    X_train_g, X_test_g, _, _ = train_test_split(
-        X_gene_expression, y_encoded, test_size=test_size, random_state=random_state
-    )
-    X_train_c, X_test_c, _, _ = train_test_split(
-        X_combined_scaled, y_encoded, test_size=test_size, random_state=random_state
-    )
-    X_train_t, X_test_t, _, _ = train_test_split(
-        X_tissue, y_encoded, test_size=test_size, random_state=random_state
-    )
-    
-    # Step 7: Train logistic regression models
-    logreg_params = {
-        'multi_class': 'multinomial',
-        'solver': 'lbfgs',
-        'max_iter': 1000,
-        'random_state': random_state
+
+    ### **Step 7: Train-Test Split**
+    data_splits = {
+        "splicing": train_test_split(X_splicing, y_encoded, test_size=test_size, random_state=random_state),
+        "gene_expression": train_test_split(X_gene_expression, y_encoded, test_size=test_size, random_state=random_state),
+        "combined": train_test_split(X_combined_scaled, y_encoded, test_size=test_size, random_state=random_state),
+        "tissue_only": train_test_split(X_tissue, y_encoded, test_size=test_size, random_state=random_state),
     }
-    model_splicing = LogisticRegression(**logreg_params)
-    model_gene_expression = LogisticRegression(**logreg_params)
-    model_combined = LogisticRegression(**logreg_params)
-    model_tissue = LogisticRegression(**logreg_params)  # New model for tissue
-    
-    model_splicing.fit(X_train_s, y_train)
-    model_gene_expression.fit(X_train_g, y_train)
-    model_combined.fit(X_train_c, y_train)
-    model_tissue.fit(X_train_t, y_train)  # Train tissue-only model
-    
-    # Step 8: Evaluate the models
-    y_pred_s = model_splicing.predict(X_test_s)
-    y_pred_g = model_gene_expression.predict(X_test_g)
-    y_pred_c = model_combined.predict(X_test_c)
-    y_pred_t = model_tissue.predict(X_test_t)  # Predictions for tissue-only model
 
-    # Predict probabilities for AUROC and AUPR
-    y_prob_s = model_splicing.predict_proba(X_test_s)
-    y_prob_g = model_gene_expression.predict_proba(X_test_g)
-    y_prob_c = model_combined.predict_proba(X_test_c)
-    y_prob_t = model_tissue.predict_proba(X_test_t)
+    ### **Step 8: Train Logistic Regression Models**
+    logreg_params = {'multi_class': 'multinomial', 'solver': 'saga', 'max_iter': 500, 'random_state': random_state}
+    models = {name: LogisticRegression(**logreg_params) for name in data_splits.keys()}
 
-    accuracy_s = accuracy_score(y_test, y_pred_s)
-    accuracy_g = accuracy_score(y_test, y_pred_g)
-    accuracy_c = accuracy_score(y_test, y_pred_c)
-    accuracy_t = accuracy_score(y_test, y_pred_t)  # Accuracy for tissue-only model
-    
-    # AUROC and AUPR scores
-    try:
-        auroc_s = roc_auc_score(y_test, y_prob_s, multi_class='ovr')
-        auroc_g = roc_auc_score(y_test, y_prob_g, multi_class='ovr')
-        auroc_c = roc_auc_score(y_test, y_prob_c, multi_class='ovr')
-        auroc_t = roc_auc_score(y_test, y_prob_t, multi_class='ovr')
+    for name, (X_train, X_test, y_train, y_test) in data_splits.items():
+        models[name].fit(X_train, y_train)
 
-        aupr_s = average_precision_score(y_test, y_prob_s, average='macro')
-        aupr_g = average_precision_score(y_test, y_prob_g, average='macro')
-        aupr_c = average_precision_score(y_test, y_prob_c, average='macro')
-        aupr_t = average_precision_score(y_test, y_prob_t, average='macro')
-
-    except ValueError as e:
-        # Handle any exception that might occur due to the number of classes
-        print(f"Error calculating AUROC/AUPR: {e}")
-        auroc_s = auroc_g = auroc_c = auroc_t = None
-        aupr_s = aupr_g = aupr_c = aupr_t = None
-
-    print(f"{feature.capitalize()} Prediction Accuracy using Splicing Factors: {accuracy_s:.4f}")
-    print(f"{feature.capitalize()} Prediction AUROC using Splicing Factors: {auroc_s:.4f}")
-    print(f"{feature.capitalize()} Prediction AUPR using Splicing Factors: {aupr_s:.4f}")
-    
-    print(f"{feature.capitalize()} Prediction Accuracy using Gene Expression PCs: {accuracy_g:.4f}")
-    print(f"{feature.capitalize()} Prediction AUROC using Gene Expression PCs: {auroc_g:.4f}")
-    print(f"{feature.capitalize()} Prediction AUPR using Gene Expression PCs: {aupr_g:.4f}")
-    
-    print(f"{feature.capitalize()} Prediction Accuracy using Combined Features: {accuracy_c:.4f}")
-    print(f"{feature.capitalize()} Prediction AUROC using Combined Features: {auroc_c:.4f}")
-    print(f"{feature.capitalize()} Prediction AUPR using Combined Features: {aupr_c:.4f}")
-    
-    print(f"{feature.capitalize()} Prediction Accuracy using Tissue Only: {accuracy_t:.4f}")
-    print(f"{feature.capitalize()} Prediction AUROC using Tissue Only: {auroc_t:.4f}")
-    print(f"{feature.capitalize()} Prediction AUPR using Tissue Only: {aupr_t:.4f}")
-        
-    # Step 9: Retrain models on full dataset for coefficient analysis
-    model_splicing.fit(X_splicing, y_encoded)
-    model_gene_expression.fit(X_gene_expression, y_encoded)
-    model_combined.fit(X_combined_scaled, y_encoded)
-    model_tissue.fit(X_tissue, y_encoded)  # Retrain tissue-only model
-    
-    # Step 10: Prepare coefficients DataFrames
-    coef_splicing = pd.DataFrame(
-        model_splicing.coef_, columns=latent_factors + tissue_columns, index=label_encoder.classes_
-    )
-    coef_gene_expression = pd.DataFrame(
-        model_gene_expression.coef_, columns=pc_columns + tissue_columns, index=label_encoder.classes_
-    )
-    coef_combined = pd.DataFrame(
-        model_combined.coef_, columns=X_combined.columns, index=label_encoder.classes_
-    )
-    coef_tissue = pd.DataFrame(
-        model_tissue.coef_, columns=tissue_columns, index=label_encoder.classes_  # Coefficients for tissue-only model
-    )
-    
-    # Collect results
+    ### **Step 9: Evaluate Models**
     accuracies = {
-        'splicing': accuracy_s,
-        'gene_expression': accuracy_g,
-        'combined': accuracy_c,
-        'tissue_only': accuracy_t  # Include tissue-only accuracy
+        name: accuracy_score(y_test, models[name].predict(X_test))
+        for name, (_, X_test, _, y_test) in data_splits.items()
     }
 
-    aurocs = {
-        'splicing': auroc_s,
-        'gene_expression': auroc_g,
-        'combined': auroc_c,
-        'tissue_only': auroc_t
-    }
-    
-    auprs = {
-        'splicing': aupr_s,
-        'gene_expression': aupr_g,
-        'combined': aupr_c,
-        'tissue_only': aupr_t
-    }
-    
-    models = {
-        'splicing': model_splicing,
-        'gene_expression': model_gene_expression,
-        'combined': model_combined,
-        'tissue_only': model_tissue  # Include tissue-only model
-    }
-    
+    ### **Step 10: Train Models on Full Dataset for Coefficients**
+    for name, (X_train, _, y_train, _) in data_splits.items():
+        models[name].fit(X_train, y_train)
+
+    ### **Step 11: Extract Coefficients**
     coefficients_dfs = {
-        'splicing': coef_splicing,
-        'gene_expression': coef_gene_expression,
-        'combined': coef_combined,
-        'tissue_only': coef_tissue  # Include tissue-only coefficients
+        name: pd.DataFrame(models[name].coef_, columns=X_train.columns, index=label_encoder.classes_)
+        for name, (X_train, _, _, _) in data_splits.items()
     }
-    
-    return accuracies, aurocs, auprs, models, label_encoder, coefficients_dfs
 
-def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), center=0):
+    ### **Step 12: Return Results**
+    return accuracies, models, label_encoder, coefficients_dfs
+
+
+def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), center=0, save_plot=False):
     """
     Plots a clustermap of the given coefficients and applies custom formatting.
     
@@ -616,7 +656,7 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
 
     # Highlight specific factors (rows)
     if highlighted_factors:
-        for label in g.ax_heatmap.yaxis.get_majorticklabels():
+        for label in g.ax_heatmap.xaxis.get_majorticklabels():
             if label.get_text() in highlighted_factors:
                 label.set_weight('bold')   # Make it bold
                 label.set_color('red')     # Change color to red
@@ -624,11 +664,11 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
     # Set colorbar font size
     g.cax.tick_params(labelsize=15)
 
-    # Save the figure to a PDF
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"factor_age_coefficients_{date_str}.pdf"
-    plt.savefig(filename, format='pdf')
-    print(f"Figure saved as {filename}")
+    if save_plot:
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        filename = f"factor_age_coefficients_{date_str}.pdf"
+        plt.savefig(filename, format='pdf')
+        print(f"Figure saved as {filename}")
 
     # Show the plot
     plt.show()

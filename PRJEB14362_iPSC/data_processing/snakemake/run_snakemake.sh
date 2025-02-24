@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 #SBATCH -N 1 # Ensure that all cores are on one machine
-#SBATCH -p pe2
 #SBATCH -J snakemake_master
 #SBATCH -c 1
 #SBATCH --mem=16G
@@ -10,21 +9,23 @@
 
 # Load necessary modules
 module purge
-module load gcc/9.2.0 
+# module load gcc/9.2.0 #pe2 command 
 module unload htslib/1.9
 module load samtools
 module unload htslib/1.9
-module load star/2.7.10b    
-module load snakemake
-module load sambamba
+# module load star/2.7.10b #pe2 command 
+module load star/2.7.10b-GCC-11.3.0
+# module load snakemake
+
+cd /gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362_iPSC/data_processing/snakemake
 
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/PRJEB14362/data_processing/snakemake
 
-slurm_out=/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/SLURM/11122024
+slurm_out=/gpfs/commons/projects/knowles_singlecell_splicing/PRJEB14362/SLURM/12022025
 
 # Run Snakemake with SLURM cluster submission
-snakemake --keep-going -j 128 --cluster-config cluster.json --forcerun run_star --cluster "sbatch -N 1 -p pe2 -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake --keep-going -j 3 --cluster-config cluster.json --forcerun run_star --cluster "sbatch -N 1 -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 
 echo "Snakemake workflow submitted"
 

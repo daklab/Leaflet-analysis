@@ -7,36 +7,47 @@ def get_sample_ids():
     bam_directory = config["bam_files"]
     sample_ids = set()
     
-    # Iterate through BAM files in the directory
     for subdir, _, files in os.walk(bam_directory):
-        for file in files:
-            if file.endswith(".bam"):
-                sample_id = os.path.splitext(file)[0]  # Remove .bam extension
-                sample_ids.add(sample_id)
+        bam_files = [f for f in files if f.endswith(".bam")]
+        bai_files = [f for f in files if f.endswith(".bai")]
+        
+        # Only include directories where there's exactly one BAM and one BAI
+        if len(bam_files) == 1 and len(bai_files) == 1:
+            sample_id = os.path.splitext(bam_files[0])[0]  # Remove .bam extension
+            sample_ids.add(sample_id)
+
     return sorted(sample_ids)
 
 # Extract sample IDs for dynamic rule creation
 sample_ids = get_sample_ids()
+print(f"The number of valid samples found: {len(sample_ids)}")
+print(f"The first 10 valid samples: {sample_ids[:10]}")
 
 # Rule to process all samples
 rule all:
     input:
+        expand(os.path.join(config["results_dir"], "{sample}_junctions.bed"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_barcodes.txt"), sample=sample_ids),
         expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids)
 
-# Rule to add CB tags to BAM files
 rule add_cb_tag:
     input:
         bam=os.path.join(config["bam_files"], "{sample}", "{sample}.bam")
     output:
         bam_CB=os.path.join(config["bam_files"], "{sample}", "{sample}_CB.bam")
     params:
-        sample="{sample}"  # Use wildcards directly for the sample name
+        sample="{sample}"
     shell:
         """
-        echo "Adding CB tag to BAM file: {input.bam}"
-        samtools view -h {input.bam} | \
-        awk -v cb={params.sample} 'BEGIN {{OFS="\t"}} {{$NF = $NF"\tCB:Z:"cb; print}}' | \
-        samtools view -bS - > {output.bam_CB}
+        echo "Processing sample: {params.sample}"
+        echo "Expected BAM path: {input.bam}"
+
+        if [[ ! -f "{input.bam}" ]]; then
+            echo "ERROR: BAM file {input.bam} not found!"
+            exit 1
+        fi
+
+        samtools view -h {input.bam} | awk -v cb="{params.sample}" 'BEGIN {{OFS="\t"}} {{if ($1 ~ /^@/) print; else print $0 "\tCB:Z:" cb;}}' | samtools view -b - > {output.bam_CB}
         """
 
 # Rule to index the BAM file

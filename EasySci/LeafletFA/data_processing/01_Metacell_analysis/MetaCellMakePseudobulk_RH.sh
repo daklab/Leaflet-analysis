@@ -2,7 +2,7 @@
 #SBATCH -J RH_pseudobulk
 #SBATCH --mem=64G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-9915%30 # Number of unique clusters
+#SBATCH --array=1-10015%10 # Number of unique clusters
 
 # conda activate python3ENV 
 module load samtools
@@ -11,6 +11,9 @@ module load samtools
 CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_cells.csv"   
 ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/" 
 OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/RH" 
+# Make OUTPUT_DIR if it does not exist
+mkdir -p "$OUTPUT_DIR"
+
 tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > RH_cluster_list.txt
 
 # Get the cluster name corresponding to this task ID

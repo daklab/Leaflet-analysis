@@ -3,6 +3,6 @@
         "cpus": 4,
         "mem": "64000",
         "time": "4-00:00",
-        "job-name": "EASYSCI_job"
+        "job-name": "MOUSE_ALLEN_j"
     }
 }

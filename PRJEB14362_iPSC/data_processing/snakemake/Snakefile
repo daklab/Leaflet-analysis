@@ -5,9 +5,15 @@ configfile: "config_human_iPSC.yaml"
 
 def get_sample_ids():
     sample_ids = set()
-    search_path = os.path.join(config["raw_dir"], "*.fastq.gz")  # Look for all .fastq.gz files
-    sample_file_check = {}
     missing_samples = []
+    
+    # Path to raw fastq files
+    search_path = os.path.join(config["raw_dir"], "*.fastq.gz")
+    
+    # Path where SJ.out.tab files are stored
+    sj_output_path = os.path.join(config["bam_files"], "{sample}", "SJ.out.tab")
+
+    sample_file_check = {}
 
     # Gather sample files and check for pairs
     for filepath in glob.glob(search_path):
@@ -24,9 +30,13 @@ def get_sample_ids():
     # Collect sample IDs with both "_1" and "_2" files
     for sample_id, reads in sample_file_check.items():
         if "1" in reads and "2" in reads:
-            sample_ids.add(sample_id)
+            sj_file_path = sj_output_path.format(sample=sample_id)
+            if not os.path.exists(sj_file_path):
+                missing_samples.append(sample_id)
+                print(f"Missing SJ.out.tab for {sample_id}, will reprocess.")
+            else:
+                sample_ids.add(sample_id)
         else:
-            missing_samples.append(sample_id)
             print(f"Warning: Sample {sample_id} is missing one of the paired files.")
 
     # Save missing samples to a file
@@ -47,7 +57,8 @@ rule all:
     input:
         expand(os.path.join(config["results_dir"], "{sample}_junctions.bed"), sample=sample_ids),
         expand(os.path.join(config["results_dir"], "{sample}_barcodes.txt"), sample=sample_ids),
-        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids)
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids),
+        expand(os.path.join(config["bam_files"], "{sample}", "SJ.out.tab"), sample=sample_ids)
 
 # Rule to generate STAR index
 rule generate_star_index:
@@ -72,6 +83,7 @@ rule run_star:
         fastq2=os.path.join(config["raw_dir"], "{sample}_2.fastq.gz")
     output:
         bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam"),
+        sj=os.path.join(config["bam_files"], "{sample}", "SJ.out.tab"),
     params:
         star_index_dir=config['star_index_dir'],
         output_prefix=os.path.join(config["bam_files"], "{sample}/")
