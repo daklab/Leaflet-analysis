@@ -75,16 +75,7 @@ rule run_star:
         log=os.path.join(config["bam_files"], "{sample}", "run_star.log")  # Log file per sample
     shell:
         """
-        echo "Checking FASTQ files for {wildcards.sample}..." > {params.log}
-
-        # Check if both FASTQ files exist and are non-empty
-        if [ ! -s {input.fastq1} ] || [ ! -s {input.fastq2} ]; then
-            echo "Skipping {wildcards.sample}: FASTQ files are empty or missing" >> {params.log}
-            exit 0  # Exit normally so Snakemake continues
-        fi
-
         echo "Running STAR for {wildcards.sample}..." >> {params.log}
-
         STAR --genomeDir {params.star_index_dir} \
              --readFilesIn {input.fastq1} {input.fastq2} \
              --readFilesCommand zcat \
@@ -94,7 +85,8 @@ rule run_star:
              --limitBAMsortRAM 44006670219 \
              --outSAMtype BAM SortedByCoordinate \
              --runThreadN 4 \
-             --twopassMode Basic \
+             --genomeLoad NoSharedMemory \
+            --twopassMode Basic \
              --outFileNamePrefix {params.output_prefix}
         """
 

@@ -30,6 +30,7 @@ TabulaSenis/temp/*
 TabulaSenis/date_figures/*
 TabulaSenis/figures/*
 TabulaSenis/LeafletFA_analysis/gencode.vM19
+TabulaSenis/LeafletFA_analysis/gencode.vM19.db
 PRJEB14362_iPSC/LeafletFA_analysis/notebooks/gencode.v45
 PRJEB14362/LeafletFA_analysis/notebooks/gencode.v45
 TabulaSapien_2025-01-08/*
@@ -175,4 +176,4 @@ cython_debug/
 
 # VS Code
 # ignore .vscode folder 
-.vscode/
+.vscode/TabulaSenis/LeafletFA_analysis/gencode.vM19.db

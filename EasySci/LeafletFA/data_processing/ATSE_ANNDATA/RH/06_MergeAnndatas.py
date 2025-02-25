@@ -21,7 +21,7 @@ def merge_anndata_files(input_dir, output_file):
     combined = ad.read_h5ad(files[0])
     
     # Set observation names to cell_id for first file
-    combined.obs_names = combined.obs['cell_id']
+    combined.obs_names = combined.obs['Main_cluster_name_wkmeans']
     current_max_index = combined.obs['cell_id_index'].max()
     
     # Store var and uns data which should be identical across files
@@ -36,7 +36,7 @@ def merge_anndata_files(input_dir, output_file):
         adata = ad.read_h5ad(file)
         
         # Set observation names to cell_id
-        adata.obs_names = adata.obs['cell_id']
+        adata.obs_names = adata.obs['Main_cluster_name_wkmeans']
         
         # Update cell_id_index for the new chunk
         adata.obs['cell_id_index'] = adata.obs['cell_id_index'] + current_max_index + 1
@@ -77,9 +77,9 @@ def merge_anndata_files(input_dir, output_file):
     print(f"Total features: {combined.shape[1]}")
     print(f"cell_id_index range: 0 to {combined.obs['cell_id_index'].max()}")
     print("\nSample of merged data:")
-    print(combined.obs[['cell_id', 'cell_id_index']].head())
+    print(combined.obs[['Main_cluster_name_wkmeans', 'cell_id_index']].head())
     print("...")
-    print(combined.obs[['cell_id', 'cell_id_index']].tail())
+    print(combined.obs[['Main_cluster_name_wkmeans', 'cell_id_index']].tail())
     
     # Save final result in a compressed format
     print(f"\nSaving merged dataset to {output_file} (compressed)")
@@ -100,9 +100,9 @@ if __name__ == '__main__':
 
 # To run this script, use the following command:
     
-# SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250128/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/anndata/merged_anndata.h5ad
+# SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
+# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
+# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas/merged_anndata.h5ad
 # 
 # sbatch --wrap="python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE" \
 #        --job-name=merge_anndata \

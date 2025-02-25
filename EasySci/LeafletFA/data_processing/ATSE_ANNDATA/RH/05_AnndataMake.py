@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import Path
 import importlib
 import argparse
+import pickle
 
 # Import source code for processing anndata object
 sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/clustering')
@@ -36,11 +37,36 @@ def main():
     print(f"Reading metadata from {METADATA_PATH}")
     metadata = pd.read_csv(METADATA_PATH, sep=",")
 
-    # Read intron clusters
+    # Load in the actual junctions observed in EasySci2024
+    with open('/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results/final_junctions.pkl', 'rb') as f:
+        junction_dict = pickle.load(f)
+    dataset_junction_ids = set(junction_dict.keys())
+    print(f"Found {len(dataset_junction_ids)} junctions in the dataset")
+
+    # Read and process intron clusters
     print(f"Reading ATSE file from {INTRON_CLUSTS_FILE}")
     intron_clusts = pd.read_csv(INTRON_CLUSTS_FILE, sep="\t")
-    relevant_junction_ids = set(intron_clusts['junction_id'])
-    print(f"Number of relevant junction ids: {len(relevant_junction_ids)}")
+    intron_clusts['junction_id'] = intron_clusts['junction_id'].astype(str)
+
+    # Filter the ATSE file to only include junctions in the dataset
+    print("Filtering ATSE file to only include junctions in the dataset...")
+    original_count = len(intron_clusts)
+    intron_clusts = intron_clusts[intron_clusts['junction_id'].isin(dataset_junction_ids)]
+    filtered_count = len(intron_clusts)
+    print(f"Filtered ATSE file from {original_count} to {filtered_count} junctions")
+
+    # Check for and remove duplicates in intron_clusts
+    print("Checking for duplicates in filtered intron_clusts")
+    dups = intron_clusts['junction_id'].duplicated()
+    if dups.any():
+        print(f"Found {dups.sum()} duplicates in intron_clusts['junction_id']")
+        print("Removing duplicates from intron_clusts (likely from liftOver analysis)")
+        intron_clusts = intron_clusts.drop_duplicates(subset='junction_id', keep='first')
+        print(f"intron_clusts shape after deduplication: {intron_clusts.shape}")
+    
+    # Extract final list of relevant junction IDs from deduplicated DataFrame
+    relevant_junction_ids = list(intron_clusts['junction_id'])
+    print(f"Final number of unique junction IDs for processing: {len(relevant_junction_ids)}")
 
     # Process files and build matrices
     print("Processing files and building matrices...")
