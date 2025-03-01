@@ -673,5 +673,101 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
     # Show the plot
     plt.show()
 
-    # Example usage:
-    # plot_clustermap(coefficients_age, highlighted_factors=['factor_17', 'factor_18', 'factor_19'])
+def plot_umap_with_junctions_and_factors(adata, junction_ids, factors, PSI_layer="PSI_CELLS", PHI_matrix=None, meta_columns=["tissue", "age"], size=8, ncols=2, wspace=0.1):
+    """
+    Plots UMAP with selected junction PSI values and factor usage across cells.
+    
+    Parameters:
+    adata : AnnData
+        The AnnData object containing UMAP coordinates and PSI values.
+    junction_ids : list
+        List of junction IDs to extract from `adata.layers[PSI_layer]` and store in `adata.obs`.
+    factors : list
+        List of factor indices to extract from `PHI_matrix` and store in `adata.obs`.
+    PSI_layer : str, optional
+        The layer containing PSI values (default is "PSI_CELLS").
+    PHI_matrix : numpy.ndarray, optional
+        The matrix containing factor usage (should match cell count in `adata`).
+    meta_columns : list, optional
+        List of column names in `adata.obs` to include in the UMAP plot (default is ["tissue", "age"]).
+    size : float, optional
+        Marker size for UMAP plot (default is 8).
+    ncols : int, optional
+        Number of columns for subplot arrangement (default is 2).
+    wspace : float, optional
+        Space between subplots (default is 0.1).
+    """
+    
+    # Add junction PSI values to adata.obs
+    for junction_id in junction_ids:
+        adata.obs[f"junction_{junction_id}"] = adata.layers[PSI_layer][:, junction_id]
+    
+    # Add factor usage to adata.obs if PHI_matrix is provided
+    if PHI_matrix is not None:
+        for factor in factors:
+            adata.obs[f"factor_{factor}"] = PHI_matrix[:, factor]
+    
+    # Define colors for UMAP visualization
+    color_vars = meta_columns + [f"junction_{j}" for j in junction_ids] + [f"factor_{f}" for f in factors]
+    
+    # Plot UMAP
+    sc.pl.umap(adata, color=color_vars, wspace=wspace, size=size, ncols=ncols)
+
+def plot_violin_by_cell_type(adata, feature="junction", factor_idx=None, junction_idx=None, gene_name=None, cell_type_column="cell_type_grouped", cell_type=None, group_column="age", size=(6, 6)):
+    """
+    Plots a violin plot of a given feature (factor or junction activity) in a specified cell type across a grouping variable.
+    """
+    
+    # Add junction or factor activity to adata.obs for easy plotting 
+    if feature == "junction":
+        if junction_idx is None:
+            raise ValueError("Please provide a junction index.")
+        adata.obs[feature] = adata.layers["PSI_CELLS"][:, junction_idx]
+    elif feature == "factor":
+        if factor_idx is None:
+            raise ValueError("Please provide a factor index.")
+        adata.obs[feature] = adata.obsm["X_PHI"][:, factor_idx]
+    elif feature == "gene":
+        if gene_name is None:
+            raise ValueError("Please provide a gene name.")
+        adata.obs[feature] = adata[:, gene_name].X.toarray()        
+    else:
+        raise ValueError("Invalid feature. Please use 'junction' or 'factor'.")
+   
+    # Filter for the specified cell type if cell_type is not None
+    if cell_type is not None:
+        subset_cells = adata[adata.obs[cell_type_column] == cell_type]
+    else:
+        subset_cells = adata
+    
+    # Create the violin plot
+    plt.figure(figsize=size)
+    ax = sns.violinplot(x=group_column, y=feature, data=subset_cells.obs, hue=group_column, inner=None)
+    
+    # Calculate median and mean per group
+    medians = subset_cells.obs.groupby(group_column)[feature].median()
+    means = subset_cells.obs.groupby(group_column)[feature].mean()
+    
+    # Annotate median and mean values on the plot
+    for i, (median, mean) in enumerate(zip(medians, means)):
+        plt.text(i, median, f"Median: {median:.2f}", ha="center", va="bottom", fontsize=10, color="black", fontweight="bold")
+    
+    # Labels and title
+    if feature == "junction":
+        plt.xlabel(group_column.capitalize(), fontsize=12)
+        plt.ylabel(f"{feature} {junction_idx} PSI", fontsize=12)
+        plt.title(f"{feature} {junction_idx} PSI in {cell_type}", fontsize=14)
+    elif feature == "factor":
+        plt.xlabel(group_column.capitalize(), fontsize=12)
+        plt.ylabel(f"{feature} {factor_idx} Activity", fontsize=12)
+        plt.title(f"{feature} {factor_idx} Activity in {cell_type}", fontsize=14)
+    elif feature == "gene":
+        plt.xlabel(group_column.capitalize(), fontsize=12)
+        plt.ylabel(f"{gene_name} Expression", fontsize=12)
+        plt.title(f"{gene_name} Expression in {cell_type}", fontsize=14)
+        print(f"The number of cells that have non-zero expression of {gene_name} is {len(subset_cells.obs[subset_cells.obs[feature] > 0])}")
+    plt.show()
+
+# Example usage:
+# plot_violin_by_cell_type(adata, feature="factor_10", cell_type_column="cell_type_grouped", cell_type="MICROGLIA", group_column="age", size=(6,6))
+# plot_violin_by_cell_type(adata, feature="junction_30510", cell_type_column="cell_type_grouped", cell_type="MICROGLIA", group_column="age", size=(6,6))

@@ -203,3 +203,9 @@ if __name__ == "__main__":
 #python $script $dataset_name smart_seq --glob_pattern "/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/Leaflet/*junctions_with_barcodes.bed" --output_dir $output_dir
     
 #### sbatch --mem=200G --time=24:00:00 --job-name=AB_junc_stats --wrap="python $script $dataset_name smart_seq --glob_pattern '/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/Leaflet/*junctions_with_barcodes.bed' --output_dir $output_dir"
+
+# how to run? example... easysci RH 
+#script=/gpfs/commons/home/kisaev/Leaflet-analysis/junction_summary_stats.py
+#dataset_name=EasySciRH
+#output_dir=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/
+#### sbatch --mem=200G -p bigmem --time=24:00:00 --job-name=AB_junc_stats --wrap="python $script $dataset_name smart_seq --glob_pattern '/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/RH/*junctions_with_barcodes.bed' --output_dir $output_dir"

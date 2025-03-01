@@ -2,7 +2,7 @@
 #SBATCH -J DT_pseudobulk
 #SBATCH --mem=64G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-9724%10 # Number of unique clusters
+#SBATCH --array=1-9724%128 # Number of unique clusters
 
 # conda activate python3ENV 
 module load samtools
