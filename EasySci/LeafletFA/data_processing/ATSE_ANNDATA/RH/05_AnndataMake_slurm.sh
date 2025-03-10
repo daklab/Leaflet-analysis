@@ -2,10 +2,9 @@
 #SBATCH --job-name=chunk_anndata
 #SBATCH --output=logs/chunkAdata_%A_%a.out
 #SBATCH --error=logs/chunkAdata_%A_%a.err
-#SBATCH --mem=64G
+#SBATCH --mem=40G
 #SBATCH --cpus-per-task=4
-#SBATCH --array=0-99%64
-#SBATCH -p bigmem
+#SBATCH --array=0-99%32
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake.py
 WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223

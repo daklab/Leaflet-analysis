@@ -16,7 +16,9 @@ sample_bam_map = get_sample_ids()
 
 rule all:
     input:
-        expand("{results_dir}/{sample}/junctions_with_barcodes.bed", 
+        expand("{results_dir}/{sample}/junctions_with_barcodes.bed",
+               results_dir=config["results_dir"], sample=sample_bam_map.keys()),
+        expand("{results_dir}/{sample}_splicing_summary.tsv",
                results_dir=config["results_dir"], sample=sample_bam_map.keys())
 
 # Rule to add CB tag to BAM files
@@ -64,4 +66,31 @@ rule extract_junctions:
         rm {input.bam}
         rm {input.bai}
         echo "Done extracting junctions with barcodes"
+        """
+
+rule summarize_splicing:
+    input:
+        bam=rules.add_cb_tag.output.bam_CB,
+        juncs=config["results_dir"] + "/{sample}/junctions.bed"
+    output:
+        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv")
+    shell:
+        """
+        echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads" > {output.summary}
+
+        sample=$(basename {input.bam} | cut -d'.' -f1)
+        total_reads=$(samtools view -c -F 4 {input.bam})
+
+        # Ensure the file has at least five columns before extracting spliced reads
+        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+
+        # Ensure spliced_reads is not empty or invalid
+        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+            spliced_reads=0
+        fi
+
+        unspliced_reads=$((total_reads - spliced_reads))
+
+        echo -e "$sample\t$total_reads\t$spliced_reads\t$unspliced_reads" >> {output.summary}
+        echo "Splicing summary written to {output.summary}"
         """

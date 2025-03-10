@@ -1,0 +1,8 @@
+raw_dir: "/commons/projects/CZI-tabula-sapiens/SS2_data_processing"
+bam_files: "/commons/projects/CZI-tabula-sapiens/SS2_temp_intermediate"
+results_dir: "/commons/projects/CZI-tabula-sapiens/Leaflet"
+star_index_dir: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/star"
+genome_fasta: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa"
+gtf_file: "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
+regtools_path: "/gpfs/commons/home/kisaev/regtools/build/regtools"
+

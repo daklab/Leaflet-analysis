@@ -23,7 +23,8 @@ rule all:
     input:
         expand(os.path.join(config["results_dir"], "{sample}_junctions.bed"), sample=sample_ids),
         expand(os.path.join(config["results_dir"], "{sample}_barcodes.txt"), sample=sample_ids),
-        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids)
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv"), sample=sample_ids) 
 
 # Rule to generate STAR index
 rule generate_star_index:
@@ -107,4 +108,31 @@ rule extract_junctions:
         {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
         paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
         echo "Done extracting junctions with barcodes"
+        """
+
+rule summarize_splicing:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed")
+    output:
+        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv")
+    shell:
+        """
+        echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads" > {output.summary}
+
+        sample=$(basename {input.bam} | cut -d'.' -f1)
+        total_reads=$(samtools view -c -F 4 {input.bam})
+
+        # Ensure the file has at least five columns before extracting spliced reads
+        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+
+        # Ensure spliced_reads is not empty or invalid
+        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+            spliced_reads=0
+        fi
+
+        unspliced_reads=$((total_reads - spliced_reads))
+
+        echo -e "$sample\t$total_reads\t$spliced_reads\t$unspliced_reads" >> {output.summary}
+        echo "Splicing summary written to {output.summary}"
         """

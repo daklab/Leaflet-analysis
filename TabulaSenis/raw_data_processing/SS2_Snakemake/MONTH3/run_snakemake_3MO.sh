@@ -1,34 +1,30 @@
 #!/bin/bash
 #
 #SBATCH -N 1 # Ensure that all cores are on one machine
-#SBATCH -p pe2
-#SBATCH -J snakemake_master
+#SBATCH -J TMS_3M
 #SBATCH -c 1
 #SBATCH --mem=16G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --output=snakemake_master_%j.log
+#SBATCH --output=TMS_3M_%j.log
 
-# conda activate python3ENV
+# Load necessary modules
+conda activate python3ENV
 
 # Load necessary modules
 module purge
-module load gcc/9.2.0 
+# module load gcc/9.2.0 #pe2 command 
 module unload htslib/1.9
+# module load star/2.7.10b #pe2 command 
+module load star/2.7.10b-GCC-11.3.0
 module load samtools
-module unload htslib/1.9
-module load star/2.7.10b    
-module load snakemake
-module load sambamba
-module load picard
-
 # Note: the TabulaSenis BAM files were already aligned with STAR using intron motifs to get XS strand info 
 
 # Navigate to your directory with the Snakefile
-cd /gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/raw_data_processing/Snakemake/MONTH3
+cd /gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/raw_data_processing/SS2_Snakemake/MONTH3
+slurm_out=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM/
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 100 --cluster-config cluster.json --cluster "sbatch -N 1 -p pe2 -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/slurm/09182024/slurm-%j.out --error=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/slurm/09182024/slurm-%j.err" --latency-wait 60 --rerun-incomplete #--unlock
-
+snakemake --keep-going -j 64 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 echo "Snakemake workflow submitted"
 
-
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM to submit job 

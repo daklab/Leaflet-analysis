@@ -12,8 +12,8 @@ from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, cr
 
 # Constants
 #metadata = pd.read_csv(metadata_path, sep=",")
-METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_anndata_meta.tsv"  
-INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles/TMS_atse_file_unanno_also_2025-03-03_15-00-44.txt.gz"
+METADATA_PATH = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/INFO/metadata.csv"  
+INTRON_CLUSTS_FILE = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/ATSEfiles/TMS_atse_file_unanno_also_2025-03-04_18-51-06.txt.gz"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 
@@ -35,10 +35,12 @@ def main():
 
     # Read metadata
     print(f"Reading metadata from {METADATA_PATH}")
-    metadata = pd.read_csv(METADATA_PATH, sep=",")
+    metadata = pd.read_csv(METADATA_PATH)
+    # Remove outlier_call column from metadata
+    metadata = metadata.drop(columns=['outlier_call', 'outlier_type'])
 
     # Load in the actual junctions observed in EasySci2024
-    with open('/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results/final_junctions.pkl', 'rb') as f:
+    with open('/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/junction_processing_20250304/results/final_junctions.pkl', 'rb') as f:
         junction_dict = pickle.load(f)
     dataset_junction_ids = set(junction_dict.keys())
     print(f"Found {len(dataset_junction_ids)} junctions in the dataset")
@@ -78,7 +80,7 @@ def main():
         sequencing_type="smart_seq", 
         max_workers=MAX_WORKERS
     )
-    
+
     # Create and save anndata object
     output_file = os.path.join(args.output_dir, f"chunk_{args.chunk_id}_anndata.h5ad")
     print(f"Creating anndata object and saving to {output_file}")
@@ -90,7 +92,7 @@ def main():
         metadata,
         intron_clusts,
         save_file=True,
-        meta_cell_column="Main_cluster_name_wkmeans",
+        meta_cell_column="sample_name",
         prefix=output_file)
 
     # Print the number of cells that have zero counts across the board

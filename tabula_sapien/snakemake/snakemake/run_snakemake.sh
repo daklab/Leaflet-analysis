@@ -2,11 +2,11 @@
 #
 #SBATCH -N 1 # Ensure that all cores are on one machine
 #SBATCH -p cpu
-#SBATCH -J HUMAN_ALLEN
+#SBATCH -J TABULA_SAPIEN
 #SBATCH -c 1
-#SBATCH --mem=32G
+#SBATCH --mem=16G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --output=HUMAN_ALLEN_%j.log
+#SBATCH --output=TABULA_SAPIEN_%j.log
 
 conda activate python3ENV
 
@@ -28,17 +28,19 @@ which STAR
 STAR --version
 
 # Navigate to your directory with the Snakefile
-cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/lein-cortex-gru/snakemake
+cd /gpfs/commons/home/kisaev/Leaflet-analysis/tabula_sapien/snakemake/snakemake
 
-slurm_out=/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/slurm/03032025
-
+# First define the SLURM output directory
+slurm_out="/commons/projects/CZI-tabula-sapiens/slurm/logs"
 if [ ! -d "$slurm_out" ]; then
     mkdir -p $slurm_out
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 32 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake -j 16 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 
 echo "Snakemake workflow submitted"
 
+# to submit go here
+# cd /commons/projects/CZI-tabula-sapiens/slurm
 

@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=1       # Number of CPUs
 
 # Calculate total number of lines in the compressed file
-total_lines=$(zcat GTEx_Analysis_2017-06-05_v8_STARv2.5.3a_junctions.gct.gz | wc -l)
+total_lines=$(zcat /gpfs/commons/groups/knowles_lab/Karin/data/GTEx/GTEx_Analysis_2017-06-05_v8_STARv2.5.3a_junctions.gct.gz | wc -l)
 
 # Process the file, displaying progress, and add a header to the output
 {

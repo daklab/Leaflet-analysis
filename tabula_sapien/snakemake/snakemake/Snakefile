@@ -1,0 +1,126 @@
+import os
+import glob
+
+configfile: "config_tabula_sapien.yaml"
+
+# Set temporary directory
+workflow.tmpdir = "/commons/projects/CZI-tabula-sapiens/slurm"
+
+# Function to recursively find all BAM files in the raw_dir and its subdirectories
+def get_sample_ids():
+    sample_ids = []
+    bam_files = {}
+    
+    # Walk through all subdirectories
+    for root, dirs, files in os.walk(config["raw_dir"]):
+        for file in files:
+            # Find original BAM files (not the .CB.bam files we create)
+            if file.endswith(".Aligned.out.sorted.bam") and not file.endswith(".CB.bam"):
+                # Use the BAM filename (without extension) as the sample ID
+                sample_id = file.replace(".Aligned.out.sorted.bam", "")
+                
+                # Store the full path to the BAM file
+                bam_path = os.path.join(root, file)
+                bam_files[sample_id] = bam_path
+                sample_ids.append(sample_id)
+                
+    print(f"Found {len(sample_ids)} samples")
+    return sample_ids, bam_files
+
+# Get sample IDs and BAM file paths
+sample_ids, bam_files = get_sample_ids()
+
+# Print debug information
+print("raw_dir:", config["raw_dir"])
+print("Found samples:", len(sample_ids))
+
+rule all:
+    input:
+        expand(os.path.join(config["results_dir"], "{sample}_junctions.bed"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_barcodes.txt"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv"), sample=sample_ids)
+
+# Get the original BAM file path for a sample
+def get_input_bam(wildcards):
+    return bam_files[wildcards.sample]
+
+rule add_cb_tag:
+    input:
+        bam=get_input_bam
+    output:
+        bam_CB=os.path.join(config["bam_files"], "{sample}.CB.bam")
+    params:
+        sample=lambda wildcards: wildcards.sample
+    shell:
+        """
+        echo "Adding CB tag to BAM file: {input.bam}"
+        mkdir -p $(dirname {output.bam_CB})
+
+        # Extract the cell ID from the BAM file name
+        cell_id="{params.sample}"
+        
+        # Extract header and alignments separately to avoid header manipulation issues
+        samtools view -H {input.bam} > {output.bam_CB}.header
+        samtools view {input.bam} | awk -v cb=$cell_id -F '\\t' 'BEGIN {{OFS="\\t"}} {{$NF = $NF"\\tCB:Z:"cb; print}}' > {output.bam_CB}.sam
+        cat {output.bam_CB}.header {output.bam_CB}.sam | samtools view -bS - > {output.bam_CB}
+        rm -f {output.bam_CB}.header {output.bam_CB}.sam
+        """
+
+# Rule to index BAM file
+rule index_bam:
+    input:
+        bam=rules.add_cb_tag.output.bam_CB
+    output:
+        bai=os.path.join(config["bam_files"], "{sample}.CB.bam.bai")
+    shell:
+        """
+        echo "Indexing BAM file: {input.bam}"
+        samtools index {input.bam} {output.bai}
+        """
+
+rule extract_junctions:
+    input:
+        bam=rules.add_cb_tag.output.bam_CB,
+        bai=rules.index_bam.output.bai
+    output:
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed"),
+        barcodes=os.path.join(config["results_dir"], "{sample}_barcodes.txt"),
+        juncswbarcodes=os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed")
+    params:
+        regtools_path=config["regtools_path"]
+    shell:
+        """
+        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
+        mkdir -p $(dirname {output.juncs})
+        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+        paste --delimiters='\\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+        echo "Done extracting junctions with barcodes"
+        """
+
+rule summarize_splicing:
+    input:
+        bam=rules.add_cb_tag.output.bam_CB,
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed")
+    output:
+        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv")
+    shell:
+        """
+        echo -e "Sample\\tTotal_Reads\\tSpliced_Reads\\tUnspliced_Reads" > {output.summary}
+        
+        sample="{wildcards.sample}"
+        total_reads=$(samtools view -c -F 4 {input.bam})
+        
+        # Ensure the file has at least five columns before extracting spliced reads
+        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+        
+        # Ensure spliced_reads is not empty or invalid
+        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+            spliced_reads=0
+        fi
+        
+        unspliced_reads=$((total_reads - spliced_reads))
+        
+        echo -e "$sample\\t$total_reads\\t$spliced_reads\\t$unspliced_reads" >> {output.summary}
+        echo "Splicing summary written to {output.summary}"
+        """
