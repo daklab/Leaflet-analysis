@@ -23,13 +23,13 @@ import visualization.IsovizPy as ja
 
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
 fasta_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/fasta/genome.fa"
-combined_junctions = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250128/results"
-output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/"
+combined_junctions = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250324/results"
+output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/ATSEfiles/"
 
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 100 
-min_num_cells_wjunc = 10
+min_junc_reads = 200 
+min_num_cells_wjunc = 500
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
@@ -89,5 +89,5 @@ atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 ## to submit:
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/ATSEfiles
 # conda activate LeafletSC
-# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/ATSEmapping.py
+# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/04_ATSEmapping.py
 # sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J TMSLeafletFA -p bigmem

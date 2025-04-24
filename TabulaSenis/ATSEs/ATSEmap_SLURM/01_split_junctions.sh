@@ -12,6 +12,8 @@ SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm
 INPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_files.txt
 WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output
 
+cd $WD
+
 # Create base directory with today's date
 BASE_DIR="junction_processing_$(date +%Y%m%d)"
 mkdir -p $BASE_DIR/{logs,chunks,results}

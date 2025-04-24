@@ -243,7 +243,7 @@ def compare_factors_by_age(splice_adata, factors, cell_type_col="cell_type_group
     return result_df
 
 # Function to plot the distribution of factor activity for young and old mice
-def plot_factor_distribution(splice_adata, cell_type, factor):
+def plot_factor_distribution(splice_adata, cell_type, factor): # to-do, add option to specify which column name contains the "cell_type" or tissue or whatever feature you want to plot distribution of relative to factor activity 
     """
     Plots the distribution of a given latent factor for a specific cell type,
     comparing young vs. old age groups.
@@ -604,7 +604,7 @@ def logistic_regression_feature_prediction(
     }
 
     ### **Step 8: Train Logistic Regression Models**
-    logreg_params = {'multi_class': 'multinomial', 'solver': 'saga', 'max_iter': 500, 'random_state': random_state}
+    logreg_params = {'multi_class': 'multinomial', 'solver': 'saga', 'max_iter': 100, 'random_state': random_state}
     models = {name: LogisticRegression(**logreg_params) for name in data_splits.keys()}
 
     for name, (X_train, X_test, y_train, y_test) in data_splits.items():
@@ -630,7 +630,7 @@ def logistic_regression_feature_prediction(
     return accuracies, models, label_encoder, coefficients_dfs
 
 
-def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), center=0, save_plot=False):
+def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), center=0, col_cluster=False, save_plot=False):
     """
     Plots a clustermap of the given coefficients and applies custom formatting.
     
@@ -643,7 +643,7 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
     """
     # Create the clustermap
     g = sns.clustermap(coefficients.T, cmap=cmap, annot=False, figsize=figsize, 
-                       row_cluster=True, col_cluster=False, xticklabels=1, yticklabels=1, center=center)
+                       row_cluster=True, col_cluster=col_cluster, xticklabels=1, yticklabels=1, center=center)
 
     # Set y-axis tick labels (rows) font size and rotation
     plt.setp(g.ax_heatmap.yaxis.get_majorticklabels(), rotation=0, fontsize=14)
@@ -712,7 +712,14 @@ def plot_umap_with_junctions_and_factors(adata, junction_ids, factors, PSI_layer
     
     # Plot UMAP
     sc.pl.umap(adata, color=color_vars, wspace=wspace, size=size, ncols=ncols)
+    plt.show()
 
+    # Remove newly made obs columns 
+    for junction_id in junction_ids:
+        del adata.obs[f"junction_{junction_id}"]
+    for factor in factors:
+        del adata.obs[f"factor_{factor}"]
+    
 def plot_violin_by_cell_type(adata, feature="junction", factor_idx=None, junction_idx=None, gene_name=None, cell_type_column="cell_type_grouped", cell_type=None, group_column="age", size=(6, 6)):
     """
     Plots a violin plot of a given feature (factor or junction activity) in a specified cell type across a grouping variable.

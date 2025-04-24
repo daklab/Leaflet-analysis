@@ -7,27 +7,29 @@ configfile: "config_tabula_sapien.yaml"
 workflow.tmpdir = "/commons/projects/CZI-tabula-sapiens/slurm"
 
 # Function to recursively find all BAM files in the raw_dir and its subdirectories
-def get_sample_ids():
+def get_sample_ids(output_file="sample_ids.txt"):
     sample_ids = []
     bam_files = {}
     
     # Walk through all subdirectories
     for root, dirs, files in os.walk(config["raw_dir"]):
         for file in files:
-            # Find original BAM files (not the .CB.bam files we create)
-            if file.endswith(".Aligned.out.sorted.bam") and not file.endswith(".CB.bam"):
-                # Use the BAM filename (without extension) as the sample ID
-                sample_id = file.replace(".Aligned.out.sorted.bam", "")
+            if file == "Aligned.sorted.out.bam":
+                relative_path = os.path.relpath(root, config["raw_dir"])
+                sample_id = relative_path.replace("/", "_")
                 
-                # Store the full path to the BAM file
                 bam_path = os.path.join(root, file)
                 bam_files[sample_id] = bam_path
                 sample_ids.append(sample_id)
-                
-    print(f"Found {len(sample_ids)} samples")
+
+    # Save sample IDs to file for inspection
+    with open(output_file, "w") as f:
+        for sid in sorted(sample_ids):
+            f.write(f"{sid}\t{bam_files[sid]}\n")
+
+    print(f"Found {len(sample_ids)} samples. Saved to '{output_file}'.")
     return sample_ids, bam_files
 
-# Get sample IDs and BAM file paths
 sample_ids, bam_files = get_sample_ids()
 
 # Print debug information
@@ -91,11 +93,21 @@ rule extract_junctions:
         regtools_path=config["regtools_path"]
     shell:
         """
-        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
-        mkdir -p $(dirname {output.juncs})
-        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
-        paste --delimiters='\\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
-        echo "Done extracting junctions with barcodes"
+        echo "Checking total reads in BAM file: {input.bam}"
+        total_reads=$(samtools view -c -F 4 {input.bam})
+        echo "Total reads: $total_reads"
+
+        if [ "$total_reads" -lt 100 ]; then
+            echo "Skipping junction extraction for {wildcards.sample}: fewer than 100 reads"
+            # Create empty output files so pipeline continues
+            touch {output.juncs} {output.barcodes} {output.juncswbarcodes}
+        else
+            echo "Extracting junctions for {wildcards.sample}"
+            mkdir -p $(dirname {output.juncs})
+            {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+            paste --delimiters='\\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+            echo "Done extracting junctions with barcodes"
+        fi
         """
 
 rule summarize_splicing:
@@ -110,17 +122,18 @@ rule summarize_splicing:
         
         sample="{wildcards.sample}"
         total_reads=$(samtools view -c -F 4 {input.bam})
-        
-        # Ensure the file has at least five columns before extracting spliced reads
-        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
-        
-        # Ensure spliced_reads is not empty or invalid
-        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+
+        if [ ! -s {input.juncs} ]; then
+            echo "Empty or missing junctions file for {wildcards.sample}, setting spliced_reads=0"
             spliced_reads=0
+        else
+            spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+            if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+                spliced_reads=0
+            fi
         fi
-        
+
         unspliced_reads=$((total_reads - spliced_reads))
-        
         echo -e "$sample\\t$total_reads\\t$spliced_reads\\t$unspliced_reads" >> {output.summary}
         echo "Splicing summary written to {output.summary}"
         """

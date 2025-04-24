@@ -4,6 +4,9 @@ import time
 
 configfile: "config_mouse_brain_dev_2021.yaml"
 
+# Set temporary directory
+workflow.tmpdir = "/commons/projects/CZI-tabula-sapiens/slurm"
+
 def get_sample_ids():
     raw_dir = config["raw_dir"]
     sample_ids = []

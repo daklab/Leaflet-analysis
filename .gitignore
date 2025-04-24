@@ -37,6 +37,10 @@ TabulaSapien_2025-01-08/*
 TabulaSenis/ATSEs/gencodeVM19
 TabulaSenis/LeafletFA_analysis/archive/*
 TabulaSenis/LeafletFA_analysis/archive
+tabula_sapien/snakemake/snakemake/sample_ids.txt
+Human_Splicing_Foundation/processed_data/tabsap_adata_2025-04-15.h5ad
+
+*.h5ad
 
 # Add all /.snakemake folders
 **/.snakemake

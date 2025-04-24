@@ -101,8 +101,8 @@ if __name__ == '__main__':
 # To run this script, use the following command:
     
 # SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/ATSEs/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250128/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/anndata/merged_anndata.h5ad
+# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250324/anndatas
+# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_processing_20250324/merged_anndata.h5ad
 # 
 # sbatch --wrap="python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE" \
 #        --job-name=merge_anndata \

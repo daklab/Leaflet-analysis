@@ -1,38 +1,52 @@
 #!/bin/sh
 #SBATCH -N 1 
-#SBATCH -p pe2
-#SBATCH -c 6
 #SBATCH --mem=40000M
 #SBATCH -t 5-00:00 
-#SBATCH -J AWS_$1
+#SBATCH --job-name=AWS_${1}  # Corrected Job Name Expansion
 
 module purge
-module load awscli/1.11.36
+module load awscli
 
-main_path=/gpfs/commons/datasets/controlled/CZI/tabula-sapiens/AWS_data/alignment-gencode/SS2
-cd $main_path
+# Check if an argument was provided
+if [ -z "$1" ]; then
+    echo "Error: No dataset name provided. Usage: sbatch download_tsp_v2.sh TSP1"
+    exit 1
+fi
 
-mkdir $1 
-cd $1
+# Argument (dataset name, e.g., TSP1, TSP2, ..., TSPN10)
+DATASET="$1"
 
-shift
-for s3_path in "$@"
-do
-    echo "starting download of $s3_path"
-    aws s3 sync $s3_path . --exclude "*" --include "*.bam" --include "*.bam.bai"
+# Define base S3 path
+S3_BASE="s3://czb-tabula-sapiens/TabulaSapiens_v2/${DATASET}/alignment_gencode41/smartseq/"
+LOCAL_DIR="/gpfs/commons/datasets/controlled/CZI/tabula-sapiens/TabulaSapiens_v2/SS2/${DATASET}"
+
+# Create local directory (cleaner structure)
+mkdir -p "$LOCAL_DIR"
+cd "$LOCAL_DIR"
+
+echo "Downloading from $S3_BASE"
+
+# Find only the relevant BAM and TXT files inside 'per/' subdirectories
+aws s3 ls "$S3_BASE" --recursive | awk '{print $NF}' | grep -E "/per/.+(Aligned.sorted.out.bam|htseq-count.txt)$" | while read -r file_path; do
+    echo "Processing: $file_path"
+
+    # Extract a cleaner local directory structure
+    CLEANED_PATH=$(echo "$file_path" | sed "s#TabulaSapiens_v2/${DATASET}/alignment_gencode41/smartseq/##")
+    LOCAL_PATH="$LOCAL_DIR/$(dirname "$CLEANED_PATH")"
+    FILENAME=$(basename "$file_path")
+
+    # Ensure local directory exists
+    mkdir -p "$LOCAL_PATH"
+
+    # Check if file already exists
+    if [ -f "$LOCAL_PATH/$FILENAME" ]; then
+        echo "Skipping (already downloaded): $LOCAL_PATH/$FILENAME"
+    else
+        echo "Downloading: $file_path"
+        aws s3 cp "s3://czb-tabula-sapiens/$file_path" "$LOCAL_PATH/"
+    fi
 done
 
-echo "$1 SS2 done"
+echo "Download completed for $DATASET"
 
-
-# download TM 10X data 
-# cd /gpfs/commons/groups/knowles_lab/data/tabula_muris/10x
-#aws s3 sync s3://czb-tabula-muris-senis/10x/3_month/ . --exclude "*" --include "*.bam" --include "*.bam.bai"
-#sbatch --wrap "aws s3 sync s3://czb-tabula-muris-senis/10x/3_month/ . --exclude \"*\" --include \"*.bam\" --include \"*.bam.bai\"" --mem 60000M -c 6 -p pe2 -t 5-00:00 -J AWS_10X_3month
-# for the same samples, evaluate which junctions are detected 
-# all data is here: https://s3.console.aws.amazon.com/s3/buckets/czb-tabula-muris-senis?region=us-west-2&tab=objects
-# tabula muris is actually the three months dataset**
-
-#aws s3 sync s3://czb-tabula-muris-senis/Metadata/ . 
-
-samtools view possorted_genome_bam.bam | head -n 5
+# ALL DONE!! 
