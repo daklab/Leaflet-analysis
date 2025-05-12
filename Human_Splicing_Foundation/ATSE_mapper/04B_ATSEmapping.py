@@ -16,7 +16,7 @@ sys.path.append(LEAFLET_SRC)
 ##----------Post processing------------------------------------------------------
 # Read the file back in and check if atses remain (post splice site usage filter)
 # that aren't overlapping anymore and should be removed 
-atse_input_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/TMS_atse_file_unanno_also_2025-04-22_14-07-59.txt.gz"
+atse_input_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-04-30_19-03-14.txt.gz"
 atses = pd.read_csv(atse_input_file, sep="\t")
 atses.drop(columns=["transcripts", "both_ends_transcripts", "only_5_prime_transcripts", "only_3_prime_transcripts"], inplace=True)
 print(f"Read existing ATSE file and starting post mapping cleanup!")
@@ -70,7 +70,7 @@ print(f"Final number of junctions in ATSE file: {len(atses)}")
 print(f"Final number of ATSE events in ATSE file: {len(atses['event_id'].unique())}")
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf
 # conda activate LeafletSC
 # script=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/04B_ATSEmapping.py
 # python $script 

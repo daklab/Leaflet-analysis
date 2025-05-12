@@ -1,7 +1,3 @@
-# %% [markdown]
-# ## Let's run intron clustering to annotate alternative splicing events given observed junctions in our cells 
-
-# %%
 import os
 import pandas as pd 
 from sklearn.decomposition import TruncatedSVD
@@ -18,7 +14,6 @@ import seaborn as sns
 import scanpy as sc
 
 from scipy.spatial.distance import cdist
-
 import numpy as np
 
 import sys
@@ -63,46 +58,47 @@ print(f"Using device: {device}")
 float_type = {"device": device, "dtype": torch.float}
 if device == torch.device('cuda'):
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
-# %% [markdown]
-# ### Load input files 
-# 
-
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
-# Output DIR 
-output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/042025"
+# --- Output Directory ---
+output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025"
+assert os.path.isdir(output_dir), f"Output directory does not exist: {output_dir}"
 print(f"Output directory: {output_dir}", flush=True)
 
-# %%
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas/merged_anndata.h5ad"
-splice_adata = ad.read_h5ad(input_file)
-splice_adata.obs.reset_index(drop=True, inplace=True)
-splice_adata.obs["cell_id_index"] = splice_adata.obs.index 
-print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
+# --- ATSEs ---
+ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
+assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
 
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/TMS_atse_file_unanno_also_2025-04-22_14-07-59.txt.gz"
 atses = pd.read_csv(ATSE_file, sep="\t")
+assert "event_id" in atses.columns, "'event_id' column missing from ATSE file"
+assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
+
+# --- Splicing Input File ---
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025/splice_adata_matched_2025-05-12.h5ad"
+assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
+
+splice_adata = ad.read_h5ad(input_file)
+assert splice_adata.shape[0] > 0, "Splice AnnData has zero cells"
+assert splice_adata.shape[1] > 0, "Splice AnnData has zero features"
+
+splice_adata.obs.reset_index(drop=True, inplace=True)
+splice_adata.obs["cell_id_index"] = splice_adata.obs.index
+print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
 
 print(splice_adata.obs.dataset.value_counts())
 print(splice_adata.obs.tissue.value_counts())
 print(splice_adata.obs["age"].value_counts())
 
-# %%
 # Assign sequencing technology based on source
 splice_adata.obs["seqtech"] = "single_nuclei"
 splice_adata.obs.loc[splice_adata.obs["dataset"] == "tabula_sapiens", "seqtech"] = "single_cell"
 splice_adata.obs.seqtech.value_counts()
 
-# %% [markdown]
-# #### Figure out which junctions to include for model training object
-
-# %%
+# Get some junction stats 
 splice_adata.var["non_zero_count_cells"] = np.array((splice_adata.X > 0).sum(axis=0)).flatten()
 splice_adata.var["non_zero_cell_prop"] = splice_adata.var["non_zero_count_cells"] / splice_adata.shape[0]
 
-# %%
 # let's make an ATSE event id score to decide which ATSEs to keep at the end, since we are limited to under 100,000 splice junctions 
 # what do we care about? 
 # - number of fully annotated splice junctions in the ATSE vs partially annotated vs unannotated (annotation_status)
@@ -136,11 +132,6 @@ junction_counts = splice_adata.var["event_id"].value_counts().rename("junction_c
 atse_scores["atse_score"] = atse_scores.sum(axis=1)
 atse_scores["number_of_junctions"] = junction_counts
 atse_scores["normalized_atse_score"] = atse_scores["atse_score"] / junction_counts
-atse_scores.sort_values("number_of_junctions", ascending=False).head()
-
-# %%
-# summarize histogram of normalized_atse_score show percentilues 10% 50% 90% 
-atse_scores["normalized_atse_score"].describe(percentiles=[0.1, 0.5, 0.6, 0.9])
 
 # Print how many ATSEs remain after filtering at each of the percentiles
 print(f"Number of ATSEs remaining at 10th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.1)].shape[0]}")
@@ -148,38 +139,20 @@ print(f"Number of ATSEs remaining at 50th percentile: {atse_scores[atse_scores['
 print(f"Number of ATSEs remaining at 60th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.6)].shape[0]}")
 print(f"Number of ATSEs remaining at 90th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.9)].shape[0]}")
 
-# %%
 # For splice_adata object, let's filter out the ATSEs that have a normalized_atse_score below the 10th percentile
-atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.5)]
+atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.4)]
 print(f"Number of ATSEs remaining after filtering: {atse_scores_filt.shape[0]}", flush=True)
 
-# %%
+# Filter 
 splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filt.index)]
-# print remaining number of atses 
 print(f"The number of junctions in the dataset is {splice_adata.shape[1]}", flush=True)
 
-# %%
-# find common columns between splice_adata.var and atses
 splice_adata.var = splice_adata.var.merge(atses[["gene_id", "gene_name", "junction_id", "annotation_status", "position_off_5_prime", "position_off_3_prime"]], on=["junction_id", "gene_id", "annotation_status", "gene_name", "position_off_5_prime", "position_off_3_prime"])
-
-# %%
 splice_adata.var.reset_index(drop=True, inplace=True)
-# Rename the old junction_id_index to old_junction_id_index 
 splice_adata.var.rename(columns={'junction_id_index': 'old_junction_id_index'}, inplace=True)
-# Redo the junction_id_index column now that we have removed some junctions
-splice_adata.var['junction_id_index'] = splice_adata.var.index
+splice_adata.var['junction_id_index'] = splice_adata.var.index # Redo the junction_id_index column now that we have removed some junctions
 
-# %%
 # Step 1: Count the number of cells per cell type in 'cell_ontology_class'
-cell_type_counts = splice_adata.obs['cell_type'].value_counts()
-print(cell_type_counts, flush=True)
-
-# Step 2: Filter for cell types with more than 50 cells
-cell_types_to_keep = cell_type_counts[cell_type_counts > 1].index
-
-# Step 3: Subset the AnnData object to only include these cell types
-splice_adata = splice_adata[splice_adata.obs['cell_type'].isin(cell_types_to_keep)]
-
 # Print the subsetted cell types and their counts
 print(splice_adata.obs['cell_type'].value_counts(), flush=True)
 
@@ -221,17 +194,17 @@ splice_adata.uns['pca_explained_variance_ratio'] = svd.explained_variance_ratio_
 sc.pp.neighbors(splice_adata, use_rep='X_pca')
 
 # Step 3. Calculate UMAP 
-sc.tl.umap(splice_adata)
+# sc.tl.umap(splice_adata)
 
 # plot UMAP with cell types and age groups
-sc.pl.umap(splice_adata, color="seqtech", title="UMAP of Data Source", show=False)
-umap_file = f"{output_dir}/seqtech_umap.png"
-plt.savefig(umap_file, bbox_inches="tight", dpi=300)
-plt.close()
-print(f"Saved UMAP plot of Data Source!", flush=True)
+# sc.pl.umap(splice_adata, color="seqtech", title="UMAP of Data Source", show=False)
+# umap_file = f"{output_dir}/seqtech_umap.png"
+# plt.savefig(umap_file, bbox_inches="tight", dpi=300)
+# plt.close()
+# print(f"Saved UMAP plot of Data Source!", flush=True)
 
 # Define possible number of waypoints to learn
-n_waypoints_learn = [100]
+n_waypoints_learn = [50]
 
 # Placeholder to store waypoints and metacell dictionaries for each n_waypoints
 waypoints_dict = {}
@@ -239,7 +212,7 @@ metacell_dicts = {}
 
 # Parameters
 num_components = 30  # Number of components to consider
-metacell_size = 20    # Number of nearest cells to assign to each waypoint
+metacell_size = 100    # Number of nearest cells to assign to each waypoint
 pca_components = splice_adata.obsm["X_pca"]
 
 # Loop over different n_waypoints to generate waypoints and metacell assignments
@@ -261,6 +234,7 @@ for n_waypoints in n_waypoints_learn:
     metacell_dicts[n_waypoints] = metacell_dict
 
 rho_hat = splice_adata.layers["junc_ratio"]
+
 # Generate multiple initializations
 print(f"Generating initializations for Psi and Phi!", flush=True)
 psi_initializations, phi_initializations = wayp.generate_initializations(rho_hat, waypoints_dict, metacell_dicts, epsilon=0.001)
@@ -290,17 +264,22 @@ for i, n_waypoints in enumerate(waypoints_dict.keys()):
 
 # remove junc_ratio layer from splice_adata to save memory prior to saving object 
 splice_adata.layers.pop("junc_ratio")
-# remove first old_junction_id_index column from splice_adata.var
 splice_adata.var.drop(columns=['old_junction_id_index'], inplace=True)
 
 #-------------------------------------------------------------
 # Save anndata object with waypoints for modeling! 
 #-------------------------------------------------------------
-new_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_{timestamp}.h5ad"
+print("Ready to save file!")
+
+# Create a string listing all waypoint values
+waypoint_str = "_".join(str(wp) for wp in n_waypoints_learn)
+new_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_{waypoint_str}waypoints_{timestamp}.h5ad"
 
 # Create the new full file path
 new_file_path = os.path.join(output_dir, new_filename)
+splice_adata.write_h5ad(new_file_path, compression='lzf')
+print(f"AnnData saved as {new_file_path} with lzf compression", flush=True)
 
-# Save the AnnData object with the new filename
-splice_adata.write_h5ad(new_file_path, compression='gzip')
-print(f"AnnData saved as {new_file_path}", flush=True)
+# Submit script like this:
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025
+# sbatch --mem=200G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

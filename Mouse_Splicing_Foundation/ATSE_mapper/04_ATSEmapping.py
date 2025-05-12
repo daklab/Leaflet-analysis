@@ -13,9 +13,9 @@ LEAFLET_SRC = '/gpfs/commons/home/kisaev/LeafletFA-utils/leafletfa_utils/atsemap
 sys.path.append(LEAFLET_SRC)
 
 # Now import your modules
-from junction_parser import JunctionReader # type: ignore
-from genome_utils import JunctionAnalyzer, GenomeDB # type: ignore
-from event_detection import ATSEAnalyzer # type: ignore
+from junction_parser import JunctionReader 
+from genome_utils import JunctionAnalyzer, GenomeDB 
+from event_detection import ATSEAnalyzer 
 
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
 fasta_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/fasta/genome.fa"
@@ -24,8 +24,8 @@ output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_
 
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 100 
-min_num_cells_wjunc = 10
+min_junc_reads = 200 
+min_num_cells_wjunc = 1000
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"

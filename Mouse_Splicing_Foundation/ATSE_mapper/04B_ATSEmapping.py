@@ -16,7 +16,7 @@ sys.path.append(LEAFLET_SRC)
 ##----------Post processing------------------------------------------------------
 # Read the file back in and check if atses remain (post splice site usage filter)
 # that aren't overlapping anymore and should be removed 
-atse_input_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-19_17-37-00.txt.gz"
+atse_input_file="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
 atses = pd.read_csv(atse_input_file, sep="\t")
 atses.drop(columns=["transcripts", "both_ends_transcripts", "only_5_prime_transcripts", "only_3_prime_transcripts"], inplace=True)
 print(f"Read existing ATSE file and starting post mapping cleanup!")

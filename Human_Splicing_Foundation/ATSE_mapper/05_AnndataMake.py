@@ -13,7 +13,7 @@ from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, cr
 # Constants
 #metadata = pd.read_csv(metadata_path, sep=",")
 METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/human_metadata_combined.tsv" #note this metadata might be just Smart-seq2 cells/nuceli... (as in no 10X here)
-INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/TMS_atse_file_unanno_also_2025-04-22_14-07-59.txt.gz"
+INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 

@@ -63,27 +63,20 @@ print(f"Using device: {device}")
 float_type = {"device": device, "dtype": torch.float}
 if device == torch.device('cuda'):
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
 # %% [markdown]
 # ### Load input files 
 # 
 
-timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-
-# Output DIR 
-output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/042025"
-print(f"Output directory: {output_dir}", flush=True)
-
 # %%
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415/anndatas/merged_anndata.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/042025/mouse_foundation_data_20250427_175203_splice.h5ad"
 splice_adata = ad.read_h5ad(input_file)
 splice_adata.obs.reset_index(drop=True, inplace=True)
 splice_adata.obs["cell_id_index"] = splice_adata.obs.index 
-print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
+print(f"The number of cells in the dataset is {splice_adata.shape[0]}")
 
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-16_09-46-32.txt.gz"
+ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
 atses = pd.read_csv(ATSE_file, sep="\t")
-print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
+print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}")
 
 # %%
 # fill in missing "age" values with "unknown_atm" not these are currently categorical 
@@ -95,92 +88,7 @@ splice_adata.obs["age"].value_counts()
 # %%
 metadata = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/metadata_mouse_metadata_combined.csv"
 metadata = pd.read_csv(metadata)
-splice_adata.obs = splice_adata.obs.drop(columns=["age", "cell_ontology_class", "mouse.id", "sex", "subtissue", "tissue"])
-
-# %%
-# subset splice_adata to just cell_id in metadata 
-splice_adata = splice_adata[splice_adata.obs["cell_id"].isin(metadata["cell_id"])]
-print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
-
-# %%
-splice_adata.obs = splice_adata.obs.merge(metadata, on = "cell_id")
-# renumber the cell_id_index
-splice_adata.obs["cell_id_index"] = range(len(splice_adata.obs))
-
-# %%
-splice_adata.obs["dataset"] = "TMS"
-# if age is 2m then change dataset to AB 
-splice_adata.obs.loc[splice_adata.obs["age"] == "2m", "dataset"] = "AB"
-splice_adata.obs.dataset.value_counts()
-
-# Now need to update tissue 
-splice_adata.obs["cell_name"] = splice_adata.obs["tissue"]
-# if dataset is TMS then use cell_id values to fill in cell_name
-splice_adata.obs.loc[splice_adata.obs["dataset"] == "TMS", "cell_name"] = splice_adata.obs.loc[splice_adata.obs["dataset"] == "TMS", "cell_id"]
-
-broad_cell_type_map = {
-    "Micro-PVM": "microglial cell", # to match how the cells are in the TMS dataset
-    "Astro": "GLIAL CELL",
-    "Oligo": "GLIAL CELL",
-    "VLMC": "VLMCs",
-    "Endo": "ENDOTHELIAL CELL",
-    "SMC-Peri": "PERICYTE",
-}
-
-# Supplemental known excitatory subregions (often hippocampal / entorhinal)
-known_exc_subregions = [
-    "CA1", "CA3", "CA2", "DG", "SUB", "ProS", "HATA", "Mossy", "PPP", "RHP"
-]
-
-def map_to_broad_category(label):
-    for keyword, category in broad_cell_type_map.items():
-        if keyword in label:
-            return category
-
-    if "Car3" in label:
-        return "Other non-neuronal (Car3+)"
-
-    if any(x in label for x in ["Sst", "Pvalb", "Vip", "Lamp5", "Sncg", "Meis2", "Ntng1", "Pax6", "CR"]):
-        return "Inhibitory Neurons"
-
-    if (
-        any(x in label for x in ["L2", "L3", "L4", "L5", "L6"])
-        or any(x in label for x in known_exc_subregions)
-        or any(x in label for x in ["IT", "CT", "PT", "NP", "CTX", "ENT", "PAR", "POST", "RSP", "HPF"])
-    ):
-        return "Excitatory Neurons"
-
-    return label  # fallback to original label
-
-# Apply to your data
-splice_adata.obs["broad_cell_type"] = splice_adata.obs["cell_ontology_class"].apply(map_to_broad_category)
-
-# If AB and Microglia cells then label as "splice_adata.obs.loc[splice_adata.obs["dataset"] == "AB", "tissue"] = "Brain_Myeloid" or "Brain_Non-Myeloid"
-# Set default for all AB cells
-splice_adata.obs.loc[splice_adata.obs["dataset"] == "AB", "tissue"] = "Brain_Non-Myeloid"
-
-# Overwrite if AB and microglial
-is_ab_microglia = (splice_adata.obs["dataset"] == "AB") & (splice_adata.obs["broad_cell_type"] == "microglial cell")
-splice_adata.obs.loc[is_ab_microglia, "tissue"] = "Brain_Myeloid"
-
-# %%
-# Assign sequencing technology based on source
-splice_adata.obs["seqtech"] = "single_nuclei"
-splice_adata.obs.loc[splice_adata.obs["dataset"] == "TMS", "seqtech"] = "single_cell"
-splice_adata.obs.seqtech.value_counts()
-
-# Clean cell_id only for TMS cells
-splice_adata.obs["cell_clean"] = splice_adata.obs["cell_id"]
-is_tms = splice_adata.obs["dataset"] == "TMS"
-splice_adata.obs.loc[is_tms, "cell_clean"] = (
-    splice_adata.obs.loc[is_tms, "cell_id"]
-    .str.replace(r'-(?=.*_)', '_', regex=True)
-    .str.split('_')
-    .str[:2]
-    .str.join('_')
-)
-
-print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
+metadata.tail()
 
 # %% [markdown]
 # #### Figure out which junctions to include for model training object
@@ -248,15 +156,16 @@ print(f"Number of ATSEs remaining at 50th percentile: {atse_scores[atse_scores['
 print(f"Number of ATSEs remaining at 60th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.6)].shape[0]}")
 print(f"Number of ATSEs remaining at 90th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.9)].shape[0]}")
 
+
 # %%
 # For splice_adata object, let's filter out the ATSEs that have a normalized_atse_score below the 10th percentile
 atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.5)]
-print(f"Number of ATSEs remaining after filtering: {atse_scores_filt.shape[0]}", flush=True)
+print(f"Number of ATSEs remaining after filtering: {atse_scores_filt.shape[0]}")
 
 # %%
 splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filt.index)]
 # print remaining number of atses 
-print(f"The number of junctions in the dataset is {splice_adata.shape[1]}", flush=True)
+print(f"The number of junctions in the dataset is {splice_adata.shape[1]}")
 
 # %%
 # find common columns between splice_adata.var and atses
@@ -268,6 +177,7 @@ splice_adata.var.reset_index(drop=True, inplace=True)
 splice_adata.var.rename(columns={'junction_id_index': 'old_junction_id_index'}, inplace=True)
 # Redo the junction_id_index column now that we have removed some junctions
 splice_adata.var['junction_id_index'] = splice_adata.var.index
+splice_adata.var.head()
 
 # %% [markdown]
 # ### Code for doing sanity check to ensure correct counts are stored in combined Anndata object across cell-junctions
@@ -462,26 +372,22 @@ splice_adata.obs['subtissue_clean'] = splice_adata.obs['subtissue'].replace(subt
 splice_adata.obs.drop(columns=['subtissue'], inplace=True)
 
 # Add new cell type groupings 
-splice_adata.obs['cell_ontology_class'] = splice_adata.obs['broad_cell_type'].astype(str)
+splice_adata.obs['cell_ontology_class'] = splice_adata.obs['cell_ontology_class'].astype(str)
 splice_adata.obs['cell_type_grouped'] = splice_adata.obs['cell_ontology_class'].replace(cell_type_groupings)
-print(f"The number of cells in the splicing dataset is {splice_adata.shape[0]}", flush=True)
+print(f"The number of cells in the splicing dataset is {splice_adata.shape[0]}")
 
 # %% [markdown]
 # ### Subset to just cell types with more than 10 cells in them
 
 # %%
-# Step 1: Count the number of cells per cell type in 'cell_ontology_class'
-cell_type_counts = splice_adata.obs['cell_type_grouped'].value_counts()
-print(cell_type_counts, flush=True)
+splice_adata.obs
 
-# Step 2: Filter for cell types with more than 50 cells
-cell_types_to_keep = cell_type_counts[cell_type_counts > 1].index
+# %%
+splice_adata.obs.iloc[10]
 
-# Step 3: Subset the AnnData object to only include these cell types
-splice_adata = splice_adata[splice_adata.obs['cell_type_grouped'].isin(cell_types_to_keep)]
-
+# %%
 # Print the subsetted cell types and their counts
-print(splice_adata.obs['cell_type_grouped'].value_counts(), flush=True)
+print(splice_adata.obs['cell_type_grouped'].value_counts())
 
 # %% [markdown]
 # ### Obtain sparse junction usage ratios! (First filter to keep only junctions with reasonable coverage...)
@@ -489,7 +395,7 @@ print(splice_adata.obs['cell_type_grouped'].value_counts(), flush=True)
 # %%
 # Print final number of splice junctions, ATSEs, and genes in splice_adata
 print(f"Number of splice junctions: {splice_adata.shape[1]}")
-print(f"Number of ATSEs: {splice_adata.var['event_id'].nunique()}", flush=True)
+print(f"Number of ATSEs: {splice_adata.var['event_id'].nunique()}")
 
 # %%
 print(splice_adata.var.splice_motif.value_counts())
@@ -509,16 +415,19 @@ splice_adata
 # %%
 # Get sparse centered PSI values 
 splice_adata.layers["junc_ratio"] = wayp.calculate_centered_psi(junction_counts, cluster_counts)
-print(f"Done getting sparse centered PSI values!", flush=True)
+print(f"Done getting sparse centered PSI values!")
 
 # Step 1: Perform PCA using sparse data
 n_components = 30  
 svd = TruncatedSVD(n_components=n_components, random_state=42)
+
 # Fit and transform the junction ratio data (this gives U)
 U = svd.fit_transform(splice_adata.layers["junc_ratio"])
-print(f"Done calculating SVD!", flush=True)
+print(f"Done calculating SVD!")
+
 # Get the singular values (S)
 S = svd.singular_values_
+
 # Multiply U by S to get U * S
 U_by_S = U * S  # This scales each component in U by the corresponding singular value in S
 
@@ -527,28 +436,13 @@ splice_adata.obsm['X_pca'] = U_by_S
 
 # store explained variance ratio for future reference
 splice_adata.uns['pca_explained_variance_ratio'] = svd.explained_variance_ratio_
+print(svd.explained_variance_ratio_)
 
-# %%
 # Step 2: Compute UMAP on the PCA-reduced data
-sc.pp.neighbors(splice_adata, use_rep='X_pca')
+# sc.pp.neighbors(splice_adata, use_rep='X_pca')
 
 # Step 3. Calculate UMAP 
-sc.tl.umap(splice_adata)
-
-# %%
-# plot UMAP with cell types and age groups
-sc.pl.umap(splice_adata, color="seqtech", title="UMAP of Data Source", show=False)
-umap_file = f"{output_dir}/seqtech_umap.png"
-plt.savefig(umap_file, bbox_inches="tight", dpi=300)
-plt.close()
-print(f"Saved UMAP plot of Data Source!", flush=True)
-
-# Make one using "cell_type_grouped" 
-sc.pl.umap(splice_adata, color="cell_type_grouped", title="UMAP of Cell Types", show=False)
-umap_file = f"{output_dir}/cell_type_grouped_umap.png"
-plt.savefig(umap_file, bbox_inches="tight", dpi=300)
-plt.close()
-print(f"Saved UMAP plot of Cell Types!", flush=True)
+# sc.tl.umap(splice_adata)
 
 # %% [markdown]
 # ### Identify cell waypoints using splicing based PCs!
@@ -562,14 +456,14 @@ waypoints_dict = {}
 metacell_dicts = {}
 
 # Parameters
-num_components = 30  # Number of components to consider
-metacell_size = 20    # Number of nearest cells to assign to each waypoint
+num_components = 20  # Number of components to consider
+metacell_size = 100   # Number of nearest cells to assign to each waypoint
 pca_components = splice_adata.obsm["X_pca"]
 
 # Loop over different n_waypoints to generate waypoints and metacell assignments
 for n_waypoints in n_waypoints_learn:
 
-    print(f"Finding {n_waypoints} waypoints from the PCA components!", flush=True)
+    print(f"Finding {n_waypoints} waypoints from the PCA components!")
     random_seed = np.random.randint(0, 10000 + 1)  # Generate random seed
     
     # Max-min sampling to identify waypoints
@@ -588,7 +482,7 @@ for n_waypoints in n_waypoints_learn:
 # #### Try looking at waypoints just using PC space...
 
 # %%
-# wayp.plot_PCA_with_waypoints(splice_adata, waypoints_dict, n_waypoints=30, waypoint_color='red', first_waypoint_color='blue', size=10)
+# wayp.plot_PCA_with_waypoints(splice_adata, waypoints_dict, n_waypoints=40, waypoint_color='red', first_waypoint_color='blue', size=10)
 
 # %% [markdown]
 # ### Generate_initializations matrices for Phi and Psi
@@ -597,14 +491,13 @@ for n_waypoints in n_waypoints_learn:
 rho_hat = splice_adata.layers["junc_ratio"]
 
 # Generate multiple initializations
-print(f"Generating initializations for Psi and Phi!", flush=True)
 psi_initializations, phi_initializations = wayp.generate_initializations(rho_hat, waypoints_dict, metacell_dicts, epsilon=0.001)
 
 # %%
 # Loop through the waypoints_dict and corresponding initializations
 for i, n_waypoints in enumerate(waypoints_dict.keys()):
 
-    print(f"Adding waypoint based initializations to anndata for {n_waypoints} waypoints!", flush=True)
+    print(f"Adding waypoint based initializations to anndata for {n_waypoints} waypoints!")
 
     # Extract the corresponding psi and phi initializations
     psi = psi_initializations[i]
@@ -637,6 +530,11 @@ splice_adata.layers.pop("junc_ratio")
 splice_adata.var.drop(columns=['old_junction_id_index'], inplace=True)
 
 # %%
+timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+
+# Output DIR 
+output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/042025"
+
 # in file name include timestamp 
 new_filename = f"MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_{timestamp}.h5ad"
 
@@ -645,11 +543,7 @@ new_file_path = os.path.join(output_dir, new_filename)
 
 # Save the AnnData object with the new filename
 splice_adata.write_h5ad(new_file_path, compression='gzip')
-print(f"AnnData saved as {new_file_path}", flush=True)
+print(f"AnnData saved as {new_file_path}")
 
-# %%
-#SCRIPT=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/
-#sbatch --mem=300G \
-#  --output=prep_anndata.out \
-#  --wrap "python -u $SCRIPT"
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/042025
+# sbatch --mem=200G --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

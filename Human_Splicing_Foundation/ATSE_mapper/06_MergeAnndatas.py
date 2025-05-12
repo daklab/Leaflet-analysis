@@ -101,3 +101,5 @@ if __name__ == '__main__':
 # OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas/merged_anndata.h5ad
 # 
 # python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
+# sbatch --job-name=human_SJ_anndata --mem=300G --partition cpu,dev,bigmem --output=run_%j.out --wrap="python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE"
+

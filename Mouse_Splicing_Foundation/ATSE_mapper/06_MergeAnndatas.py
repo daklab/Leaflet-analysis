@@ -100,15 +100,13 @@ if __name__ == '__main__':
 
 # To run this script, use the following command:
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415
 # SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/ATSE_mapper/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas/merged_anndata.h5ad
+# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415/anndatas
+# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415/anndatas/merged_anndata.h5ad
 # 
-# python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
-# sbatch --wrap "python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE" --mem 64G 
 
-#sbatch --mem=300G \
+#sbatch --mem=200G \
 #  --output=merge_anndata.out \
 #  --error=merge_anndata.err \
 #  --wrap "python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE"

@@ -283,7 +283,7 @@ pd.DataFrame({
     "ts_ctrl_sum": ts_ctrl_sum
 }).to_csv(f"{outdir}/pseudobulk_microglia_macrophage_controls.tsv", sep="\t", index=False)
 
-print("✅ All pseudobulk files saved.")
+print("All pseudobulk files saved.")
 
 
 # SCRIPT=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/TabulaSapien_vs_Allen_pseudobulk_analysis_2.py

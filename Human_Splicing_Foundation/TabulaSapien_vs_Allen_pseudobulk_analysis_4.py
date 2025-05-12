@@ -24,16 +24,14 @@ from collections import defaultdict
 import gffutils 
 import scipy.sparse as sp
 import gffutils 
-
-# %% [markdown]
-# ### Normalize and combine each version of the data: exons, introns, total
-
-# %%
 import scanpy as sc
 import pandas as pd
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse import csr_matrix
+import pickle
+from datetime import date
+
 
 # %%
 def extract_gene_transcript_info(gtf_file, db_file):
@@ -306,9 +304,9 @@ ab_introns.var = ab_introns.var.reset_index().merge(gene_info_df, on="gene_name"
 ab_exons.var = ab_exons.var.reset_index().merge(gene_info_df, on="gene_name").set_index("index")
 
 # Load model for mapping exon + intron log1p length normalized counts to total spliced counts (single cell from single nuclei estimatoin)
-linear_model_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/linear_model.pkl"
+linear_model_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/linear_norm_ts_model.pkl"
+
 # Load the model
-import pickle
 with open(linear_model_file, 'rb') as f:
     model_linear = pickle.load(f)
 
@@ -318,10 +316,35 @@ print(model_linear.summary())
 # Estimate total spliced counts from exons and introns (from single nuclei data to single cell data as a way to account for differences in spliced products)
 # For each gene, we will estimate the total spliced counts using the linear model for each cell, if its counts were missing, we will not include it 
 
+# Step 1: Filter genes in gene_info_df
+valid_gene_info = gene_info_df[
+    (gene_info_df["mean_transcript_length"] > 0) &
+    (gene_info_df["mean_intron_length"] > 0)
+].copy()
+
+print(f"Retaining {len(valid_gene_info)} genes with nonzero transcript/intron length.")
+
+# Step 2: Subset all adata objects to valid genes
+valid_genes = set(valid_gene_info["gene_name"])
+
+for adata in [ts_adata, ab_exons, ab_introns]:
+    adata._inplace_subset_var(adata.var["gene_name"].isin(valid_genes))
+
 # Extract exon and intron raw counts
 exon_counts = ab_exons.X  # shape: cells x genes
 intron_counts = ab_introns.X  # same shape
 tot_counts = ts_adata.X  # shape: cells x genes
+
+# === Sanity check: ensure gene order is the same across all AnnData objects ===
+gene_order = ab_exons.var["gene_name"].values
+
+assert np.array_equal(gene_order, ab_introns.var["gene_name"].values), \
+    "Gene order mismatch between ab_exons and ab_introns!"
+
+assert np.array_equal(gene_order, ts_adata.var["gene_name"].values), \
+    "Gene order mismatch between ab_exons and ts_adata!"
+
+print("✅ Gene order is consistent across ab_exons, ab_introns, and ts_adata.")
 
 # Get gene lengths
 gene_lengths = ts_adata.var.loc[ab_exons.var_names, ['mean_transcript_length', 'mean_intron_length']]
@@ -331,17 +354,40 @@ length_norm_exons = exon_counts / gene_lengths['mean_transcript_length'].values
 length_norm_introns = intron_counts / gene_lengths['mean_intron_length'].values
 length_norm_tot = tot_counts / gene_lengths['mean_transcript_length'].values
 
+ab_exons.layers["length_norm"] = csr_matrix(length_norm_exons)
+ab_introns.layers["length_norm"] = csr_matrix(length_norm_introns)
+ts_adata.layers["length_norm"] = csr_matrix(length_norm_tot)
+
+# Confirm no cells with zero counts across the board 
+# === Check for cells with zero total normalized expression before library size adjustment ===
+for name, adata in zip(["ab_exons", "ab_introns", "ts_adata"], [ab_exons, ab_introns, ts_adata]):
+    length_norm = adata.layers["length_norm"]
+    row_sums = length_norm.sum(axis=1).A1  # get sum per cell
+    zero_cells = np.sum(row_sums == 0)
+    print(f"{zero_cells} cells in {name} have zero length-normalized counts before library size adjustment.")
+    assert zero_cells == 0, f"🚨 ERROR: {zero_cells} all-zero cells found in {name}!"
+
+# Now normalize by library size 
+length_norm_exons = length_norm_exons.multiply(1e4 / length_norm_exons.sum(axis=1).A1[:, None])
+length_norm_introns = length_norm_introns.multiply(1e4 / length_norm_introns.sum(axis=1).A1[:, None])
+length_norm_tot = length_norm_tot.multiply(1e4 / length_norm_tot.sum(axis=1).A1[:, None])
+
 # Apply log1p transformation
 log_norm_exons = np.log1p(length_norm_exons)
 log_norm_introns = np.log1p(length_norm_introns)
 log_norm_tot = np.log1p(length_norm_tot)
 
-from scipy.sparse import csr_matrix
-
 # Add as new layers
 ab_exons.layers["log_norm"] = csr_matrix(log_norm_exons)
 ab_introns.layers["log_norm"] = csr_matrix(log_norm_introns)
 ts_adata.layers["log_norm"] = csr_matrix(log_norm_tot)
+
+for name, adata in zip(["ab_exons", "ab_introns", "ts_adata"], [ab_exons, ab_introns, ts_adata]):
+    length_norm = adata.layers["log_norm"]
+    row_sums = length_norm.sum(axis=1).A1  # get sum per cell
+    zero_cells = np.sum(row_sums == 0)
+    print(f"{zero_cells} cells in {name} have zero length-normalized counts before library size adjustment.")
+    assert zero_cells == 0, f"🚨 ERROR: {zero_cells} all-zero cells found in {name}!"
 
 intercept = model_linear.params["const"]
 coef_exons = model_linear.params["exons"]
@@ -351,7 +397,49 @@ log_exons = ab_exons.layers["log_norm"]  # CSR sparse matrix
 log_introns = ab_introns.layers["log_norm"]  # CSR sparse matrix
 
 log_pred_tot = log_exons.multiply(coef_exons) + log_introns.multiply(coef_introns)
+
+log_pred_tot_with_intercept = log_pred_tot.copy()
+log_pred_tot_with_intercept.data += intercept
+
+# Create a new object using ab_exons as base
 ab_adata = ab_exons.copy()
-intercept_matrix = csr_matrix(np.full(log_pred_tot.shape, intercept))
-log_pred_tot_with_intercept = log_pred_tot + intercept_matrix
+# Store adjusted log-normalized total spliced counts
 ab_adata.layers["predicted_log_norm_ts"] = log_pred_tot_with_intercept
+# Preserve raw counts explicitly
+ab_adata.layers["raw_counts"] = csr_matrix(ab_adata.layers["raw_counts"])
+# Clean up obs to only necessary metadata (optional but clean)
+ab_adata.obs = ab_adata.obs[["sample_name"]]
+
+# Remove old exon-only log_norm layer to avoid confusion
+if "log_norm" in ab_adata.layers:
+    del ab_adata.layers["log_norm"]
+
+# === Sanity check 1: Non-zero total raw counts per cell ===
+raw_sums = ab_adata.layers["raw_counts"].sum(axis=1).A1
+zero_raw = np.sum(raw_sums == 0)
+print(f"🔍 Cells with zero raw counts: {zero_raw}")
+assert zero_raw == 0, "🚨 ERROR: Some cells have zero total raw counts!"
+
+# === Sanity check 2: Non-zero total predicted log counts per cell ===
+pred_sums = ab_adata.layers["predicted_log_norm_ts"].sum(axis=1).A1
+zero_pred = np.sum(pred_sums == 0)
+print(f"🔍 Cells with zero predicted log counts: {zero_pred}")
+assert zero_pred == 0, "🚨 ERROR: Some cells have zero total predicted log counts!"
+
+# === Sanity check: ensure gene order is the same in ab_adata and ts_adata ===
+assert np.array_equal(ab_adata.var_names, ts_adata.var_names), \
+    "🚨 ERROR: Gene order mismatch between ab_adata and ts_adata!"
+print("✅ Gene order is consistent between ab_adata and ts_adata.")
+
+# Save the object
+today = date.today().strftime("%Y-%m-%d")
+outfile = os.path.join(outdir, f"AB_adjusted_GeneExpression_via_exon_intron_regression_{today}.h5ad")
+ab_adata.write_h5ad(outfile, compression="lzf")
+print(f"Saved the object to {outfile}")
+
+outfile = os.path.join(outdir, f"TS_GeneExpression_with_length_norm_{today}.h5ad")
+ts_adata.write_h5ad(outfile, compression="lzf")
+print(f"Saved the object to {outfile}")
+
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
+# sbatch --mem=100G --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/TabulaSapien_vs_Allen_pseudobulk_analysis_4.py"

@@ -159,6 +159,7 @@ def plot_top_factor_distributions(splice_adata, top_factors, age_column="age", p
 # Step 1: Create the age_category column
 def create_age_category(splice_adata):
     splice_adata.obs['age_category'] = splice_adata.obs['age'].map({
+        '2m': 'young',
         '3m': 'young', 
         '18m': 'old', 
         '24m': 'old'
