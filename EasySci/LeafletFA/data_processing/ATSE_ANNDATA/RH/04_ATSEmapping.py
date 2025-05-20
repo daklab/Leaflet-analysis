@@ -9,35 +9,30 @@ import pickle
 import gffutils
 
 # Add the directory containing find_intron_clusters_v3.py to Python path
-LEAFLET_SRC = '/gpfs/commons/home/kisaev/Leaflet-private/src'
+LEAFLET_SRC = '/gpfs/commons/home/kisaev/LeafletFA-utils/leafletfa_utils/atsemapper'
 sys.path.append(LEAFLET_SRC)
 
 # Now import your modules
-from clustering.find_intron_clusters_v3 import (
-    JunctionReader,
-    JunctionAnalyzer, 
-    GenomeDB, 
-    ATSEAnalyzer
-)
-
-import visualization.IsovizPy as ja
+from junction_parser import JunctionReader 
+from genome_utils import JunctionAnalyzer, GenomeDB 
+from event_detection import ATSEAnalyzer 
 
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode.vM27.basic.annotation.gtf"
 fasta_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/GRCm39.primary_assembly.genome.fa"
-combined_junctions = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results"
+combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results"
 output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles"
 db_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode_vM27.db"
 
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 20 
-min_num_cells_wjunc = 5
+min_junc_reads = 10 
+min_num_cells_wjunc = 3
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
 
 # Load pkl file with junctions
-pkl_path = f"{combined_junctions}/final_junctions.pkl"
+pkl_path = f"{combined_junctions_file}/final_junctions.pkl"
 combined_junctions = pd.read_pickle(pkl_path)
 
 # Initialize the junction reader
@@ -83,7 +78,7 @@ print(event_counts)
 # Save the ATSEs to a file
 date = datetime.datetime.now().strftime("%Y-%m-%d")
 time = datetime.datetime.now().strftime("%H-%M-%S")
-atse_file = f"TMS_atse_file_{annot_status}_{date}_{time}.txt"
+atse_file = f"EasySci_RH_ATSE_FILE_{annot_status}_{date}_{time}.txt"
 
 output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
@@ -92,4 +87,4 @@ atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/04_ATSEmapping.py
-# sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J EasySciRHATSE -p bigmem
+# sbatch --mem=300G --time=3-00:00:00 -J EasySciRHATSE -p bigmem,cpu,dev --wrap="python $script_path" 

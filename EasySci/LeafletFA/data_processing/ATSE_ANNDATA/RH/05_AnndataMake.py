@@ -13,7 +13,7 @@ from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, cr
 # Constants
 #metadata = pd.read_csv(metadata_path, sep=",")
 METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_anndata_meta.tsv"  
-INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles/TMS_atse_file_unanno_also_2025-03-03_15-00-44.txt.gz"
+INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26_lifted_mm39.txt.gz"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 
@@ -35,19 +35,24 @@ def main():
 
     # Read metadata
     print(f"Reading metadata from {METADATA_PATH}")
-    metadata = pd.read_csv(METADATA_PATH, sep=",")
+    metadata = pd.read_csv(METADATA_PATH, sep=",", low_memory=False)
+    print(metadata.head())
 
-    # Load in the actual junctions observed in EasySci2024
+    # Load in the actual junctions observed in MOUSE SPLICING FOUNDATION
     with open('/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results/final_junctions.pkl', 'rb') as f:
         junction_dict = pickle.load(f)
     dataset_junction_ids = set(junction_dict.keys())
+    # print the first 10 junctions
+    print(list(dataset_junction_ids)[:10])
     print(f"Found {len(dataset_junction_ids)} junctions in the dataset")
 
     # Read and process intron clusters
     print(f"Reading ATSE file from {INTRON_CLUSTS_FILE}")
     intron_clusts = pd.read_csv(INTRON_CLUSTS_FILE, sep="\t")
     intron_clusts['junction_id'] = intron_clusts['junction_id'].astype(str)
-
+    # print the first 10 junctions in intron_clusts["junction_id"]
+    print(intron_clusts["junction_id"].head(10))
+    
     # Filter the ATSE file to only include junctions in the dataset
     print("Filtering ATSE file to only include junctions in the dataset...")
     original_count = len(intron_clusts)

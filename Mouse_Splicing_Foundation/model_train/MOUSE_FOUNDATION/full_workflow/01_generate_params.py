@@ -8,7 +8,7 @@ import pandas as pd
 
 # Define output directory
 # Define base output directory
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/"
 
 # Create output directory if it doesn't exist with today's date inside base_output_dir
 today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -20,8 +20,8 @@ print(f"All outputs will be saved in {base_output_dir}")
 param_grid = {
     "input_conc": [None, 'inf'],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
-    "delta_fixed": [1, None],
-    "K": [50],
+    "delta_fixed": [0.5, 1, None],
+    "K": [30],
     "waypoints_use": [True],
     "num_inits": [1],
     "ELBO_num_particles": [5],

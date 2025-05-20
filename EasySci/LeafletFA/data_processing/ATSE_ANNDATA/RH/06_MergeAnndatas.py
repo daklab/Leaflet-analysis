@@ -30,7 +30,7 @@ def merge_anndata_files(input_dir, output_file):
     
     # Process remaining files
     for i, file in enumerate(files[1:], 1):
-        print(f"Processing file {i+1}/{len(files)}: {file}")
+        print(f"Processing file {i+1}/{len(files)}: {file}", flush=True)
         
         # Load next file
         adata = ad.read_h5ad(file)
@@ -92,7 +92,7 @@ def main():
     parser.add_argument('--output-file', required=True, help='Path for merged output file')
     
     args = parser.parse_args()
-    
+    print("Script started", flush=True)    
     merge_anndata_files(args.input_dir, args.output_file)
 
 if __name__ == '__main__':
@@ -100,8 +100,8 @@ if __name__ == '__main__':
 
 # To run this script, use the following command:
     
-# SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas/merged_anndata.h5ad
+#SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
+#INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
+#OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas/merged_anndata.h5ad
 # 
-# python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
+#python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE

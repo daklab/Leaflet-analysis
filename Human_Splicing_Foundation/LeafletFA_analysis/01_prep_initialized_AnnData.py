@@ -140,7 +140,7 @@ print(f"Number of ATSEs remaining at 60th percentile: {atse_scores[atse_scores['
 print(f"Number of ATSEs remaining at 90th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.9)].shape[0]}")
 
 # For splice_adata object, let's filter out the ATSEs that have a normalized_atse_score below the 10th percentile
-atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.4)]
+atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.6)]
 print(f"Number of ATSEs remaining after filtering: {atse_scores_filt.shape[0]}", flush=True)
 
 # Filter 
@@ -282,4 +282,4 @@ print(f"AnnData saved as {new_file_path} with lzf compression", flush=True)
 
 # Submit script like this:
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025
-# sbatch --mem=200G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"
+# sbatch --mem=300G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

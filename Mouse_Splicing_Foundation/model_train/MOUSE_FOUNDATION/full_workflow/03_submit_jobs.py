@@ -4,7 +4,7 @@ import datetime
 
 # Define where to save outputs 
 # Should be directory in which model params are saved
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-12"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13"
 
 # Load parameter list from JSON file
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -23,16 +23,16 @@ job_script_template = """#!/bin/bash
 #SBATCH --job-name=leaflet_{job_id}
 #SBATCH --output={log_dir}/leaflet_{job_id}.out
 #SBATCH --error={log_dir}/leaflet_{job_id}.err
-#SBATCH --time=5-00:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=600G
-#SBATCH --partition cpu,dev,bigmem
+#SBATCH --mem=500G
+#SBATCH --partition=cpu,bigmem
 
 # Set Python to run in unbuffered mode to ensure real-time output
 export PYTHONUNBUFFERED=1
 
 # Run Python script with proper output handling
-python -u /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/full_workflow/run_leaflet.py {param_id} 2>&1
+python -u /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/02_run_leaflet.py {param_id} 2>&1
 
 # Optional: Add timestamp at the end of the job
 echo "Job completed at: $(date)"

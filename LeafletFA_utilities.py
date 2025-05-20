@@ -631,7 +631,8 @@ def logistic_regression_feature_prediction(
     return accuracies, models, label_encoder, coefficients_dfs
 
 
-def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), center=0, col_cluster=False, save_plot=False):
+def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figsize=(6, 7), 
+                   center=0, col_cluster=False, save_plot=False, save_path=None):
     """
     Plots a clustermap of the given coefficients and applies custom formatting.
     
@@ -641,6 +642,9 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
         cmap (str): Colormap for the heatmap.
         figsize (tuple): Size of the figure.
         center (float): Center value for diverging colormap.
+        col_cluster (bool): Whether to cluster columns.
+        save_plot (bool): Whether to save the plot.
+        save_path (str): Path to save the plot to. If None, uses default filename.
     """
     # Create the clustermap
     g = sns.clustermap(coefficients.T, cmap=cmap, annot=False, figsize=figsize, 
@@ -666,13 +670,18 @@ def plot_clustermap(coefficients, highlighted_factors=None, cmap="seismic", figs
     g.cax.tick_params(labelsize=15)
 
     if save_plot:
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        filename = f"factor_age_coefficients_{date_str}.pdf"
-        plt.savefig(filename, format='pdf')
-        print(f"Figure saved as {filename}")
+        if save_path:
+            # Use the provided save path
+            plt.savefig(save_path, dpi=300)
+            print(f"Figure saved to {save_path}")
+        else:
+            # Use default filename
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            filename = f"factor_age_coefficients_{date_str}.pdf"
+            plt.savefig(filename, format='pdf')
+            print(f"Figure saved as {filename}")
 
-    # Show the plot
-    plt.show()
+    return g
 
 def plot_umap_with_junctions_and_factors(adata, junction_ids, factors, PSI_layer="PSI_CELLS", PHI_matrix=None, meta_columns=["tissue", "age"], size=8, ncols=2, wspace=0.1):
     """
