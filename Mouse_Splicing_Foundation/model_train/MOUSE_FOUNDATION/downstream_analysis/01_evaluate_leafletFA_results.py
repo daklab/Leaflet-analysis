@@ -61,7 +61,6 @@ print(f"Using device: {device}")
 # Input/Output paths - all these need to be parameters from the command line or it's fine to just edit here with human paths
 BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829.h5ad"
-GE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/aligned_gene_expression_data_20250513_035938.h5ad"
 ATSE_FILE_PATH = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
 
 MODEL_OUTPUTS_DIR = f"{BASE_DIR}/Leaflet/leafletFAmodel/2025-05-13/"
@@ -70,6 +69,9 @@ GENOME_DB_PATH = "/gpfs/commons/home/kisaev/Leaflet-private/src/clustering/genco
 # Reference gene lists
 RBP_FILE_PATH = "/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
 AGING_GENES_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
+
+# Gene expression data
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
 
 ######################
 ### Helper Functions #
@@ -165,6 +167,10 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
     
     # Use provided PI values
     PI = pi_values
+
+    # In 01_evaluate_leafletFA_results.py, inside main() after PI is defined
+    np.save(os.path.join(DATA_DIR, "PI_values.npy"), PI)
+    print(f"   ✓ PI values saved to: {os.path.join(DATA_DIR, 'PI_values.npy')}")
     
     # Initialize output
     explained_variances = []
@@ -180,47 +186,42 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
         # Get factor values
         factor_values = X_PHI[:, factor_idx]
         
-        # Calculate total variance
-        total_variance = np.var(factor_values, ddof=1)
-        
         # Create a DataFrame for ANOVA
         anova_df = pd.DataFrame({
             'factor_values': factor_values,
             'group': groups
         })
-        
-        # Calculate group means and counts
+
+        # Group stats
         group_stats = anova_df.groupby('group')['factor_values'].agg(['mean', 'count'])
-        
+
         # Overall mean
         overall_mean = np.mean(factor_values)
-        
-        # Calculate between-group sum of squares
-        # Formula: Σ n_i * (mean_i - overall_mean)²
+
+        # Between-group sum of squares: Σ n_i * (mean_i - overall_mean)^2
         between_ss = np.sum(group_stats['count'] * (group_stats['mean'] - overall_mean)**2)
-        
+               
+        # Within-group sum of squares: Σ (x_ij - group_mean)^2
+        within_ss = 0
+        for group_name, group_data in anova_df.groupby('group'):
+            group_mean = group_stats.loc[group_name, 'mean']
+            within_ss += np.sum((group_data['factor_values'] - group_mean) ** 2)
+
         # Degrees of freedom
         n_groups = len(group_stats)
         n_samples = len(factor_values)
         df_between = n_groups - 1
-        df_within = n_samples - n_groups
-        
-        # Between-group variance
+        df_within = n_samples - n_groups        
+
+        # Variance components (mean square errors)
         between_variance = between_ss / df_between if df_between > 0 else 0
-        
-        # Calculate within-group sum of squares
-        # For each group, calculate: Σ (x - group_mean)²
-        within_ss = 0
-        for group_name, group_data in anova_df.groupby('group'):
-            group_mean = group_stats.loc[group_name, 'mean']
-            within_ss += np.sum((group_data['factor_values'] - group_mean)**2)
-        
-        # Within-group variance
         within_variance = within_ss / df_within if df_within > 0 else 0
-        
-        # Calculate proportion of variance explained (R²)
-        # This is equivalent to: 1 - (within_ss / total_ss)
+    
+        # Total sum of squares (for consistency)
         total_ss = between_ss + within_ss
+        total_variance = total_ss / (n_samples - 1)  # same denominator as np.var(..., ddof=1)
+    
+        # Proportion of variance explained (R²)
         variance_explained = between_ss / total_ss if total_ss > 0 else 0
         
         # Store results
@@ -500,14 +501,15 @@ def main():
     
     # Load splicing data
     splice_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
+    ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
+    assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
+    # Add "library_size" from ge_adata to splice_adata
+    splice_adata.obs["library_size"] = ge_adata.obs["library_size"]
 
     # if "mouse.id" is in splice_adata.obs rename it to donor_id 
     if "mouse.id" in splice_adata.obs.columns:
         splice_adata.obs.rename(columns={"mouse.id": "donor_id"}, inplace=True)
-    
-    # Load gene expression data
-    ge_adata = ad.read_h5ad(GE_ANNDATA_PATH)
-        
+            
     # Load aging gene lists
     aging_genes = load_aging_genes(AGING_GENES_PATH)
     
@@ -539,6 +541,17 @@ def main():
     splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
     splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes)
     
+    # Handle age data which is categorical
+    print("   :gear: Processing age data...")
+    # Create numeric age values (extract the numbers from strings like "18m" for mouse age)
+    if splice_adata.obs["age"].astype(str).str.contains("m").any():
+        age_numeric = pd.to_numeric(splice_adata.obs["age"].astype(str).str.replace("m", "", regex=False))
+        splice_adata.obs["age_numeric"] = age_numeric
+        print(f"   ✓ Age range: {age_numeric.min()} - {age_numeric.max()} months")
+    else:
+        splice_adata.obs["age_numeric"] = pd.to_numeric(splice_adata.obs["age"])
+        print(f"   ✓ Age range: {splice_adata.obs['age_numeric'].min()} - {splice_adata.obs['age_numeric'].max()} years")  # human age is in years
+
     print(f"   ✓ Data loaded successfully")
     
     ############################
@@ -568,10 +581,45 @@ def main():
     perplexity = np.exp(entropy)
     splice_adata.obs["perplexity"] = perplexity
     splice_adata.obs["entropy"] = entropy
+
+    # In 01_evaluate_leafletFA_results.py, inside main() after perplexity is calculated
+    median_perplexity = splice_adata.obs["perplexity"].median()
+    pd.DataFrame({"median_cell_perplexity": [median_perplexity]}).to_csv(os.path.join(DATA_DIR, "median_cell_perplexity.csv"), index=False)
+    print(f"   ✓ Median cell perplexity ({median_perplexity:.2f}) saved to: {os.path.join(DATA_DIR, 'median_cell_perplexity.csv')}")
     
+    # --- New snippet to save cell-level data with perplexity ---
+    print(f"  Preparing to save cell-level metadata with perplexity...")
+
+    # Define the columns you want from splice_adata.obs
+    cols_to_select = ['broad_cell_type', 'tissue', 'age_numeric', 'dataset', 'perplexity', 'library_size']
+
+    # Create a DataFrame with these columns
+    # First, check which of the desired columns actually exist in splice_adata.obs
+    existing_cols_to_select = [col for col in cols_to_select if col in splice_adata.obs.columns]
+    cell_meta_df = splice_adata.obs[existing_cols_to_select].copy()
+
+    # Add cell IDs - assuming they are in the AnnData index splice_adata.obs_names
+    # If you have a specific 'cell_id' column, you could add it to cols_to_select instead
+    cell_meta_df['cell_id'] = splice_adata.obs["cell_id"]
+    # Reorder columns to have 'cell_id' first, then perplexity, then others
+    final_columns_order = ['cell_id'] + \
+                          (['perplexity'] if 'perplexity' in cell_meta_df.columns else []) + \
+                          [col for col in existing_cols_to_select if col != 'perplexity']
+    
+    # Filter out any columns that might have been duplicated or are not in the df
+    final_columns_order = [col for col in final_columns_order if col in cell_meta_df.columns]
+    cell_meta_df = cell_meta_df[final_columns_order]
+    # Define the output file path
+    output_filename = f"cell_metadata_with_perplexity_param_id_{param_id}.csv.gz" # param_id should be defined in your script 01
+    output_file_path = os.path.join(DATA_DIR, output_filename)
+    # Save to a gzipped CSV
+    cell_meta_df.to_csv(output_file_path, index=False, compression='gzip')
+    print(f"   ✓ Cell metadata with perplexity saved to: {output_file_path}")
+ 
     # Print model parameters
     print(f"   ✓ Extracted {K} factors from the model")
     print(alpha_pi, bb_conc, dir_conc)
+
 #    print(f"   ✓ Model parameters: alpha_pi={alpha_pi:.4f}, bb_conc={bb_conc:.4f}, dir_conc={dir_conc:.4f}")
     
     # Save model parameters to file
@@ -585,17 +633,6 @@ def main():
 
     pd.DataFrame([model_params]).to_csv(os.path.join(DATA_DIR, "model_parameters.csv"), index=False)
     
-    # Handle age data which is categorical
-    print("   :gear: Processing age data...")
-    # Create numeric age values (extract the numbers from strings like "18m" for mouse age)
-    if splice_adata.obs["age"].astype(str).str.contains("m").any():
-        age_numeric = pd.to_numeric(splice_adata.obs["age"].astype(str).str.replace("m", "", regex=False))
-        splice_adata.obs["age_numeric"] = age_numeric
-        print(f"   ✓ Age range: {age_numeric.min()} - {age_numeric.max()} months")
-    else:
-        splice_adata.obs["age_numeric"] = pd.to_numeric(splice_adata.obs["age"])
-        print(f"   ✓ Age range: {splice_adata.obs['age_numeric'].min()} - {splice_adata.obs['age_numeric'].max()} years")  # human age is in years
-
     ############################
     # 3. Basic Visualizations
     ############################
@@ -682,6 +719,15 @@ def main():
     for color_var in ['broad_cell_type', 'tissue', 'dataset', 'age_numeric']:
         if color_var in splice_adata.obs.columns:
             visualize_cell_perplexity(splice_adata, color_by=color_var, PLOTS_DIR=PLOTS_DIR, DATA_DIR=DATA_DIR)
+
+    # Plot scatter plot of perplexity vs library size
+    plt.figure(figsize=(6, 6))
+    sns.scatterplot(x='library_size', y='perplexity', data=splice_adata.obs)
+    plt.title('Perplexity vs Library Size')
+    plt.xlabel('Library Size')
+    plt.ylabel('Perplexity')
+    plt.savefig(os.path.join(PLOTS_DIR, "perplexity_vs_library_size.png"), dpi=300, bbox_inches='tight')
+    plt.close()
 
     # Test factor activity distribution by cell type (this will be more useful in a notebook/interactive environment)
     plot_factor_distribution_by_group(splice_adata, 3, "broad_cell_type", n_groups=5, DATA_DIR=DATA_DIR, PLOTS_DIR=PLOTS_DIR)   

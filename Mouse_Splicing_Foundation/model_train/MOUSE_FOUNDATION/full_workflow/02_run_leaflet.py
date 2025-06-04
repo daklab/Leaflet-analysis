@@ -50,13 +50,14 @@ if src_path not in sys.path:
 import BetaDirichletFactor.LeafletFA as LeafletFA
 import BetaDirichletFactor.utils as utils
 
-# Define base output directory
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/"
-print(f"Base output directory: {base_output_dir}")
-
-# Get parameter set ID from command line
+# Get arguments from command line
 param_id = int(sys.argv[1])
+base_output_dir = sys.argv[2]
+ATSE_anndata_file = sys.argv[3]
+
 print(f"Loading parameter set {param_id}...")
+print(f"Base output directory: {base_output_dir}")
+print(f"Anndata file: {ATSE_anndata_file}")
 
 # Load parameters
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -93,11 +94,8 @@ wandb.init(
 wandb.config.update({
     "param_id": param_id,
     "data_source": "MouseFoundation",
-    "anndata_file": "MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829",
+    "anndata_file": ATSE_anndata_file,
 })
-
-# Load Anndata file
-ATSE_anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829.h5ad"
 
 print(f"Loading Anndata file: {ATSE_anndata_file}")
 adata = ad.read_h5ad(ATSE_anndata_file)

@@ -17,6 +17,9 @@ import os
 import sys
 import statsmodels.formula.api as smf
 from statsmodels.stats.anova import anova_lm
+import os
+import matplotlib.pyplot as plt
+import scanpy as sc
 
 import importlib
 import datetime
@@ -183,7 +186,7 @@ print(f"The number of junctions EasySci that are the same as in Mouse Foundation
 # Load the best model that was trained on the Mouse Foundation data 
 print("\n>> Extracting model parameters...")
 model_home = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/"
-param_id = 0
+param_id = 1
 model_path = f"{model_home}/run_{param_id}/leafletfa_model.pkl.xz"
 leaflet_model = load_model(model_path)
 
@@ -232,6 +235,7 @@ output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_S
 # if doesn't exist, create it
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+print(f"Made output directory: {output_dir}")
 
 #Initialize model (maybe should also use fixed PI here...)
 print("Initializing LeafletFA model...")
@@ -239,15 +243,17 @@ easysci_leaflet_model = LeafletFA.LeafletFA(
     adata=easysci_adata, 
     K=K, 
     fixed_psi=torch.tensor(psi_input),
+    pi_init=torch.tensor(PI),
+    alpha_pi_init = torch.tensor(leaflet_model["alpha_pi"]),
     junc_specific_prior=leaflet_model["junc_specific_prior"], 
-    waypoints_use=False, # should i use them here? feels like too much... 
-    input_conc_prior=None, 
-    delta_fixed=leaflet_model["dir_conc"],
+    waypoints_use=False, 
+    input_conc_prior=np.inf, # ideally should use the one the original model learned
+    delta_fixed=torch.tensor(leaflet_model["dir_conc"]),
     num_epochs=300, 
     print_epochs=5, 
     ELBO_num_particles=10, 
-    lr=0.3, 
-    gamma=0.001, 
+    lr=0.7, 
+    gamma=0.01, 
     min_delta=10,
     num_samples=100, 
     patience=5,
@@ -257,6 +263,7 @@ easysci_leaflet_model = LeafletFA.LeafletFA(
 
 # Print confirm that model has dir_conc 
 print(f"Model initialized with dir_conc: {easysci_leaflet_model.dir_conc}")
+print(f"Model initialized with pi_init: {easysci_leaflet_model.pi_init} and alpha_pi_init: {easysci_leaflet_model.alpha_pi_init}")
 
 # Train model
 print(f"Extracting sparse tensors from anndata object")
@@ -280,20 +287,33 @@ PI = easysci_leaflet_model.pi
 PI_df = pd.DataFrame(PI, columns=["PI"])
 
 temp_save="/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/model_evaluation/"
+
 # Run neighbor analysis and UMAP on easysci_adata X_leafletFA_K{K}
-sc.pp.neighbors(easysci_adata, use_rep="X_leafletFA_K30")
-sc.tl.umap(easysci_adata, min_dist=0.5)
-# Make plot using broad_cell_type as color 
-sc.pl.umap(easysci_adata, color="broad_cell_type", legend_loc="on data", title="UMAP of EasySci data colored by broad cell type")
-# save plot 
-plt.savefig(f"{temp_save}/easysci_adata_leafletFA_K{K}_umap.png")
+sc.pp.neighbors(easysci_adata, use_rep="X_leafletFA_K30", n_neighbors=20)
+sc.tl.umap(easysci_adata)
 
+# Define a custom UMAP plotting function
+def save_umap(adata, color, file_path, figsize=(8, 6)):
+    # Create figure manually to set size BEFORE sc.pl.umap()
+    plt.figure(figsize=figsize)
+    
+    sc.pl.umap(
+        adata,
+        color=color,
+        show=False,
+        frameon=True,
+        legend_fontsize=10,
+        legend_loc='right margin'
+    )
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.95])  # Adjust as needed
+    plt.savefig(file_path, dpi=300, bbox_inches='tight')
+    plt.close()
 
-
-
-
-
-
+# Example usage — adjust figsize as needed
+save_umap(easysci_adata, "broad_cell_type", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_broad_cell_type.png", figsize=(10, 8))
+save_umap(easysci_adata, "Type", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_type.png", figsize=(10, 8))
+save_umap(easysci_adata, "Main_cluster_name", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_Main_cluster_name.png", figsize=(12, 9))
 
 
 

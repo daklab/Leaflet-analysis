@@ -99,7 +99,7 @@ def main():
     # Create output directory
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d")
-    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{timestamp}_{param_id}"
+    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{timestamp}/param_id_{param_id}"
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
     

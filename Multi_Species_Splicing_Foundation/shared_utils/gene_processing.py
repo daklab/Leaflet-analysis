@@ -121,34 +121,36 @@ def normalize_by_gene_length(adata, input_layer="raw_counts", output_layer="leng
     Returns:
         AnnData: Object with normalized counts
     """
-    try:
-        # Make sure input data is in CSR format
-        counts = adata.layers[input_layer]
-        if not isinstance(counts, csr_matrix):
-            counts = csr_matrix(counts)
+
+    # Make sure input data is in CSR format
+    counts = adata.layers[input_layer]
+    if not isinstance(counts, csr_matrix):
+        counts = csr_matrix(counts)
+    
+    # Get per-gene mean transcript lengths and enforce column order
+    lengths = adata.var["mean_transcript_length"].reindex(adata.var.index)  # enforce order
+    if lengths.isnull().any():
+        raise ValueError("Some genes are missing length annotations.")
+    lengths = lengths.values
+
+    overall_median_length = np.median(lengths)
+
+     # Do sparse division
+    inv_lengths = 1.0 / lengths
+    row, col = counts.nonzero()
+    counts_norm = counts.copy()
+    print("First normalizing by individual gene length")
+    counts_norm.data = counts_norm.data * inv_lengths[col]
+    print("Then scaling by overall median length")
+    counts_norm.data = counts_norm.data * overall_median_length
+
+    # Round down to integer values so we maintain count based data
+    counts_norm.data = np.floor(counts_norm.data)
+
+    # Save back
+    adata.layers[output_layer] = counts_norm
+    return adata
         
-        # Get per-gene mean transcript lengths
-        lengths = adata.var["mean_transcript_length"].values.copy()
-
-        # Verify no zero-length genes
-        zero_length = (lengths <= 0)
-        if zero_length.any():
-            raise ValueError(f"Found {zero_length.sum()} genes with zero or negative length. This shouldn't happen after filtering.")
-
-        # Do sparse division
-        inv_lengths = 1.0 / lengths
-        row, col = counts.nonzero()
-        counts_norm = counts.copy()
-        counts_norm.data = counts_norm.data * inv_lengths[col]
-
-        # Save back
-        adata.layers[output_layer] = counts_norm
-        return adata
-        
-    except Exception as e:
-        print(f"   ❌ Error in gene length normalization: {str(e)}")
-        raise
-
 def safe_stringify_obs(adata):
     """
     Convert object columns in adata.obs to strings to avoid compatibility issues.

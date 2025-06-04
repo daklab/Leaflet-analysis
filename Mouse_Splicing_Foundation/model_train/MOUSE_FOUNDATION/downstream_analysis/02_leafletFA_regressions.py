@@ -56,7 +56,6 @@ ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_An
 # Gene expression data
 GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
 GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_models_2025-05-16.h5ad"
-MODEL_OUTPUTS_DIR = f"{BASE_DIR}/Leaflet/leafletFAmodel/2025-05-13/"
 
 # Reference gene lists
 RBP_FILE_PATH = "/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
@@ -213,6 +212,14 @@ def predict_age_with_factors(splice_adata, NMF_ge_matrix, n_nmf_components, PLOT
         coef_df = coef_df.sort_values(by="Coefficient")
         coef_df.to_csv(os.path.join(DATA_DIR, f"age_prediction_coeffs_{model_name}_alpha{alpha_val}.csv"), index=False)
         
+        # Save model metrics to file as well 
+        model_metrics_df = pd.DataFrame({
+            "model_name": [model_name],
+            "r2": [r2],
+            "mse": [mse]
+        })
+        model_metrics_df.to_csv(os.path.join(DATA_DIR, f"age_prediction_metrics_{model_name}_alpha{alpha_val}.csv"), index=False)
+
         # Plot coefficients for the current model
         if PLOTS_DIR and not coef_df.empty:
             plt.figure(figsize=(10, max(6, len(coef_df) * 0.3)))
@@ -522,6 +529,12 @@ def logistic_regression_feature_prediction(splice_adata, gene_expression_adata, 
             coefficients_dfs[name] = coef_df
             
             if DATA_DIR:
+                # Save also model metrics 
+                model_metrics_df = pd.DataFrame({
+                    "model_name": [name],
+                    "accuracy": [accuracy]
+                })
+                model_metrics_df.to_csv(os.path.join(DATA_DIR, f"{feature}_prediction_metrics_{name}.csv"), index=False)
                 coef_df.to_csv(os.path.join(DATA_DIR, f"{feature}_prediction_coeffs_{name}.csv"))
             
             # Plot heatmap for multiclass with more than 2 classes and if PLOTS_DIR is provided

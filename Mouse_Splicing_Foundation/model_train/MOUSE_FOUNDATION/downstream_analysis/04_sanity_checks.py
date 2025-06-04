@@ -96,7 +96,6 @@ def correlate_imputed_psi_with_observed_psi(splice_adata, PLOTS_DIR, DATA_DIR, n
         # Calculate Pearson correlation for the current sample
         correlation = np.nan # Default to NaN if correlation cannot be computed
         if len(psi_observed_sample) >= 2 and np.std(psi_observed_sample) > 1e-9 and np.std(psi_imputed_sample) > 1e-9:
-            # Correlation is only well-defined with at least 2 data points and non-zero variance in both samples
             correlation, _ = pearsonr(psi_observed_sample, psi_imputed_sample)
         
         all_correlations.append(correlation)
@@ -131,7 +130,7 @@ def correlate_imputed_psi_with_observed_psi(splice_adata, PLOTS_DIR, DATA_DIR, n
         f.write(f"mean_corr: {mean_corr:.4f}\n")
         f.write(f"median_corr: {median_corr:.4f}\n")
         f.write(f"std_corr: {std_corr:.4f}\n")
-    
+    # num_samples, mean_corr, median_corr, std_corr
     return all_correlations
 
 ###########################
@@ -164,7 +163,7 @@ def main():
     # Create output directory
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y-%m-%d")
-    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{timestamp}_{param_id}"
+    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{timestamp}/param_id_{param_id}"
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
     
@@ -192,7 +191,7 @@ def main():
 
     # Call PSI correlation check
     print("\n>> Checking PSI correlation...")
-    correlate_imputed_psi_with_observed_psi(splice_adata, PLOTS_DIR, DATA_DIR, num_cells=10000, num_samples=100)
+    correlate_imputed_psi_with_observed_psi(splice_adata, PLOTS_DIR, DATA_DIR, num_cells=20000, num_samples=100)
 
     print("\n========================================")
     print("LeafletFA Model Analysis Completed.")

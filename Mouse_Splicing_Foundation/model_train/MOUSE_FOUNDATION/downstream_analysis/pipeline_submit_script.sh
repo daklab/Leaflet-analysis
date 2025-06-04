@@ -1,6 +1,7 @@
 # This is a bash script
-MODEL_OUTPUTS_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13
-cd $MODEL_OUTPUTS_DIR
+MODEL_TRAIN_DATE="2025-05-13"
+MODEL_OUTPUTS_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/${MODEL_TRAIN_DATE}
+cd $MODEL_OUTPUTS_DIR/slurm
 conda activate LeafletSC
 
 # Get the number of rows in params.txt (-1 because of header)
@@ -17,12 +18,14 @@ for ((i=0; i<=num_rows-1; i++)); do
     script3=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/03_differential_splicing_analysis.py
     script4=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/04_sanity_checks.py
 
-    sbatch --mem=350G -p dev,cpu,bigmem -J "evaluate_leafletFA_results_$i" --wrap="python $script1 $i $MODEL_OUTPUTS_DIR"
-    sbatch --mem=350G -p dev,cpu,bigmem -J "leafletFA_regressions_$i" --wrap="python $script2 $i $MODEL_OUTPUTS_DIR"
-    #sbatch --mem=350G -p dev,cpu,bigmem -J "differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR"
-    #sbatch --mem=350G -p dev,cpu,bigmem -J "sanity_checks_$i" --wrap="python $script4 $i $MODEL_OUTPUTS_DIR"
+    sbatch --mem=450G -p dev,cpu,bigmem -J "evaluate_leafletFA_results_$i" --wrap="python $script1 $i $MODEL_OUTPUTS_DIR"
+    #sbatch --mem=350G -p dev,cpu,bigmem -J "leafletFA_regressions_$i" --wrap="python $script2 $i $MODEL_OUTPUTS_DIR"
+    #sbatch --mem=220G -p dev,cpu,bigmem -J "differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR"
+    #sbatch --mem=400G -p dev,cpu,bigmem -J "sanity_checks_$i" --wrap="python $script4 $i $MODEL_OUTPUTS_DIR"
 
 done
 
 
 
+# After all jobs are done, run the following script to find the best model
+#python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/05_summarize_models.py
