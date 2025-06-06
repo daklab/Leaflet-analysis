@@ -22,6 +22,11 @@ import scipy.sparse
 # Single-cell analysis
 import anndata as ad
 
+# ----- TO -DO! -----
+# Change truly missing values where the ATSE wasn't at ALL detected in a given group of cells to NaN and color GREY in clustermap... 
+# Make pseudobulk matrix via RAW data (not LeafletFA imputed values or anything)
+# Align junctions with annotated isoform JUNCTIONS to label junctions with annotated vs novel isoform events...
+
 # ----- Setup and configuration -----
 
 # Timestamp for file naming
@@ -30,8 +35,9 @@ timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 # ----- Directory and file setup -----
 
 # Output directory
-output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025"
-assert os.path.isdir(output_dir), f"Output directory does not exist: {output_dir}"
+output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025"
+# Create output directory if it doesn't exist
+os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}", flush=True)
 
 # ATSE file path
@@ -48,13 +54,53 @@ print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}
 input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025/splice_adata_matched_2025-05-12.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
+# Define which column to use for cell type grouping
+cell_type_column = "broad_cell_type"
+
 # ----- Load and preprocess data -----
 
 # Read splicing AnnData
 print("Loading splicing AnnData file...", flush=True)
 splice_adata = ad.read_h5ad(input_file)
-assert splice_adata.shape[0] > 0, "Splice AnnData has zero cells"
-assert splice_adata.shape[1] > 0, "Splice AnnData has zero features"
+
+# Add parameter for testing with subset of cells
+MAX_CELLS = 5000  # Set to None to use all cells
+if MAX_CELLS is not None and MAX_CELLS < splice_adata.shape[0]:
+    print(f"\nSubsampling to {MAX_CELLS} cells while maintaining cell type proportions...")
+    
+    # Get cell type proportions
+    cell_type_props = splice_adata.obs[cell_type_column].value_counts(normalize=True)
+    print(cell_type_props)
+    
+    # Calculate number of cells to sample per cell type
+    cells_per_type = (cell_type_props * MAX_CELLS).round().astype(int)
+    
+    # Ensure we don't exceed MAX_CELLS
+    while cells_per_type.sum() > MAX_CELLS:
+        # Find the largest cell type and reduce by 1
+        largest_type = cells_per_type.idxmax()
+        cells_per_type[largest_type] -= 1
+    
+    # Sample cells for each cell type
+    sampled_indices = []
+    for cell_type, n_cells in cells_per_type.items():
+        print(f"Sampling {n_cells} cells for cell type {cell_type}")
+        type_indices = np.where(splice_adata.obs[cell_type_column] == cell_type)[0]
+        if len(type_indices) > n_cells:
+            sampled_indices.extend(np.random.choice(type_indices, n_cells, replace=False))
+        else:
+            sampled_indices.extend(type_indices)
+    
+    # Create subset of AnnData
+    splice_adata = splice_adata[sampled_indices].copy()
+    print(f"Created subset with {splice_adata.shape[0]} cells")
+    print("\nCell type distribution in subset:")
+    print(splice_adata.obs[cell_type_column].value_counts())
+
+    # Verify layer data is properly reindexed
+    print("\nVerifying layer data reindexing:")
+    for layer in splice_adata.layers:
+        print(f"Layer '{layer}' shape: {splice_adata.layers[layer].shape}")
 
 # Reset index and store original index
 splice_adata.obs.reset_index(drop=True, inplace=True)
@@ -79,10 +125,6 @@ print(splice_adata.obs.seqtech.value_counts())
 # Check available columns for cell type grouping
 print("\nAvailable columns in splice_adata.obs:")
 print(splice_adata.obs.columns.tolist())
-
-# Determine which column to use for cell type
-cell_type_column = "broad_cell_type" if "broad_cell_type" in splice_adata.obs.columns else "cell_type"
-print(f"Using '{cell_type_column}' column for cell type grouping")
 
 # Show distribution of cell types by dataset
 print("\n=== Distribution of cell types by dataset ===")

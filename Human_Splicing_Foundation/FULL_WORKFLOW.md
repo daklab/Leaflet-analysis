@@ -14,23 +14,24 @@ The pipeline consists of five main components:
 ## Directory Structure
 
 ```
-/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/
+/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/
 ├── ATSE_mapper/                 # ATSEmapper pipeline scripts
+├── metadata/                    # Compiling all metadata
 ├── GeneExpression/              # Gene expression processing scripts
 │   └── 10X_prep/                # 10X data preparation
 ├── LeafletFA_analysis/          # LeafletFA preparation and analysis
 └── model_train/                 # Model training and evaluation
-    └── MOUSE_FOUNDATION/        # Mouse foundation model specific scripts
+    └── HUMAN_FOUNDATION/        # Mouse foundation model specific scripts
         └── full_workflow/       # Model training workflow scripts
 ```
 
 ## 1. ATSEmapper Workflow
-
+  
 From raw junction files to mapped ATSEs and final AnnData objects:
 
 ```bash
 # Base path
-ROOT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation
+ROOT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation
 
 # Step 1: Split junction files into chunks so can analyze across SLURM jobs 
 ${ROOT_PATH}/ATSE_mapper/ATSEmap_SLURM/01_split_junctions.sh
@@ -52,22 +53,14 @@ ${ROOT_PATH}/ATSE_mapper/05_AnndataMake_slurm.sh
 ${ROOT_PATH}/ATSE_mapper/06_MergeAnndatas.py
 ```
 
-## 2. Metadata Integration
+## 2. Gene Expression Processing
 
-```bash
-# Process and combine metadata from TMS and Allen Brain
-${ROOT_PATH}/metadata_prep.py
-``` 
-
-## 3. Gene Expression Processing
-
-### 3.1 Smart-seq Data Processing
-This workflow combines gene expression counts from Tabula Muris Senis (single-cell) and Allen Brain (single-nuclei), normalizing for transcript length differences:
+### 2.1 Smart-seq Data Processing
+This workflow combines gene expression counts from Tabula Sapien (single-cell) and Allen Brain (single-nuclei), normalizing for transcript length differences:
 
 ```bash 
-# Step 1: Prepare gene lengths and combine TMS/Allen Brain data
-# NOTE: this can take a few hours to run since the inital loading of the raw data takes a while... 
-${ROOT_PATH}/GeneExpression/01_prepare_expression_data.py 
+# Step 1: Load each initial anndata object 
+${ROOT_PATH}/GeneExpression/01_load_raw_datasets.ipynb
 
 # Step 2: Generate metacell pseudobulk counts for shared cell types
 ${ROOT_PATH}/GeneExpression/02_generate_metacells.py
@@ -78,9 +71,12 @@ ${ROOT_PATH}/GeneExpression/03_train_regression_model.ipynb
 # Step 4: Apply regression model to estimate spliced values
 ${ROOT_PATH}/GeneExpression/04_apply_regression_model.py 
 
-# Step 5: Allign cells / nuclei in gene expression and splicing objects to follow same order 
+# Step 5: Combine TS + Allen Brain 
+${ROOT_PATH}/GeneExpression/05_combine_TS_AB.py 
+
+# Step 6: Allign cells / nuclei in gene expression and splicing objects to follow same order 
 # Also clean up cell type labels 
-${ROOT_PATH}/GeneExpression/05_align_splice_ge_anndatas.py
+${ROOT_PATH}/GeneExpression/06_align_splice_ge_anndatas.py
 
 # Step 5: Run scVI on length-normalized counts
 ${ROOT_PATH}/GeneExpression/06_run_scVI.py
@@ -92,11 +88,23 @@ ${ROOT_PATH}/GeneExpression/07_run_NMF.py
 ${ROOT_PATH}/GeneExpression/08_visualize_scVI_NMF.py  
 ```
 
-### 3.2 10X Data Processing
+### 2.2 10X Data Processing
 ```bash
 # Process 10X data from Tabula Muris Senis
 ${ROOT_PATH}/GeneExpression/10X_prep/01_process_TMS_10X.ipynb  
 ```
+
+## 3. Metadata Integration (run the gene expression steps first to get the metadata)
+
+```bash
+
+# Figure out which TS V2 cells to actually keep out of all the raw BAM files that were available...
+${ROOT_PATH}/metadata//01_TabulaSapien_extract_BAM_files_to_keep.ipynb
+
+# Make shared metadata across AB + TS 
+${ROOT_PATH}/metadata/02_TS_vs_AB_make_shared_metadata.py
+
+``` 
 
 ## 4. LeafletFA Input Preparation
 
@@ -118,6 +126,7 @@ ${ROOT_PATH}/model_train/MOUSE_FOUNDATION/full_workflow/02_run_leaflet.py
 
 # Submit training jobs to SLURM
 ${ROOT_PATH}/model_train/MOUSE_FOUNDATION/full_workflow/03_submit_jobs.py
+
 ```
 
 ### 5.2 Model Evaluation and Interpretation
@@ -126,12 +135,23 @@ ${ROOT_PATH}/model_train/MOUSE_FOUNDATION/full_workflow/03_submit_jobs.py
 # Step 1. Run several workflows to assess individual model results
 # including LeafletFA variance explained, differential splicing... 
 bash ${ROOT_PATH}/downstream_analysis/pipeline_submit_script.sh
+
+# Step 2. Assess summary stats files produced for each model run to choose best model 
+# using an array of metrics 
+${ROOT_PATH}/model_train/MOUSE_FOUNDATION/model_evaluation/01_compare_LeafletFA_model_results.py
 ```
 
-### 6. Model External Validation...
+## 6. RNA Isoform Gazers Input Data (need to do the same thing for mouse...)
+
 ```bash
-# Evaluate model on EasySci 
-${ROOT_PATH}/model_train/MOUSE_FOUNDATION/model_external_validation/01_apply_model_Easysci_data.py
+# TO-DO here: 
+# Change truly missing values where the ATSE wasn't at ALL detected in a given group of cells to NaN and color GREY in clustermap... 
+# Make pseudobulk matrix via RAW data (not LeafletFA imputed values or anything)
+# Align junctions with annotated isoform JUNCTIONS to label junctions with annotated vs novel isoform events...
+${ROOT_PATH}/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py
+
+# Code for visualizing atses/junctions for a given gene across all major cell types for which pseudobulk was calcualated
+${ROOT_PATH}/RNA_gazers/02_visualize_human_gene_ATSEs_pseudobulk.ipynb
 ```
 
 ## Notes

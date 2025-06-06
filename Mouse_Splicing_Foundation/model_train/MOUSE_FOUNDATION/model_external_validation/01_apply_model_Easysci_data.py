@@ -185,9 +185,10 @@ print(f"The number of junctions EasySci that are the same as in Mouse Foundation
 
 # Load the best model that was trained on the Mouse Foundation data 
 print("\n>> Extracting model parameters...")
-model_home = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/"
+model_home = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/"
+date = "2025-05-13"
 param_id = 1
-model_path = f"{model_home}/run_{param_id}/leafletfa_model.pkl.xz"
+model_path = f"{model_home}/{date}/run_{param_id}/leafletfa_model.pkl.xz"
 leaflet_model = load_model(model_path)
 
 # Extract hyperparameters
@@ -227,11 +228,9 @@ assert (psi_subset.index == easysci_adata.var["junction_id"]).all()
 
 # We will run LeafletFA here but using a fixed PSI matrix 
 # Check what shape and type PSI matrix need to be in 
-# leaflet_model["psi_learned"].shape
-# Out[14]: (30, 16530)
-# so need to make sure psi_subset is a numpy array of shape (J, K)
+# leaflet_model["psi_learned"].shape K by J
 psi_input = psi_subset.T.values
-output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/EasySci_results"
+output_dir = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/EasySci"
 # if doesn't exist, create it
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -249,14 +248,14 @@ easysci_leaflet_model = LeafletFA.LeafletFA(
     waypoints_use=False, 
     input_conc_prior=np.inf, # ideally should use the one the original model learned
     delta_fixed=torch.tensor(leaflet_model["dir_conc"]),
-    num_epochs=300, 
+    num_epochs=200, 
     print_epochs=5, 
     ELBO_num_particles=10, 
-    lr=0.7, 
-    gamma=0.01, 
+    lr=0.6, 
+    gamma=0.005, 
     min_delta=10,
     num_samples=100, 
-    patience=5,
+    patience=10,
     output_dir=output_dir,
     log_wandb=False  # Log to wandb
 )
@@ -286,10 +285,8 @@ alpha_pi=easysci_leaflet_model.alpha_pi
 PI = easysci_leaflet_model.pi
 PI_df = pd.DataFrame(PI, columns=["PI"])
 
-temp_save="/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/model_evaluation/"
-
 # Run neighbor analysis and UMAP on easysci_adata X_leafletFA_K{K}
-sc.pp.neighbors(easysci_adata, use_rep="X_leafletFA_K30", n_neighbors=20)
+sc.pp.neighbors(easysci_adata, use_rep=f"X_leafletFA_K{K}", n_neighbors=20)
 sc.tl.umap(easysci_adata)
 
 # Define a custom UMAP plotting function
@@ -311,13 +308,26 @@ def save_umap(adata, color, file_path, figsize=(8, 6)):
     plt.close()
 
 # Example usage — adjust figsize as needed
-save_umap(easysci_adata, "broad_cell_type", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_broad_cell_type.png", figsize=(10, 8))
-save_umap(easysci_adata, "Type", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_type.png", figsize=(10, 8))
-save_umap(easysci_adata, "Main_cluster_name", f"{temp_save}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_Main_cluster_name.png", figsize=(12, 9))
+save_umap(easysci_adata, "broad_cell_type", f"{output_dir}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_broad_cell_type.png", figsize=(10, 8))
+save_umap(easysci_adata, "Type", f"{output_dir}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_type.png", figsize=(10, 8))
+save_umap(easysci_adata, "Main_cluster_name", f"{output_dir}/easysci_adata_leafletFA_K{K}_param_{param_id}_umap_by_Main_cluster_name.png", figsize=(12, 9))
 
+# Save the easysci_adata object 
+# Convert any COO sparse matrices to CSR format before saving
+for layer_name in easysci_adata.layers:
+    if scipy.sparse.issparse(easysci_adata.layers[layer_name]):
+        if isinstance(easysci_adata.layers[layer_name], scipy.sparse.coo_matrix):
+            easysci_adata.layers[layer_name] = easysci_adata.layers[layer_name].tocsr()
 
+# Also convert the main X matrix if it's sparse
+if scipy.sparse.issparse(easysci_adata.X):
+    if isinstance(easysci_adata.X, scipy.sparse.coo_matrix):
+        easysci_adata.X = easysci_adata.X.tocsr()
 
+easysci_adata.write_h5ad(f"{output_dir}/easysci_adata_leafletFA_K{K}_param_{param_id}.h5ad", compression="gzip")
 
-
-
-
+# Submit script to sbatch
+# conda activate LeafletSC
+# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/model_evaluation/02_apply_model_Easysci_data.py
+# cd /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/model_evaluation/
+# sbatch --job-name=easysciLeaflet --mem=64G --partition=gpu --gres=gpu:1 --wrap="python $script"

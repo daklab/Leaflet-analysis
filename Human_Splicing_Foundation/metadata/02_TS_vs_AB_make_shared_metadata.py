@@ -39,23 +39,108 @@ from scipy.sparse import csr_matrix
 print(f"Reading in the anndata objects...")
 outdir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/"
 ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_2025-04-15.h5ad")
-ab_introns = sc.read_h5ad(f"{outdir}/ab_adata_introns_2025-04-15.h5ad")
 ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_2025-04-15.h5ad")
+
+# Columns that we have in the shared metadata file in mouse foundation 
+# cell_id, age, cell_ontology_class, mouse.id, sex, subtissue, tissue
 
 # === Clean up gene symbols ===
 print(f"Cleaning up gene symbols...")
-for adata in [ab_exons, ab_introns, ts_adata]:
+for adata in [ab_exons, ts_adata]:
     adata.var["gene_symbol"] = adata.var["gene_symbol"].astype(str)
     adata = adata[:, ~adata.var["gene_symbol"].duplicated(keep=False)].copy()
     adata.var_names = adata.var["gene_symbol"]
 
 # === Subset to shared genes ===
 print(f"Subsetting to shared genes...")
-common_genes = set(ab_exons.var_names).intersection(ab_introns.var_names).intersection(ts_adata.var_names)
-for adata in [ab_exons, ab_introns, ts_adata]:
+common_genes = set(ab_exons.var_names).intersection(ts_adata.var_names)
+for adata in [ab_exons, ts_adata]:
     adata._inplace_subset_var([g in common_genes for g in adata.var_names])
 
-# === Broad cell type mapping ===
+ts_adata.obs["cell_type_grouped"] = ts_adata.obs["free_annotation"]
+ab_exons.obs["cell_type_grouped"] = ab_exons.obs["subclass_label"]
+
+# F2S4_190227_086_D01_junctions_with_barcodes.bed
+# TSP1_TSP1_smartseq2_NA_B107921_Muscle_NA.multi_star.output_raw.output_raw_per_TSP1_smartseq2_NA_NA_B107921_M23_Muscle_NA_NA_junctions_with_barcodes.bed
+
+ab_metadata = ab_exons.obs[["sample_name", "cell_type_designation_label", "cell_type_alias_label",  "specimen_type", "subclass_label", "donor_sex_label", "external_donor_name_label", "cell_type_grouped", "class_label", "region_label"]].reset_index(drop=True)
+ab_metadata["dataset"] = "allen_brain"
+# adding age manuall for donors using https://pmc.ncbi.nlm.nih.gov/articles/PMC6919571/table/T1/
+# H200.1030 --> 54 (Caucasian)
+# H200.1023 --> 43 (iranian descent)
+# H200.1025 --> 50 (Caucasian)
+ab_metadata["age"] = 0 
+ab_metadata.loc[ab_metadata["external_donor_name_label"] == "H200.1030", "age"] = 54
+ab_metadata.loc[ab_metadata["external_donor_name_label"] == "H200.1023", "age"] = 43
+ab_metadata.loc[ab_metadata["external_donor_name_label"] == "H200.1025", "age"] = 50
+
+# Collect metadata from TabulaSapien
+ts_metadata = ts_adata.obs[["old_index", "sample_id", "donor", "tissue", "cell_ontology_class", "compartment", "broad_cell_class", "cell_type_grouped", "age", "sex", "dataset"]].reset_index(drop=True)
+# Extract project prefix (e.g., TSP1) from sample_id
+ts_metadata["project_id"] = ts_metadata["sample_id"].str.extract(r'^(TSP\d+)')
+parts = ts_metadata["old_index"].str.split("_")
+
+# Correct prefix from specific fields
+ts_metadata["junc_prefix_core"] = (
+    parts.str[0] + "_" +  # TSP1
+    parts.str[1] + "_" +  # smartseq2
+    parts.str[2] + "_" +  # NA
+    parts.str[4] + "_" +  # B107921
+    parts.str[6] + "_" +  # Muscle
+    parts.str[7]          # NA
+)
+
+# Add project prefix and fixed literal string
+ts_metadata["cell_id_prefix"] = (
+    ts_metadata["project_id"] + "_" +
+    ts_metadata["junc_prefix_core"] +
+    ".multi_star.output_raw.output_raw_per_"
+)
+
+# Full cell_id
+ts_metadata["cell_id"] = ts_metadata["cell_id_prefix"] + ts_metadata["old_index"]
+
+# Make a copy
+ts_meta = ts_metadata.copy()
+ab_meta = ab_metadata.copy()
+
+# Rename columns to match target structure
+ts_meta = ts_meta.rename(columns={
+    "donor": "donor",
+    "sex": "sex",
+    "cell_ontology_class": "cell_type",
+})
+
+ab_meta = ab_meta.rename(columns={
+    "sample_name": "cell_id",
+    "external_donor_name_label": "donor",
+    "donor_sex_label": "sex",
+    "region_label": "tissue", 
+    "cell_type_alias_label": "cell_type"
+})
+
+# Ensure same columns exist
+final_columns = ["cell_id", "donor", "sex", "age", "dataset", "tissue", "cell_type_grouped", "cell_type"]
+
+# Ensure all columns are in the right order and exist
+ts_meta = ts_meta[final_columns].reset_index(drop=True)
+ab_meta = ab_meta[final_columns].reset_index(drop=True)
+
+# --- Coerce any categoricals to strings ---
+
+from pandas.api.types import CategoricalDtype
+
+for df in [ts_meta, ab_meta]:
+    for col in df.columns:
+        if isinstance(df[col].dtype, CategoricalDtype):
+            df[col] = df[col].astype(str)
+
+# --- Combine ---
+
+combined_metadata = pd.concat([ts_meta, ab_meta], ignore_index=True)
+
+# Finally clean up cell types!
+
 # Grouped mappings by broad cell type
 grouped_broad_map = {
     'Neuron': [
@@ -193,103 +278,59 @@ def flatten_grouped_map(grouped_map):
 
 # 2. Create the flat map once (outside the loop)
 grouped_broad_map_flat = flatten_grouped_map(grouped_broad_map)
+combined_metadata['broad_cell_type'] = (combined_metadata['cell_type_grouped'].map(grouped_broad_map_flat).fillna('Other'))
 
-ts_adata.obs["broad_cell_type"] = ts_adata.obs["free_annotation"].map(grouped_broad_map_flat).fillna('Other')
-ab_exons.obs["broad_cell_type"] = ab_exons.obs["subclass_label"].map(grouped_broad_map_flat).fillna('Other')
-ab_introns.obs["broad_cell_type"] = ab_introns.obs["subclass_label"].map(grouped_broad_map_flat).fillna('Other')
+# Determine shared cell types with at least 50 cells per dataset
+broad_counts = (
+       combined_metadata.groupby(["dataset", "broad_cell_type"])
+        .size().reset_index(name="count")
+    )
 
-# Find common broad cell types across ts_adata and ab_exons 
-common_broad_types = set(ts_adata.obs["broad_cell_type"]).intersection(set(ab_exons.obs["broad_cell_type"]))
-print(f"Common broad cell types: {common_broad_types}")
+pivot_counts = broad_counts.pivot(index="broad_cell_type", columns="dataset", values="count").fillna(0)
+shared_broad_cell_types = pivot_counts[(pivot_counts >= 50).all(axis=1)].index.tolist()
+    
+print(f"Shared broad cell types (≥50 per dataset): {shared_broad_cell_types}")
 
-# Removed Other from common_broad_types
-common_broad_types = [broad_type for broad_type in common_broad_types if broad_type != 'Other']
-# remove neuron 
-common_broad_types = [broad_type for broad_type in common_broad_types if broad_type != 'Neuron']
+combined_metadata.to_csv(
+    "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/human_metadata_combined.tsv",
+    sep="\t", index=False
+)
 
-# === Identify indices ===
-print(f"Identifying indices for shared cell types across TS and AB...")
-idx_ts = ts_adata.obs["broad_cell_type"].isin(common_broad_types)
-idx_ab_exons = ab_exons.obs["broad_cell_type"].isin(common_broad_types)
-idx_ab_introns = ab_introns.obs["broad_cell_type"].isin(common_broad_types)
+print("Done saving metadata!")
 
-print(f"Number of cells in Tabula Sapiens: {len(ts_adata.obs[idx_ts])}")
-print(f"Number of cells in Allen Brain Exon: {len(ab_exons.obs[idx_ab_exons])}")
-print(f"Number of cells in Allen Brain Intron: {len(ab_introns.obs[idx_ab_introns])}")
+# Ensure only samples with metadata go through Leaflet and ATSEmapper pipeline
+from pathlib import Path
 
-# Print breakdown of each broad cell type in each dataset 
-print("Tabula Sapiens breakdown:")
-print(ts_adata.obs[idx_ts]["broad_cell_type"].value_counts())
-print("Allen Brain Exon breakdown:")
-print(ab_exons.obs[idx_ab_exons]["broad_cell_type"].value_counts())
+# Paths generated via /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/ATSEmap_SLURM/01_split_junctions.sh
+ab_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_AB.txt"
+ts_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS.txt"
 
-# === Make sparse if needed ===
-for adata in [ab_exons, ab_introns, ts_adata]:
-    if not sp.issparse(adata.X):
-        adata.X = csr_matrix(adata.X)
+# Output
+clean_ts = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS_subset.txt"
+clean_ab = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_AB_subset.txt"
 
-# === Pseudobulk counts ===
-print(f"Getting pseudobulk counts for each broad cell type...")
+# Load metadata
+valid_cell_ids = set(combined_metadata["cell_id"])
 
-# Assert that genes are ordered the same in all datasets in the same exact order
-assert np.array_equal(ab_exons.var_names, ab_introns.var_names), "Gene names in ab_exons and ab_introns are not the same."
-assert np.array_equal(ab_exons.var_names, ts_adata.var_names), "Gene names in ab_exons and ts_adata are not the same."
-assert np.array_equal(ab_introns.var_names, ts_adata.var_names), "Gene names in ab_introns and ts_adata are not the same."
+# Helper function
+def filter_junction_paths(filelist_path, output_path, valid_ids):
+    with open(filelist_path) as f:
+        lines = f.read().splitlines()
 
-for cell_type in common_broad_types:
-    print(f"Processing {cell_type}...")
-    # Get indices for each cell type
-    idx_ts = ts_adata.obs["broad_cell_type"] == cell_type
-    idx_ab_exons = ab_exons.obs["broad_cell_type"] == cell_type
-    idx_ab_introns = ab_introns.obs["broad_cell_type"] == cell_type
+    def extract_cell_id_from_path(path):
+        fname = Path(path).name
+        return fname.replace("_junctions_with_barcodes.bed", "")
 
-    # Sum counts for each gene across cells of the same type
-    ts_sum = np.array(ts_adata.X[idx_ts].sum(axis=0)).flatten()
-    ab_exons_sum = np.array(ab_exons.X[idx_ab_exons].sum(axis=0)).flatten()
-    ab_introns_sum = np.array(ab_introns.X[idx_ab_introns].sum(axis=0)).flatten()
-    genes = ab_exons.var_names.to_list()
+    filtered_lines = [
+        path for path in lines
+        if extract_cell_id_from_path(path) in valid_ids
+    ]
 
-    # Save pseudobulk data for that cell type
-    pd.DataFrame({
-        "gene": genes,
-        "ab_exons_sum": ab_exons_sum,
-        "ab_introns_sum": ab_introns_sum,
-        "ts_sum": ts_sum
-    }).to_csv(f"{outdir}/pseudobulk_{cell_type}.tsv", sep="\t", index=False)
-    print(f"Pseudobulk data saved for {cell_type}.")
+    with open(output_path, "w") as f:
+        f.write("\n".join(filtered_lines))
 
-# === Negative controls: 2 random samples from each dataset ===
-np.random.seed(42)
-ts_other_idx = ts_adata.obs[~ ts_adata.obs["broad_cell_type"].isin(common_broad_types)].index
-ab_exons_other_idx = ab_exons.obs[ab_exons.obs["broad_cell_type"].isin(common_broad_types)].index
-ab_introns_other_idx = ab_introns.obs[ab_introns.obs["broad_cell_type"].isin(common_broad_types)].index
-num_cells_sample = 2000 
+    print(f"Retained {len(filtered_lines)} of {len(lines)} in {output_path}")
 
-ts_rand_cells = np.random.choice(ts_other_idx, size=num_cells_sample, replace=False)
-ab_exons_rand_cells = np.random.choice(ab_exons_other_idx, size=num_cells_sample, replace=False)
-ab_introns_rand_cells = np.random.choice(ab_introns_other_idx, size=num_cells_sample, replace=False)
-print(f"Got {len(ts_rand_cells)} random cells from Tabula Sapiens.")
-print(f"Got {len(ab_exons_rand_cells)} random cells from Allen Brain Exon.")
-print(f"Got {len(ab_introns_rand_cells)} random cells from Allen Brain Intron.")
-ts_ctrl_sum = np.array(ts_adata[ts_rand_cells].X.sum(axis=0)).flatten()
-ab_ctrl_exons_sum = np.array(ab_exons[ab_exons_rand_cells].X.sum(axis=0)).flatten()
-ab_ctrl_introns_sum = np.array(ab_introns[ab_introns_rand_cells].X.sum(axis=0)).flatten()
-
-# === Save control pseudobulk ===
-pd.DataFrame({
-    "gene": genes,
-    "ab_exons_ctrl_sum": ab_ctrl_exons_sum,
-    "ab_introns_ctrl_sum": ab_ctrl_introns_sum,
-    "ts_ctrl_sum": ts_ctrl_sum
-}).to_csv(f"{outdir}/pseudobulk_microglia_macrophage_controls.tsv", sep="\t", index=False)
-
-print("All pseudobulk files saved.")
-
-
-# SCRIPT=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/TabulaSapien_vs_Allen_pseudobulk_analysis_2.py
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
-#sbatch --mem=500G \
-#  --output=merge_microglia.out \
-#  --wrap "python -u $SCRIPT"
-# %%
-
+# Filter both AB and TS junction lists
+filter_junction_paths(ab_junc_filelist, clean_ab, valid_cell_ids)
+filter_junction_paths(ts_junc_filelist, clean_ts, valid_cell_ids)
