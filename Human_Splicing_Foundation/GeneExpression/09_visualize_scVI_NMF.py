@@ -10,8 +10,8 @@ import scanpy as sc
 BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION"
 
 # Gene expression data
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_models_2025-05-16.h5ad"
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-06-06.h5ad"
+GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_model_50_1024_2025-06-06.h5ad"
 PLOTS_DIR = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/gene_expression/plots"
 # if doesn't exist, create it
 if not os.path.exists(PLOTS_DIR):
@@ -29,7 +29,6 @@ ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
 ge_adata.varm["nmf_standard_mb_components"] = ge_adata_nmf.varm["nmf_standard_mb_components"]
 print(f"Obtained one Gene Expression Object with both NMF and scVI models")
 print(ge_adata)
-
 
 def plot_umap(ge_adata, rep_input, variable_name, PLOTS_DIR, num_groups=None):
     print(f"Generating UMAPs for {rep_input} and {variable_name}...")

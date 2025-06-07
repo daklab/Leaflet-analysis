@@ -1,285 +1,360 @@
+#!/usr/bin/env python
+"""
+LeafletFA Input Preparation - Human Splicing Foundation
+
+This script:
+1. Loads splicing data from aligned AnnData
+2. Filters ATSEs based on quality scores
+3. Computes dimensionality reduction (PCA) on junction ratios
+4. Identifies waypoints and creates metacells
+5. Generates initializations for LeafletFA model training
+6. Saves prepared AnnData with initializations
+"""
+
 import os
-import pandas as pd 
-from sklearn.decomposition import TruncatedSVD
-import anndata as ad
-from scipy.sparse import coo_matrix, csr_matrix
-from datetime import datetime
-
-# turn this into AnnData object 
-import anndata as ad
-import numpy as np
-import torch 
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scanpy as sc
-
-from scipy.spatial.distance import cdist
-import numpy as np
-
 import sys
-import os
-import json
-import numpy as np
-import torch
-import anndata as ad
-from importlib import reload
-import seaborn as sns
-import matplotlib.pyplot as plt
-from tqdm import tqdm
 import pandas as pd
-import pyro 
-import umap.umap_ as umap
-import matplotlib.patches as mpatches
-import scipy.sparse
+import numpy as np
+import anndata as ad
 import datetime
-import sys
-import random
+import traceback
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.sparse import coo_matrix, csr_matrix
+from sklearn.decomposition import TruncatedSVD
+import torch
+from tqdm import tqdm
 
-sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/visualization')
-# from visualize_ATSE import visualize_local_events
-
-# Define module paths
+# Define module paths for custom modules
 src_path = "/gpfs/commons/home/kisaev/Leaflet-private/src/"
-
-# Add to sys.path if not already present
 if src_path not in sys.path:
     sys.path.append(src_path)
 
 # Import custom modules
-import BetaDirichletFactor.LeafletFA as LeafletFA
-import BetaDirichletFactor.differential_splicing as ds
-import BetaDirichletFactor.utils as utils
 import BetaDirichletFactor.waypoints as wayp
+
+# Configuration
+timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+print(f"Output directory: {OUTPUT_DIR}", flush=True)
+
+# Input file paths
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/splice_adata_matched_2025-06-06.h5ad"
+ATSE_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
+
+# Model configuration
+N_WAYPOINTS = 50
+N_PCA_COMPONENTS = 50
+N_DIM_COMPONENTS = 30
+METACELL_SIZE = 200
+
+# ATSE filtering parameters
+ATSE_FILTER_PERCENTILE = 0.3  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
-
-float_type = {"device": device, "dtype": torch.float}
+print(f"Using device: {device}", flush=True)
 if device == torch.device('cuda'):
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 
-# --- Output Directory ---
-output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025"
-assert os.path.isdir(output_dir), f"Output directory does not exist: {output_dir}"
-print(f"Output directory: {output_dir}", flush=True)
-
-# --- ATSEs ---
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
-assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
-
-atses = pd.read_csv(ATSE_file, sep="\t")
-assert "event_id" in atses.columns, "'event_id' column missing from ATSE file"
-assert len(atses) > 0, "ATSE file is empty"
-print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
-
-# --- Splicing Input File ---
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025/splice_adata_matched_2025-05-12.h5ad"
-assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
-
-splice_adata = ad.read_h5ad(input_file)
-assert splice_adata.shape[0] > 0, "Splice AnnData has zero cells"
-assert splice_adata.shape[1] > 0, "Splice AnnData has zero features"
-
-splice_adata.obs.reset_index(drop=True, inplace=True)
-splice_adata.obs["cell_id_index"] = splice_adata.obs.index
-print(f"The number of cells in the dataset is {splice_adata.shape[0]}", flush=True)
-
-print(splice_adata.obs.dataset.value_counts())
-print(splice_adata.obs.tissue.value_counts())
-print(splice_adata.obs["age"].value_counts())
-
-# Assign sequencing technology based on source
-splice_adata.obs["seqtech"] = "single_nuclei"
-splice_adata.obs.loc[splice_adata.obs["dataset"] == "tabula_sapiens", "seqtech"] = "single_cell"
-splice_adata.obs.seqtech.value_counts()
-
-# Get some junction stats 
-splice_adata.var["non_zero_count_cells"] = np.array((splice_adata.X > 0).sum(axis=0)).flatten()
-splice_adata.var["non_zero_cell_prop"] = splice_adata.var["non_zero_count_cells"] / splice_adata.shape[0]
-
-# let's make an ATSE event id score to decide which ATSEs to keep at the end, since we are limited to under 100,000 splice junctions 
-# what do we care about? 
-# - number of fully annotated splice junctions in the ATSE vs partially annotated vs unannotated (annotation_status)
-# - number of cells that have splice junctions in this ATSE expressed above zero (non_zero_cell_prop)
-# - which splice_motif is used in the ATSE (splice_motif)
-
-# let's make a score for each ATSE based on these three criteria 
-# - annotation_status: 1 for fully annotated, 0.5 for partially annotated, 0 for unannotated
-# - non_zero_cell_prop: 1 if non_zero_cell_prop > 0.01, 0 otherwise
-# - splice_motif: 1 if splice_motif is "GT-AG", 0 otherwise
-
-# let's calculate these for every junction and combine and normalize score per ATSE event_id 
-splice_adata.var["annotation_status_score"] = splice_adata.var["annotation_status"].map({"both": 1, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0})
-splice_adata.var["non_zero_cell_prop_score"] = (splice_adata.var["non_zero_cell_prop"] > 0.01).astype(int)
-splice_adata.var["splice_motif_score"] = (splice_adata.var["splice_motif"] == "GT-AG").astype(int)
-
-# weigh the annotation_status_score more heavily than the other two scores 
-splice_adata.var["annotation_status_score"] *= 2
-splice_adata.var["non_zero_cell_prop_score"] *= 1.5
-
-# Combine and normalize score per ATSE event_id 
-# First group by event_id and sum the scores before normalizing by the number of junctions in the event_id
-atse_scores = splice_adata.var.groupby("event_id")[
-    ["annotation_status_score", "non_zero_cell_prop_score"]
-].sum()
-
-# Normalize by the number of junctions in each event_id
-junction_counts = splice_adata.var["event_id"].value_counts().rename("junction_count")
-
-# Add the three columns to make ATSE_score 
-atse_scores["atse_score"] = atse_scores.sum(axis=1)
-atse_scores["number_of_junctions"] = junction_counts
-atse_scores["normalized_atse_score"] = atse_scores["atse_score"] / junction_counts
-
-# Print how many ATSEs remain after filtering at each of the percentiles
-print(f"Number of ATSEs remaining at 10th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.1)].shape[0]}")
-print(f"Number of ATSEs remaining at 50th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.5)].shape[0]}")
-print(f"Number of ATSEs remaining at 60th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.6)].shape[0]}")
-print(f"Number of ATSEs remaining at 90th percentile: {atse_scores[atse_scores['normalized_atse_score'] > atse_scores['normalized_atse_score'].quantile(0.9)].shape[0]}")
-
-# For splice_adata object, let's filter out the ATSEs that have a normalized_atse_score below the 10th percentile
-atse_scores_filt = atse_scores[atse_scores["normalized_atse_score"] > atse_scores["normalized_atse_score"].quantile(0.6)]
-print(f"Number of ATSEs remaining after filtering: {atse_scores_filt.shape[0]}", flush=True)
-
-# Filter 
-splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filt.index)]
-print(f"The number of junctions in the dataset is {splice_adata.shape[1]}", flush=True)
-
-splice_adata.var = splice_adata.var.merge(atses[["gene_id", "gene_name", "junction_id", "annotation_status", "position_off_5_prime", "position_off_3_prime"]], on=["junction_id", "gene_id", "annotation_status", "gene_name", "position_off_5_prime", "position_off_3_prime"])
-splice_adata.var.reset_index(drop=True, inplace=True)
-splice_adata.var.rename(columns={'junction_id_index': 'old_junction_id_index'}, inplace=True)
-splice_adata.var['junction_id_index'] = splice_adata.var.index # Redo the junction_id_index column now that we have removed some junctions
-
-# Step 1: Count the number of cells per cell type in 'cell_ontology_class'
-# Print the subsetted cell types and their counts
-print(splice_adata.obs['cell_type'].value_counts(), flush=True)
-
-# Print final number of splice junctions, ATSEs, and genes in splice_adata
-print(f"Number of splice junctions: {splice_adata.shape[1]}")
-print(f"Number of ATSEs: {splice_adata.var['event_id'].nunique()}", flush=True)
-print(splice_adata.var.splice_motif.value_counts())
-print(splice_adata.var.annotation_status.value_counts())
-
-#-------------------------------------------------------------
-# Prep waypoints for initialization using centered PSI values!
-#-------------------------------------------------------------
-
-# Update junction_counts and cluster_counts
-junction_counts = splice_adata.layers["cell_by_junction_matrix"].tocoo()
-cluster_counts = splice_adata.layers["cell_by_cluster_matrix"].tocoo()
-
-# Get sparse centered PSI values 
-splice_adata.layers["junc_ratio"] = wayp.calculate_centered_psi(junction_counts, cluster_counts)
-print(f"Done getting sparse centered PSI values!", flush=True)
-
-# Step 1: Perform PCA using sparse data
-n_components = 30  
-svd = TruncatedSVD(n_components=n_components, random_state=42)
-
-# Fit and transform the junction ratio data (this gives U)
-U = svd.fit_transform(splice_adata.layers["junc_ratio"])
-print(f"Done calculating SVD!", flush=True)
-
-# Get the singular values (S)
-S = svd.singular_values_
-
-# Multiply U by S to get U * S
-U_by_S = U * S  # This scales each component in U by the corresponding singular value in S
-splice_adata.obsm['X_pca'] = U_by_S
-splice_adata.uns['pca_explained_variance_ratio'] = svd.explained_variance_ratio_
-
-# Step 2: Compute UMAP on the PCA-reduced data
-sc.pp.neighbors(splice_adata, use_rep='X_pca')
-
-# Step 3. Calculate UMAP 
-# sc.tl.umap(splice_adata)
-
-# plot UMAP with cell types and age groups
-# sc.pl.umap(splice_adata, color="seqtech", title="UMAP of Data Source", show=False)
-# umap_file = f"{output_dir}/seqtech_umap.png"
-# plt.savefig(umap_file, bbox_inches="tight", dpi=300)
-# plt.close()
-# print(f"Saved UMAP plot of Data Source!", flush=True)
-
-# Define possible number of waypoints to learn
-n_waypoints_learn = [50]
-
-# Placeholder to store waypoints and metacell dictionaries for each n_waypoints
-waypoints_dict = {}
-metacell_dicts = {}
-
-# Parameters
-num_components = 30  # Number of components to consider
-metacell_size = 100    # Number of nearest cells to assign to each waypoint
-pca_components = splice_adata.obsm["X_pca"]
-
-# Loop over different n_waypoints to generate waypoints and metacell assignments
-for n_waypoints in n_waypoints_learn:
-
-    print(f"Finding {n_waypoints} waypoints from the PCA components!", flush=True)
-    random_seed = np.random.randint(0, 10000 + 1)  # Generate random seed
+def load_data():
+    """Load splicing data and ATSE file"""
+    print("\n>> Loading datasets...")
+    # Load splicing data
+    print(f"   Loading splicing AnnData from {SPLICE_INPUT}")
+    splice_adata = ad.read_h5ad(SPLICE_INPUT)
+    splice_adata.obs.reset_index(drop=True, inplace=True)
+    splice_adata.obs["cell_id_index"] = splice_adata.obs.index 
+    print(f"   Loaded splicing data with {splice_adata.shape[0]} cells and {splice_adata.shape[1]} junctions")
     
-    # Max-min sampling to identify waypoints
-    waypoints = wayp.max_min_sampling(pca_components, n_waypoints, num_components=num_components, seed=random_seed)
+    # Load ATSE file
+    print(f"   Loading ATSE information from {ATSE_FILE}")
+    atses = pd.read_csv(ATSE_FILE, sep="\t")
+    print(f"   Loaded ATSE info with {len(atses['event_id'].unique())} unique events")
+
+    print(splice_adata.obs.dataset.value_counts())
+    print(splice_adata.obs.tissue.value_counts())
+    print(splice_adata.obs["age"].value_counts())
+
+    # Assign sequencing technology based on source
+    splice_adata.obs["seqtech"] = "single_nuclei"
+    splice_adata.obs.loc[splice_adata.obs["dataset"] == "tabula_sapiens", "seqtech"] = "single_cell"
+    print(splice_adata.obs["seqtech"].value_counts())
+ 
+    # Print summary of cell types (already standardized in step 05)
+    print(f"   Data contains {splice_adata.obs['broad_cell_type'].nunique()} standardized cell types")
+    print(f"   Top 5 cell types: {dict(splice_adata.obs['broad_cell_type'].value_counts().head(5))}")
+    return splice_adata, atses
+        
+def compute_atse_scores(splice_adata):
+    """Compute quality scores for ATSEs to determine which to keep"""
+    print("\n>> Computing ATSE quality scores...")
     
-    # Store waypoints for this particular number of waypoints
-    waypoints_dict[n_waypoints] = waypoints
+    try:
+        # Calculate counts and proportions
+        print("   Computing junction expression statistics...")
+        splice_adata.var["non_zero_count_cells"] = np.array((splice_adata.X > 0).sum(axis=0)).flatten()
+        splice_adata.var["non_zero_cell_prop"] = splice_adata.var["non_zero_count_cells"] / splice_adata.shape[0]
+        
+        # Calculate component scores
+        print("   Computing component quality scores...")
+        splice_adata.var["annotation_status_score"] = splice_adata.var["annotation_status"].map(
+            {"both": 1, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0}
+        ) * 2  # Weight more heavily
+        
+        splice_adata.var["non_zero_cell_prop_score"] = (splice_adata.var["non_zero_cell_prop"] > 0.01).astype(int) * 1.5
+        
+        # Group by event_id and calculate scores
+        print("   Aggregating scores by ATSE...")
+        atse_scores = splice_adata.var.groupby("event_id")[
+            ["annotation_status_score", "non_zero_cell_prop_score"]
+        ].sum()
+        
+        # Normalize by junction counts
+        junction_counts = splice_adata.var["event_id"].value_counts().rename("junction_count")
+        atse_scores["atse_score"] = atse_scores.sum(axis=1)
+        atse_scores["number_of_junctions"] = junction_counts
+        atse_scores["normalized_atse_score"] = atse_scores["atse_score"] / junction_counts
+        
+        # Calculate percentiles
+        score_percentiles = atse_scores["normalized_atse_score"].describe(
+            percentiles=[0.1, 0.5, 0.6, 0.9]
+        )
+        print(f"   ATSE score percentiles: {dict(score_percentiles)}")
+        
+        # Filter ATSEs by percentile
+        filter_threshold = atse_scores["normalized_atse_score"].quantile(ATSE_FILTER_PERCENTILE)
+        atse_scores_filtered = atse_scores[atse_scores["normalized_atse_score"] > filter_threshold]
+        
+        print(f"   Filtered to {len(atse_scores_filtered)} ATSEs (top {100-ATSE_FILTER_PERCENTILE*100}%)")
+        
+        return atse_scores_filtered
+        
+    except Exception as e:
+        print(f"   Error computing ATSE scores: {str(e)}")
+        traceback.print_exc()
+        sys.exit(1)
 
-    # Assign nearest cells to each waypoint (metacells)
-    metacell_dict = wayp.assign_nearest_cells(waypoints, pca_components, num_nearest=metacell_size)
+def filter_and_process_junctions(splice_adata, atses, atse_scores_filtered):
+    """Filter junctions by ATSE scores and process for model input"""
+    print("\n>> Filtering and processing junctions...")
     
-    # Store the metacell dictionary for this number of waypoints
-    metacell_dicts[n_waypoints] = metacell_dict
+    try:
+        # Filter junctions by ATSE scores
+        print("   Filtering junctions by ATSE scores...")
+        splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filtered.index)]
+        print(f"   ✓ Filtered to {splice_adata.shape[1]} junctions in {len(atse_scores_filtered)} ATSEs")
+        
+        # Merge ATSE metadata
+        print("   Merging ATSE metadata...")
+        splice_adata.var = splice_adata.var.merge(
+            atses[["gene_id", "gene_name", "junction_id", "annotation_status", 
+                  "position_off_5_prime", "position_off_3_prime"]], 
+            on=["junction_id", "gene_id", "annotation_status", "gene_name", 
+               "position_off_5_prime", "position_off_3_prime"]
+        )
+        
+        # Reset indices and update junction index
+        splice_adata.var.reset_index(drop=True, inplace=True)
+        if 'junction_id_index' in splice_adata.var.columns:
+            splice_adata.var.rename(columns={'junction_id_index': 'old_junction_id_index'}, inplace=True)
+        splice_adata.var['junction_id_index'] = splice_adata.var.index
+        
+        print(f"   ✓ Junction information processed for model input")
+        
+        return splice_adata
+        
+    except Exception as e:
+        print(f"   Error filtering and processing junctions: {str(e)}")
+        traceback.print_exc()
+        sys.exit(1)
 
-rho_hat = splice_adata.layers["junc_ratio"]
+def compute_dimensionality_reduction(splice_adata):
+    """Compute PCA on junction ratio data"""
+    print("\n>> Computing dimensionality reduction...")
+    
+    # Use the already calculated centered junction ratios (junc_ratio) or
+    # check first if junc_ratio layer exists
+    if "junc_ratio" not in splice_adata.layers:
+        # Need to get sparse centered PSI values
+        print("   Computing sparse centered PSI values...")
+        # Update junction_counts and cluster_counts
+        junction_counts = splice_adata.layers["cell_by_junction_matrix"].tocoo()
+        cluster_counts = splice_adata.layers["cell_by_cluster_matrix"].tocoo()
+        # Get sparse centered PSI values 
+        splice_adata.layers["junc_ratio"] = wayp.calculate_centered_psi(junction_counts, cluster_counts)
+        print(f"Done getting sparse centered PSI values!", flush=True)
+        
+    # Perform PCA using sparse data
+    print(f"  Computing PCA with {N_PCA_COMPONENTS} components...")
+    svd = TruncatedSVD(n_components=N_PCA_COMPONENTS, random_state=42)
+    U = svd.fit_transform(splice_adata.layers["junc_ratio"])
+    # Get the singular values
+    S = svd.singular_values_
+    # Multiply U by S to get U * S
+    U_by_S = U * S
+    # Store the PCA results in the obsm attribute
+    splice_adata.obsm['X_pca'] = U_by_S
+    # Store explained variance for future reference
+    splice_adata.uns['pca_explained_variance_ratio'] = svd.explained_variance_ratio_
+    print(f" PCA complete. Top 5 explained variance: {svd.explained_variance_ratio_[:5]}")
+    return splice_adata
+        
+def identify_waypoints_and_metacells(splice_adata):
+    """Identify waypoints and create metacells for LeafletFA initialization"""
+    print("\n>> Identifying waypoints and creating metacells...")
+    
+    try:
+        # Dictionary to store waypoints and metacell assignments
+        waypoints_dict = {}
+        metacell_dicts = {}
+        
+        # Extract PCA components
+        pca_components = splice_adata.obsm["X_pca"]
+        
+        # Generate random seed
+        random_seed = np.random.randint(0, 10000 + 1)
+        
+        # Identify waypoints using max-min sampling
+        print(f"   Finding {N_WAYPOINTS} waypoints from the PCA components...")
+        waypoints = wayp.max_min_sampling(
+            pca_components, 
+            N_WAYPOINTS, 
+            num_components=N_DIM_COMPONENTS, 
+            seed=random_seed
+        )
+        
+        # Store waypoints
+        waypoints_dict[N_WAYPOINTS] = waypoints
+        
+        # Assign nearest cells to each waypoint (metacells)
+        print(f"  Assigning {METACELL_SIZE} nearest cells to each waypoint...")
+        metacell_dict = wayp.assign_nearest_cells(
+            waypoints, 
+            pca_components, 
+            num_nearest=METACELL_SIZE
+        )
+        
+        # Store metacell dictionaries
+        metacell_dicts[N_WAYPOINTS] = metacell_dict
+        
+        print(f"   ✓ Created {N_WAYPOINTS} waypoints and metacells")
+        
+        return waypoints_dict, metacell_dicts
+        
+    except Exception as e:
+        print(f"  Error identifying waypoints: {str(e)}")
+        traceback.print_exc()
+        sys.exit(1)
 
-# Generate multiple initializations
-print(f"Generating initializations for Psi and Phi!", flush=True)
-psi_initializations, phi_initializations = wayp.generate_initializations(rho_hat, waypoints_dict, metacell_dicts, epsilon=0.001)
+def generate_and_store_initializations(splice_adata, waypoints_dict, metacell_dicts):
+    """Generate and store LeafletFA initializations in AnnData"""
+    print("\n>> Generating LeafletFA initializations...")
+    
+    try:
+            
+        # Get centered junction ratios
+        rho_hat = splice_adata.layers["junc_ratio"]
+        
+        # Generate initializations
+        print("  Computing Phi and Psi initializations...")
+        psi_initializations, phi_initializations = wayp.generate_initializations(
+            rho_hat, 
+            waypoints_dict, 
+            metacell_dicts, 
+            epsilon=0.001
+        )
+        
+        # Store initializations in AnnData
+        for i, n_waypoints in enumerate(waypoints_dict.keys()):
+            print(f" Storing initializations for {n_waypoints} waypoints...")
+            
+            # Extract initializations
+            psi = psi_initializations[i]
+            phi = phi_initializations[i]
+            
+            # Convert to NumPy arrays if they are torch tensors
+            if isinstance(psi, torch.Tensor):
+                psi = psi.cpu().numpy()
+            if isinstance(phi, torch.Tensor):
+                phi = phi.cpu().numpy()
+            
+            # Store in AnnData
+            splice_adata.varm[f'psi_init_{n_waypoints}_waypoints'] = psi
+            splice_adata.obsm[f'phi_init_{n_waypoints}_waypoints'] = phi
+        
+        print(f" Successfully stored initializations")
+        
+        return splice_adata
+        
+    except Exception as e:
+        print(f" Error generating initializations: {str(e)}")
+        traceback.print_exc()
+        sys.exit(1)
 
-# Loop through the waypoints_dict and corresponding initializations
-for i, n_waypoints in enumerate(waypoints_dict.keys()):
+def save_prepared_anndata(splice_adata):
+    """Save the prepared AnnData object for LeafletFA training"""
+    print("\n>> Saving prepared AnnData object...")
+    
+    try:
+        # Define output filename specify what waypoints were used 
+        # N_WAYPOINTS is just a number, not a list
+        waypoint_str = "_".join(str(N_WAYPOINTS))
+        output_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_{waypoint_str}waypoints_{timestamp}.h5ad"
+        output_path = os.path.join(OUTPUT_DIR, output_filename)
+        
+        # Remove unnecessary columns from var
+        if 'old_junction_id_index' in splice_adata.var.columns:
+            splice_adata.var.drop(columns=['old_junction_id_index'], inplace=True)
+        
+        for key in splice_adata.layers.keys():
+            if isinstance(splice_adata.layers[key], coo_matrix):
+                splice_adata.layers[key] = splice_adata.layers[key].tocsr()
 
-    print(f"Adding waypoint based initializations to anndata for {n_waypoints} waypoints!", flush=True)
+        # Save AnnData object
+        print(f" Saving AnnData to {output_path}...")
+        splice_adata.write_h5ad(output_path, compression='lzf')
+        
+        print(f" Successfully saved prepared AnnData")
+        return True
+        
+    except Exception as e:
+        print(f"  Error saving AnnData: {str(e)}")
+        traceback.print_exc()
+        return False
 
-    # Extract the corresponding psi and phi initializations
-    psi = psi_initializations[i]
-    phi = phi_initializations[i]
+# Main execution
+print("\n========================================")
+print("LeafletFA Input Preparation - Mouse Splicing Foundation")
+print("========================================\n")
 
-    # Convert psi and phi to torch tensors if needed
-    psi = torch.tensor(psi)
-    phi = torch.tensor(phi)
+# Load data
+splice_adata, atses = load_data()
 
-    # Convert to NumPy arrays if psi and phi are torch tensors (just in case)
-    if isinstance(psi, torch.Tensor):
-        psi = psi.cpu().numpy()  # Convert to NumPy array
-    if isinstance(phi, torch.Tensor):
-        phi = phi.cpu().numpy()  # Convert to NumPy array
+# Compute ATSE scores and filter
+atse_scores_filtered = compute_atse_scores(splice_adata)
 
-    # Store psi in `adata.varm` and phi in `adata.obsm` with keys based on the number of waypoints
-    splice_adata.varm[f'psi_init_{n_waypoints}_waypoints'] = psi  # Store psi with name 'psi_init_{n_waypoints}_waypoints'
-    splice_adata.obsm[f'phi_init_{n_waypoints}_waypoints'] = phi  # Store phi with name 'phi_init_{n_waypoints}_waypoints'
+# Filter junctions and process
+splice_adata = filter_and_process_junctions(splice_adata, atses, atse_scores_filtered)
 
-# remove junc_ratio layer from splice_adata to save memory prior to saving object 
-splice_adata.layers.pop("junc_ratio")
-splice_adata.var.drop(columns=['old_junction_id_index'], inplace=True)
+# Compute dimensionality reduction
+splice_adata = compute_dimensionality_reduction(splice_adata)
 
-#-------------------------------------------------------------
-# Save anndata object with waypoints for modeling! 
-#-------------------------------------------------------------
-print("Ready to save file!")
+# Identify waypoints and create metacells
+waypoints_dict, metacell_dicts = identify_waypoints_and_metacells(splice_adata)
 
-# Create a string listing all waypoint values
-waypoint_str = "_".join(str(wp) for wp in n_waypoints_learn)
-new_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_{waypoint_str}waypoints_{timestamp}.h5ad"
+# Generate and store initializations
+splice_adata = generate_and_store_initializations(splice_adata, waypoints_dict, metacell_dicts)
 
-# Create the new full file path
-new_file_path = os.path.join(output_dir, new_filename)
-splice_adata.write_h5ad(new_file_path, compression='lzf')
-print(f"AnnData saved as {new_file_path} with lzf compression", flush=True)
+# Save prepared AnnData
+save_prepared_anndata(splice_adata)
 
-# Submit script like this:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025
-# sbatch --mem=300G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"
+print("\n========================================")
+print("LeafletFA input preparation complete!")
+print(f"Results saved to: {OUTPUT_DIR}")
+print("========================================\n")
+
+# Submission command for reference
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
+# sbatch --mem=400G -p cpu,bigmem -J "prep_initialized_AnnData" --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

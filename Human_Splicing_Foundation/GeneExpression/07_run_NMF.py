@@ -29,7 +29,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250513_035938.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/ge_adata_matched_2025-06-06.h5ad"
 # Ensure the input file exists
 if not os.path.exists(GE_INPUT):
     raise FileNotFoundError(f"Input file not found: {GE_INPUT}")
@@ -86,7 +86,7 @@ def train_mini_batch_NMF(ge_adata):
     """Train mini batch NMF model for gene expression data using sklearn's MiniBatchNMF"""
     print("\n>> Training MiniBatchNMF model...")
     
-    layer_name = "predicted_log_norm_tms"
+    layer_name = "log_norm"
     if layer_name not in ge_adata.layers:
         print(f"  Error: Layer '{layer_name}' not found. Cannot proceed with NMF.")
         sys.exit(1)
@@ -204,7 +204,7 @@ print("========================================\n")
 
 # Load data
 ge_adata = load_data()
-check_data_quality(ge_adata, "predicted_log_norm_tms") # Using layer with predicted values for Allen Brain nuclei using TMS regression model
+check_data_quality(ge_adata, "log_norm") # Using layer with predicted values for Allen Brain nuclei using TMS regression model
 
 # Train mini batch NMF model
 ge_adata = train_mini_batch_NMF(ge_adata)
@@ -220,5 +220,5 @@ print("========================================\n")
 
 # conda activate LeafletSC
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/NMF
-# sbatch --mem=300G -p cpu,dev,bigmem -J "NMF_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/07_run_NMF.py"
+# sbatch --mem=300G -p cpu,bigmem -J "NMF_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/07_run_NMF.py"
 

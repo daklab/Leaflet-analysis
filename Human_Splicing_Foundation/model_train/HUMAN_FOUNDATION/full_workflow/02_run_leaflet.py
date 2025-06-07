@@ -50,13 +50,14 @@ if src_path not in sys.path:
 import BetaDirichletFactor.LeafletFA as LeafletFA
 import BetaDirichletFactor.utils as utils
 
-# Define base output directory
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-12/"
-print(f"Base output directory: {base_output_dir}")
-
-# Get parameter set ID from command line
+# Get arguments from command line
 param_id = int(sys.argv[1])
+base_output_dir = sys.argv[2]
+ATSE_anndata_file = sys.argv[3]
+
 print(f"Loading parameter set {param_id}...")
+print(f"Base output directory: {base_output_dir}")
+print(f"Anndata file: {ATSE_anndata_file}")
 
 # Load parameters
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -93,11 +94,8 @@ wandb.init(
 wandb.config.update({
     "param_id": param_id,
     "data_source": "HumanFoundation",
-    "anndata_file": "HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_50waypoints_20250512_063334",
+    "anndata_file": ATSE_anndata_file,
 })
-
-# Load Anndata file
-ATSE_anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025/HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_50waypoints_20250512_063334.h5ad"
 
 print(f"Loading Anndata file: {ATSE_anndata_file}")
 adata = ad.read_h5ad(ATSE_anndata_file)
@@ -125,7 +123,7 @@ leaflet_model = LeafletFA.LeafletFA(
     input_conc_prior=params["input_conc"], 
     delta_fixed=params["delta_fixed"],
     num_epochs=params["num_epochs"], 
-    print_epochs=3, 
+    print_epochs=5, 
     ELBO_num_particles=params["ELBO_num_particles"], 
     lr=params["lr"], 
     gamma=params["gamma"], 
@@ -172,28 +170,6 @@ wandb.log({
     "new_K": new_K,
 })
 
-# Compute UMAP
-print(f"Computing UMAP for K={new_K}...")
-sc.pp.neighbors(adata, use_rep=f"X_leafletFA_K{new_K}")
-sc.tl.umap(adata)
-
-# Define UMAP save paths for cell_type and age
-umap_tissue_path = os.path.join(output_dir, f"UMAP_K{new_K}_tissue.png")
-umap_seqtech_path = os.path.join(output_dir, f"UMAP_K{new_K}_seqtech.png")
-
-# Generate age UMAP
-with plt.rc_context({'figure.figsize': (10, 7), 'savefig.dpi': 300}):  
-    sc.pl.umap(
-        adata, 
-        color=["seqtech"], 
-        wspace=0.9, 
-        show=False  # Don't show interactive plot
-    )
-    plt.savefig(umap_seqtech_path, bbox_inches="tight")  # Save with tight bounding box
-    plt.close()
-    
-print(f"Saved UMAP plots to {output_dir}")
-
 # Make a quick barplot of PI and add to wandb log 
 alpha_pi=leaflet_model.alpha_pi
 PI = leaflet_model.pi
@@ -206,7 +182,7 @@ print(f"Original K is {leaflet_model.K} and reduced K is {len(PI_df)}")
 PI_df.to_csv(os.path.join(output_dir, "factor_assignment_probabilities.csv"), index=False)
 print(f"Saved factor assignment probabilities to {os.path.join(output_dir, 'factor_assignment_probabilities.csv')}")
 
-# Log UMAPs to wandb
+# Log to wandb
 wandb.log({
     "alpha_pi": alpha_pi,
     "dir_conc": leaflet_model.dir_conc,
@@ -218,6 +194,7 @@ results_df = pd.DataFrame([{
     "param_id": param_id,
     "K": params["K"],
     "junc_specific_prior": params["junc_specific_prior"],
+    "dir_conc": params["delta_fixed"], 
     "waypoints_use": params["waypoints_use"],
     "best_elbo": leaflet_model.best_elbo,
     "input_conc": leaflet_model.bb_conc,

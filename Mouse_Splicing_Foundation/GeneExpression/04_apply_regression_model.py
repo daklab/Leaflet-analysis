@@ -23,6 +23,18 @@ import anndata as ad
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
+# Add the directory containing the shared utils to the Python path
+sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
+
+# Import utility functions
+from gene_processing import (
+    extract_gene_transcript_info, 
+    normalize_by_gene_length,
+    safe_stringify_obs,
+    preprocess_anndata,
+    normalize_and_log_transform
+)
+
 # Set up logging and configuration
 today = datetime.datetime.now().strftime("%Y-%m-%d")
 print("="*80)

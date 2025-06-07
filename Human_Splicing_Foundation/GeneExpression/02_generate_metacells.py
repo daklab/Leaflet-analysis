@@ -1,46 +1,33 @@
-# %%
-import os
-# Get the current working directory
-current_dir = os.getcwd()
-print("Current working directory:", current_dir)
+#!/usr/bin/env python
+"""
+Gene Expression Metacell Generation for Mouse Splicing Foundation
 
+This script:
+1. Loads processed gene expression and intron data
+2. Maps cell types to standardized broader categories
+3. Generates pseudobulk counts for common cell types
+4. Saves the resulting pseudobulk data for downstream analysis
+"""
+
+import os
+import sys
+import datetime
 import pandas as pd
-import scanpy as sc
+import numpy as np
 import anndata as ad
 from tqdm import tqdm
-import matplotlib.pyplot as plt # import matplotlib to visualize our qc metrics
-import subprocess
-import sys
-import seaborn as sns
-import numpy as np
-from scipy.sparse import csr_matrix
-import scanpy.external as sce
-from sklearn.metrics import silhouette_score
-import datetime
-import numpy as np
-from collections import defaultdict
-import scipy.sparse as sp
-from collections import defaultdict
-import gffutils 
-import scipy.sparse as sp
-import gffutils 
 
-# %% [markdown]
-# ### Normalize and combine each version of the data: exons, introns, total
+# Configuration
+WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
+OUTPUT_DIR = WD  # Save in the same directory
+today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-# %%
-import scanpy as sc
-import pandas as pd
-import numpy as np
-import scipy.sparse as sp
-from scipy.sparse import csr_matrix
+# Cell types to focus on for pseudobulk analysis
+COMMON_BROAD_TYPES = ['Other_Neuron', 'Pericyte', 'General_Fibroblast', 'Microglia', 'CNS_Glia']
 
-# === Paths and output ===
-print(f"Reading in the anndata objects...")
-outdir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/"
-ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_2025-04-15.h5ad")
-ab_introns = sc.read_h5ad(f"{outdir}/ab_adata_introns_2025-04-15.h5ad")
-ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_2025-04-15.h5ad")
+ab_exons = sc.read_h5ad(f"{WD}/ab_adata_exons_2025-04-15.h5ad")
+ab_introns = sc.read_h5ad(f"{WD}/ab_adata_introns_2025-04-15.h5ad")
+ts_adata = sc.read_h5ad(f"{WD}/tabsap_adata_2025-04-15.h5ad")
 
 # === Clean up gene symbols ===
 print(f"Cleaning up gene symbols...")

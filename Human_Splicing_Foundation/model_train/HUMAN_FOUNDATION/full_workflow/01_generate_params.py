@@ -20,17 +20,17 @@ print(f"All outputs will be saved in {base_output_dir}")
 param_grid = {
     "input_conc": [None, 'inf'],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
-    "delta_fixed": [1, None],
+    "delta_fixed": [0.5, 1, None],
     "K": [50],
     "waypoints_use": [True],
     "num_inits": [1],
-    "ELBO_num_particles": [5],
+    "ELBO_num_particles": [3],
     "num_samples": [100],
     'gamma': [0.01],
-    'min_delta': [10],
-    "lr": [0.8],
-    "num_epochs": [200],
-    "patience": [10],
+    'min_delta': [100],
+    "lr": [0.7],
+    "num_epochs": [120],
+    "patience": [5],
 }
 
 # Generate all parameter combinations
@@ -53,3 +53,6 @@ param_df.to_csv(os.path.join(base_output_dir, "parameter_combinations.csv"), ind
 print(f"Generated {len(param_list)} parameter sets.")
 print(f"Parameter JSON saved to: {param_file}")
 print(f"Parameter CSV saved to: {os.path.join(base_output_dir, 'parameter_combinations.csv')}")
+
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/
+# python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/full_workflow/01_generate_params.py 

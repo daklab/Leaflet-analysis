@@ -29,7 +29,7 @@ param_grid = {
     'gamma': [0.01],
     'min_delta': [100],
     "lr": [0.7],
-    "num_epochs": [200],
+    "num_epochs": [120],
     "patience": [5],
 }
 

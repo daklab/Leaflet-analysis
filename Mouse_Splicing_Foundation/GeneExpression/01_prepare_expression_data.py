@@ -218,7 +218,6 @@ print("   ✓ Standardized metadata columns across all datasets")
 print("\n>> Performing gene length normalization...")
 # For introns, use intron length instead of transcript length
 ab_adata_introns.var["mean_transcript_length"] = ab_adata_introns.var["mean_intron_length"].copy()
-
 normalize_by_gene_length(ab_adata_introns)
 normalize_by_gene_length(ab_adata_exons)
 normalize_by_gene_length(tms_adata)

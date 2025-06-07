@@ -2,29 +2,35 @@
 #SBATCH -J RH_pseudobulk
 #SBATCH --mem=64G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-10015%10 # Number of unique clusters
+#SBATCH --array=1-23497%50 # Number of unique clusters
 
-# conda activate python3ENV 
+#conda activate python3ENV 
 module load samtools
 
 # Input variables
 CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_cells.csv"   
 ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/" 
-OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/RH" 
-# Make OUTPUT_DIR if it does not exist
-mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells" 
 
-tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > RH_cluster_list.txt
+# make subdir for RH with date 
+RH_DIR="$OUTPUT_DIR/RH_$(date +%Y%m%d)"
+mkdir -p "$RH_DIR"
+echo "Output directory: $RH_DIR"
+
+# Make OUTPUT_DIR if it does not exist
+mkdir -p "$RH_DIR"
+
+tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > $RH_DIR/RH_cluster_list.txt
 
 # Get the cluster name corresponding to this task ID
-cluster=$(sed -n "${SLURM_ARRAY_TASK_ID}p" RH_cluster_list.txt)
+cluster=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $RH_DIR/RH_cluster_list.txt)
 echo "Processing cluster: $cluster"
 
 # If "/" is found within the cluster name, replace it with "_"
 cluster=$(echo "$cluster" | tr '/' '_')
 
 # Create output directory for the cluster
-cluster_dir="$OUTPUT_DIR/$cluster"
+cluster_dir="$RH_DIR/$cluster"
 mkdir -p "$cluster_dir"
 
 # Collect and process BAM files for the cluster

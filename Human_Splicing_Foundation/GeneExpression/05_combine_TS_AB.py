@@ -16,13 +16,10 @@ import numpy as np
 from scipy.sparse import csr_matrix
 import scanpy.external as sce
 from sklearn.metrics import silhouette_score
-import datetime
-import numpy as np
+from datetime import datetime
 from collections import defaultdict
 import scipy.sparse as sp
 from collections import defaultdict
-import gffutils 
-import scipy.sparse as sp
 import gffutils 
 import scanpy as sc
 import pandas as pd
@@ -32,11 +29,13 @@ from scipy.sparse import csr_matrix
 import pickle
 from datetime import date
 
-# Combine the cleaned up and length normalized AB + TS gene expression adata objects into one!
-WD="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
-ab_adata_file = "AB_adjusted_GeneExpression_via_exon_intron_regression_2025-05-03.h5ad"
-ts_adata_file = "TS_GeneExpression_with_length_norm_2025-05-03.h5ad"
+# === Paths and input files ===
+WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
+ab_adata_file = "AB_adjusted_GeneExpression_via_exon_intron_regression_2025-06-06.h5ad"
+ts_adata_file = "TS_GeneExpression_with_length_norm_2025-06-06.h5ad"
 
+# === Load AnnData objects ===
+print("Loading AnnData objects...")
 ab_adata = ad.read_h5ad(f"{WD}/{ab_adata_file}")
 ts_adata = ad.read_h5ad(f"{WD}/{ts_adata_file}")
 
@@ -44,7 +43,6 @@ ts_adata = ad.read_h5ad(f"{WD}/{ts_adata_file}")
 # Read in metadata
 metadata = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/human_metadata_combined.tsv"
 metadata = pd.read_csv(metadata, sep="\t")
-metadata = metadata[metadata["dataset"] == "allen_brain"]
 
 # Align metadata to adata
 ab_adata.obs["external_name"] = ab_adata.obs_names
@@ -54,7 +52,6 @@ ab_adata.obs_names = ab_adata.obs.index
 metadata_key = "cell_id"
 metadata_sub = metadata[metadata[metadata_key].isin(ab_adata.obs_names)].copy()
 metadata_sub = metadata_sub.set_index(metadata_key)
-
 ab_adata = ab_adata[ab_adata.obs_names.isin(metadata_sub.index)].copy()
 ab_adata.obs = metadata_sub.loc[ab_adata.obs_names]
 print(all(ts_adata.var_names == ab_adata.var_names))
@@ -66,7 +63,7 @@ ab_adata.obs["cell_id"] = ab_adata.obs.index
 ab_adata.obs.reset_index(drop=True, inplace=True)
 
 # Columns to keep for ab_adata.obs
-final_columns = ["cell_id", "donor", "sex", "age", "dataset", "tissue", "cell_type_grouped", "cell_type", "broad_cell_type"]
+final_columns = ["cell_id", "donor", "sex", "age", "dataset", "tissue", "cell_type", "broad_cell_type"]
 
 # Ensure all columns are in the right order and exist
 ts_adata.obs = ts_adata.obs[final_columns].reset_index(drop=True)
@@ -75,37 +72,33 @@ ab_adata.layers["log_norm"] = ab_adata.layers.pop("predicted_log_norm_ts")
 
 # === Check 1: Gene order ===
 assert np.array_equal(ab_adata.var_names, ts_adata.var_names), \
-    "🚨 ERROR: Gene names not aligned across ab_adata and ts_adata!"
+    "ERROR: Gene names not aligned across ab_adata and ts_adata!"
 assert np.array_equal(ab_adata.var.index, ts_adata.var.index), \
-    "🚨 ERROR: Gene indices not in the same order!"
-print("✅ Gene order is consistent between ab_adata and ts_adata.")
+    "ERROR: Gene indices not in the same order!"
+print("Gene order is consistent between ab_adata and ts_adata.")
 
-# === Check 2: Gene metadata equality ===
+# === Verify gene metadata ===
 shared_gene_cols = ["gene_symbol", "gene_name", "mean_transcript_length"]
 for col in shared_gene_cols:
     assert np.all(ab_adata.var[col].values == ts_adata.var[col].values), \
-        f"🚨 ERROR: Mismatch in gene metadata column: {col}"
-print("✅ Gene metadata columns are consistent.")
+        f"ERROR: Mismatch in gene metadata column: {col}"
+print("Gene metadata columns are consistent.")
 
-# === Check 3: Nonzero predicted log counts in ab_adata ===
+# === Verify non-zero counts ===
 library_size_ab = np.asarray(ab_adata.layers["log_norm"].sum(axis=1)).flatten()
 zero_count_cells = np.sum(library_size_ab == 0)
-assert zero_count_cells == 0, f"🚨 ERROR: {zero_count_cells} cells in ab_adata have zero predicted log counts."
-print("✅ All ab_adata cells have non-zero predicted log counts.")
-
-# === Check 4: All required columns exist in obs ===
-for df, name in zip([ab_adata.obs, ts_adata.obs], ["ab_adata", "ts_adata"]):
-    for col in final_columns:
-        assert col in df.columns, f"🚨 ERROR: Column {col} missing in {name}.obs!"
-print("✅ All required metadata columns are present.")
+assert zero_count_cells == 0, f"ERROR: {zero_count_cells} cells in ab_adata have zero predicted log counts."
+print("All ab_adata cells have non-zero predicted log counts.")
 
 # === Compute library size based on length-normalized raw counts ===
 for adata, name in zip([ab_adata, ts_adata], ["ab_adata", "ts_adata"]):
     if "length_norm" not in adata.layers:
-        raise ValueError(f"🚨 ERROR: {name} is missing 'length_norm' layer.")
+        raise ValueError(f"ERROR: {name} is missing 'length_norm' layer.")
 
     # Calculate total normalized counts per cell
     library_size = np.asarray(adata.layers["length_norm"].sum(axis=1)).flatten()
+    # Make sure to do np.floor of library_size
+    library_size = np.floor(library_size)
 
     # Store in .obs and .obsm
     adata.obs["library_size"] = library_size
@@ -114,25 +107,30 @@ for adata, name in zip([ab_adata, ts_adata], ["ab_adata", "ts_adata"]):
     # Sanity checks
     num_nan = np.sum(np.isnan(library_size))
     num_zero = np.sum(library_size == 0)
-    assert num_nan == 0, f"🚨 ERROR: {num_nan} NaNs found in library size for {name}"
-    assert num_zero == 0, f"🚨 ERROR: {num_zero} zero-library cells found in {name}"
-    print(f"✅ {name}: Library size stored with no NaNs or zeros.")
+    assert num_nan == 0, f"ERROR: {num_nan} NaNs found in library size for {name}"
+    assert num_zero == 0, f"ERROR: {num_zero} zero-library cells found in {name}"
+    print(f"{name}: Library size stored with no NaNs or zeros.")
 
+# === Combine AnnData objects ===
+print("Combining AnnData objects...")
 combined_adata = ad.concat([ab_adata, ts_adata], join="outer", 
                         label="batch", keys=["allen_brain_exons", "tabula_sapien"])
 
 # Set cell_id as obs_names and drop redundant column
 combined_adata.obs_names = combined_adata.obs["cell_id"]
-# Rename the column to something else (preserve info without conflict)
 combined_adata.obs["cell_id_backup"] = combined_adata.obs["cell_id"]
 combined_adata.obs = combined_adata.obs.drop(columns=["cell_id"])
 
-# save in WD 
-output_dir = WD
-today = datetime.datetime.now()
-today = today.strftime("%Y-%m-%d")
-combined_adata.write_h5ad(os.path.join(output_dir, f"ts_ab_exons_combo_ge_adata_{today}.h5ad"), compression="lzf")
-print(f"Saved combined anndata objects to {output_dir}")
+# sex column is currently cateogrical need to reset make just M and F groups 
+combined_adata.obs["sex"] = combined_adata.obs["sex"].astype(str)
+combined_adata.obs.loc[combined_adata.obs["sex"] == "male", "sex"] = "M"
+combined_adata.obs.loc[combined_adata.obs["sex"] == "female", "sex"] = "F"
+
+# === Save combined object ===
+today = datetime.now().strftime("%Y-%m-%d")
+output_file = os.path.join(WD, f"ts_ab_exons_combo_ge_adata_{today}.h5ad")
+combined_adata.write_h5ad(output_file, compression="lzf")
+print(f"Saved combined AnnData object to {output_file}")
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
-# sbatch --mem=100G --partition dev,cpu --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/TabulaSapien_vs_Allen_pseudobulk_analysis_5.py"
+# sbatch --mem=150G --partition dev,cpu --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/05_combine_TS_AB.py"

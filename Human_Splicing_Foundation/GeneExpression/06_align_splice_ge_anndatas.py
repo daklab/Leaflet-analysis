@@ -39,7 +39,7 @@ import random
 
 # Output DIR 
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025"
+output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025"
 print(f"Output directory: {output_dir}", flush=True)
 
 # --- Splice data ---
@@ -65,7 +65,7 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # --- Gene expression data ---
-ge_input = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/ts_ab_exons_combo_ge_adata_2025-05-03.h5ad"
+ge_input = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/ts_ab_exons_combo_ge_adata_2025-06-06.h5ad"
 assert os.path.exists(ge_input), f"Gene expression file does not exist: {ge_input}"
 
 ge_adata = ad.read_h5ad(ge_input)
@@ -171,5 +171,5 @@ ge_adata.write_h5ad(ge_adata_file, compression="lzf")
 print(f"Saved ge_adata to {ge_adata_file}")
 
 # Submit script like this:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025
-# sbatch --mem=200G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/align_splice_ge_anndatas.py"
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
+# sbatch --mem=200G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/06_align_splice_ge_anndatas.py"

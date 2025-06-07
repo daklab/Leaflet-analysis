@@ -62,29 +62,35 @@ This workflow combines gene expression counts from Tabula Sapien (single-cell) a
 # Step 1: Load each initial anndata object 
 ${ROOT_PATH}/GeneExpression/01_load_raw_datasets.ipynb
 
-# Step 2: Generate metacell pseudobulk counts for shared cell types
+# Step 2: Figure out which TS V2 cells to actually keep out of all the raw BAM files that were available...
+${ROOT_PATH}/metadata/01_TabulaSapien_extract_BAM_files_to_keep.ipynb
+
+# Step 3: Make shared metadata across AB + TS 
+${ROOT_PATH}/metadata/02_TS_vs_AB_make_shared_metadata.py
+
+# Step 4: Generate metacell pseudobulk counts for shared cell types
 ${ROOT_PATH}/GeneExpression/02_generate_metacells.py
 
-# Step 3: Train regression model to account for sc/sn differences
+# Step 5: Train regression model to account for sc/sn differences
 ${ROOT_PATH}/GeneExpression/03_train_regression_model.ipynb 
 
-# Step 4: Apply regression model to estimate spliced values
+# Step 6: Apply regression model to estimate spliced values
 ${ROOT_PATH}/GeneExpression/04_apply_regression_model.py 
 
-# Step 5: Combine TS + Allen Brain 
+# Step 7: Combine TS + Allen Brain 
 ${ROOT_PATH}/GeneExpression/05_combine_TS_AB.py 
 
-# Step 6: Allign cells / nuclei in gene expression and splicing objects to follow same order 
+# Step 8: Allign cells / nuclei in gene expression and splicing objects to follow same order 
 # Also clean up cell type labels 
 ${ROOT_PATH}/GeneExpression/06_align_splice_ge_anndatas.py
 
-# Step 5: Run scVI on length-normalized counts
+# Step 9: Run scVI on length-normalized counts
 ${ROOT_PATH}/GeneExpression/06_run_scVI.py
 
-# Step 6: Run NMF on regression-adjusted values
+# Step 10: Run NMF on regression-adjusted values
 ${ROOT_PATH}/GeneExpression/07_run_NMF.py  
 
-# Step 7: Visualize latent spaces from scVI and NMF 
+# Step 11: Visualize latent spaces from scVI and NMF 
 ${ROOT_PATH}/GeneExpression/08_visualize_scVI_NMF.py  
 ```
 
@@ -92,30 +98,17 @@ ${ROOT_PATH}/GeneExpression/08_visualize_scVI_NMF.py
 ```bash
 # Process 10X data from Tabula Muris Senis
 ${ROOT_PATH}/GeneExpression/10X_prep/01_process_TMS_10X.ipynb  
-```
 
-## 3. Metadata Integration (run the gene expression steps first to get the metadata)
-
-```bash
-
-# Figure out which TS V2 cells to actually keep out of all the raw BAM files that were available...
-${ROOT_PATH}/metadata//01_TabulaSapien_extract_BAM_files_to_keep.ipynb
-
-# Make shared metadata across AB + TS 
-${ROOT_PATH}/metadata/02_TS_vs_AB_make_shared_metadata.py
-
-``` 
-
-## 4. LeafletFA Input Preparation
+## 3. LeafletFA Input Preparation
 
 ```bash
 # Prepare input for LeafletFA model training
 ${ROOT_PATH}/LeafletFA_analysis/01_prep_initialized_AnnData.py
 ```
 
-## 5. Model Training and Evaluation
+## 4. Model Training and Evaluation
 
-### 5.1 Model Training Workflow
+### 4.1 Model Training Workflow
 
 ```bash
 # Generate model parameters and directory for storing model outputs 
@@ -129,7 +122,7 @@ ${ROOT_PATH}/model_train/MOUSE_FOUNDATION/full_workflow/03_submit_jobs.py
 
 ```
 
-### 5.2 Model Evaluation and Interpretation
+### 4.2 Model Evaluation and Interpretation
 
 ```bash
 # Step 1. Run several workflows to assess individual model results
@@ -141,7 +134,7 @@ bash ${ROOT_PATH}/downstream_analysis/pipeline_submit_script.sh
 ${ROOT_PATH}/model_train/MOUSE_FOUNDATION/model_evaluation/01_compare_LeafletFA_model_results.py
 ```
 
-## 6. RNA Isoform Gazers Input Data (need to do the same thing for mouse...)
+## 5. RNA Isoform Gazers Input Data (need to do the same thing for mouse...)
 
 ```bash
 # TO-DO here: 

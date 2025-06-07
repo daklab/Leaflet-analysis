@@ -24,9 +24,7 @@ from collections import defaultdict
 import gffutils 
 import scipy.sparse as sp
 import gffutils 
-
-# %% [markdown]
-# ### Normalize and combine each version of the data: exons, introns, total
+from pathlib import Path
 
 # %%
 import scanpy as sc
@@ -43,27 +41,10 @@ ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_2025-04-15.h5ad")
 
 # Columns that we have in the shared metadata file in mouse foundation 
 # cell_id, age, cell_ontology_class, mouse.id, sex, subtissue, tissue
-
-# === Clean up gene symbols ===
-print(f"Cleaning up gene symbols...")
-for adata in [ab_exons, ts_adata]:
-    adata.var["gene_symbol"] = adata.var["gene_symbol"].astype(str)
-    adata = adata[:, ~adata.var["gene_symbol"].duplicated(keep=False)].copy()
-    adata.var_names = adata.var["gene_symbol"]
-
-# === Subset to shared genes ===
-print(f"Subsetting to shared genes...")
-common_genes = set(ab_exons.var_names).intersection(ts_adata.var_names)
-for adata in [ab_exons, ts_adata]:
-    adata._inplace_subset_var([g in common_genes for g in adata.var_names])
-
-ts_adata.obs["cell_type_grouped"] = ts_adata.obs["free_annotation"]
-ab_exons.obs["cell_type_grouped"] = ab_exons.obs["subclass_label"]
-
 # F2S4_190227_086_D01_junctions_with_barcodes.bed
 # TSP1_TSP1_smartseq2_NA_B107921_Muscle_NA.multi_star.output_raw.output_raw_per_TSP1_smartseq2_NA_NA_B107921_M23_Muscle_NA_NA_junctions_with_barcodes.bed
 
-ab_metadata = ab_exons.obs[["sample_name", "cell_type_designation_label", "cell_type_alias_label",  "specimen_type", "subclass_label", "donor_sex_label", "external_donor_name_label", "cell_type_grouped", "class_label", "region_label"]].reset_index(drop=True)
+ab_metadata = ab_exons.obs[["sample_name", "cell_type_designation_label", "cell_type_alias_label", "specimen_type", "subclass_label", "donor_sex_label", "external_donor_name_label", "class_label", "region_label"]].reset_index(drop=True)
 ab_metadata["dataset"] = "allen_brain"
 # adding age manuall for donors using https://pmc.ncbi.nlm.nih.gov/articles/PMC6919571/table/T1/
 # H200.1030 --> 54 (Caucasian)
@@ -75,7 +56,7 @@ ab_metadata.loc[ab_metadata["external_donor_name_label"] == "H200.1023", "age"] 
 ab_metadata.loc[ab_metadata["external_donor_name_label"] == "H200.1025", "age"] = 50
 
 # Collect metadata from TabulaSapien
-ts_metadata = ts_adata.obs[["old_index", "sample_id", "donor", "tissue", "cell_ontology_class", "compartment", "broad_cell_class", "cell_type_grouped", "age", "sex", "dataset"]].reset_index(drop=True)
+ts_metadata = ts_adata.obs[["old_index", "sample_id", "donor", "tissue", "cell_ontology_class", "compartment", "broad_cell_class", "age", "sex", "dataset", "free_annotation"]].reset_index(drop=True)
 # Extract project prefix (e.g., TSP1) from sample_id
 ts_metadata["project_id"] = ts_metadata["sample_id"].str.extract(r'^(TSP\d+)')
 parts = ts_metadata["old_index"].str.split("_")
@@ -108,7 +89,7 @@ ab_meta = ab_metadata.copy()
 ts_meta = ts_meta.rename(columns={
     "donor": "donor",
     "sex": "sex",
-    "cell_ontology_class": "cell_type",
+    "free_annotation": "cell_type",
 })
 
 ab_meta = ab_meta.rename(columns={
@@ -116,60 +97,84 @@ ab_meta = ab_meta.rename(columns={
     "external_donor_name_label": "donor",
     "donor_sex_label": "sex",
     "region_label": "tissue", 
-    "cell_type_alias_label": "cell_type"
+    "subclass_label": "cell_type"
 })
 
 # Ensure same columns exist
-final_columns = ["cell_id", "donor", "sex", "age", "dataset", "tissue", "cell_type_grouped", "cell_type"]
+final_columns = ["cell_id", "donor", "sex", "age", "dataset", "tissue", "cell_type"]
 
 # Ensure all columns are in the right order and exist
 ts_meta = ts_meta[final_columns].reset_index(drop=True)
 ab_meta = ab_meta[final_columns].reset_index(drop=True)
 
 # --- Coerce any categoricals to strings ---
-
 from pandas.api.types import CategoricalDtype
-
 for df in [ts_meta, ab_meta]:
     for col in df.columns:
         if isinstance(df[col].dtype, CategoricalDtype):
             df[col] = df[col].astype(str)
 
 # --- Combine ---
-
 combined_metadata = pd.concat([ts_meta, ab_meta], ignore_index=True)
+# sex column is currently cateogrical need to reset make just M and F groups 
+combined_metadata["sex"] = combined_metadata["sex"].astype(str)
+combined_metadata.loc[combined_metadata["sex"] == "male", "sex"] = "M"
+combined_metadata.loc[combined_metadata["sex"] == "female", "sex"] = "F"
 
-# Finally clean up cell types!
+# === Refined cell type mapping with intermediate granularity ===
+grouped_refined_map = {
 
-# Grouped mappings by broad cell type
-grouped_broad_map = {
-    'Neuron': [
-        'IT', 'L4 IT', 'VIP', 'PVALB', 'SST', 'L6 CT', 'L6b', 'L5 ET', 'L5/6 IT Car3',
-        'L5/6 NP', 'PAX6', 'LAMP5', 'retinal bipolar neuron'
+    # === NEURONS - Split by major functional classes ===
+    'Excitatory_Neuron': [
+        'IT', 'L4 IT', 'L5 ET', 'L6 CT', 'L6b', 'L5/6 IT Car3', 'L5/6 NP'
     ],
-    'T cell': [
-        'cd4-positive, alpha-beta t cell', 'cd8-positive, alpha-beta t cell', 't cell',
-        'regulatory t cell', 'cd4-positive helper t cell', 'cd4-positive, alpha-beta memory t cell',
-        'cd8-positive, alpha-beta memory t cell', 'naive thymus-derived cd4-positive, alpha-beta t cell',
-        'activated cd4-positive, alpha-beta t cell', 'cd8-positive, alpha-beta thymocyte',
-        'naive cd8-positive t cell', 'cd4-positive, alpha-beta thymocyte', 'gamma-delta t cell',
-        'cd4-positive memory t cell', 'activated cd8-positive, alpha-beta t cell',
-        't follicular helper cell', 'naive regulatory t cell', 'thymocyte',
-        'cd8-positive cytotoxic t cell', 'cd8+, alpha-beta cytokine secreting effector t cell'
+    'Inhibitory_Neuron': [
+        'VIP', 'PVALB', 'SST', 'LAMP5'
     ],
-    'B cell': ['b cell', 'memory b cell', 'plasma cell', 'naive b cell'],
-    'Microglia_Macrophage': [
-        'macrophage', 'Microglia', 'microglial cell', 'Monocyte_Macrophage',
-        'tissue-resident macrophage', 'muscle macrophage', 'retina - microglia'
+    'Other_Neuron': [
+        'PAX6', 'retinal bipolar neuron'
+    ],
+    
+    # === T CELLS - Organized by major functional subsets ===
+    'CD4_T_cell': [
+        'cd4-positive, alpha-beta t cell', 'cd4-positive helper t cell', 
+        'cd4-positive, alpha-beta memory t cell', 'naive thymus-derived cd4-positive, alpha-beta t cell',
+        'activated cd4-positive, alpha-beta t cell', 'cd4-positive, alpha-beta thymocyte',
+        'cd4-positive memory t cell', 't follicular helper cell'
+    ],
+    'CD8_T_cell': [
+        'cd8-positive, alpha-beta t cell', 'cd8-positive, alpha-beta memory t cell',
+        'cd8-positive, alpha-beta thymocyte', 'naive cd8-positive t cell',
+        'activated cd8-positive, alpha-beta t cell', 'cd8-positive cytotoxic t cell',
+        'cd8+, alpha-beta cytokine secreting effector t cell'
+    ],
+    'Regulatory_T_cell': [
+        'regulatory t cell', 'naive regulatory t cell'
+    ],
+    'Other_T_cell': [
+        't cell', 'gamma-delta t cell', 'thymocyte'
+    ],
+    
+    # === B CELLS ===
+    'B_cell': [
+        'b cell', 'memory b cell', 'naive b cell'
+    ],
+    'Plasma_cell': [
+        'plasma cell', 'antibody secreting cell'
+    ],
+    
+    # === MYELOID CELLS - Split by major lineages ===
+    'Microglia': [
+        'Microglia', 'microglial cell', 'retina - microglia'
+    ],
+    'Macrophage': [
+        'macrophage', 'Monocyte_Macrophage', 'tissue-resident macrophage', 
+        'muscle macrophage'
     ],
     'Monocyte': [
         'monocyte', 'classical monocyte', 'non-classical monocyte', 'intermediate monocyte'
     ],
-    'NK/ILC': [
-        'nk cell', 'natural killer cell', 'nk t cell', 'innate lymphoid cell', 'mature nk t cell',
-        'type i nk t cell', 'uterine nk cell', 'proliferating nk cell', 'immature natural killer cell'
-    ],
-    'Dendritic': [
+    'Dendritic_cell': [
         'dendritic cell', 'myeloid dendritic cell', 'plasmacytoid dendritic cell',
         'cd1c-positive myeloid dendritic cell', 'cd141-positive myeloid dendritic cell',
         'cdc1', 'cdc2', 'conventional dendritic cell'
@@ -178,107 +183,185 @@ grouped_broad_map = {
         'neutrophil', 'cd24 neutrophil', 'nampt neutrophil', 'granulocyte',
         'basophil', 'mast cell'
     ],
-    'Epithelial': [
-        'epithelial cell', 'club cell', 'ionocyte', 'duct epithelial cell', 'goblet cell',
-        'ltf+ epithelial cell', 'ciliated epithelial cell', 'basal epithelial cell',
-        'bladder urothelial cell', 'basal bladder urothelial cell', 'intermediate bladder urothelial cell',
-        'enterocyte of epithelium of large intestine', 'enterocyte of epithelium proper of small intestine',
-        'salivary gland cell', 'HR positive luminal epithelial cell of mammary gland',
-        'epithelial cell of uterus', 'pulmonary ionocyte', 'large intestine goblet cell',
-        'medullary thymic epithelial cell', 'antibody secreting cell', 'conjunctival epithelial cell',
-        'corneal epithelial cell', 'secretory luminal epithelial cell of mammary gland',
-        'glandular epithelial cell', 'luminal epithelial cell', 'cycling epithelial cell',
-        'mucus secreting cell', 'serous cell of epithelium of bronchus', 'best4+ intestinal epithelial cell',
-        'biliary epithelial cell', 'pancreatic ductal cell', 'small intestine goblet cell',
-        'stratified squamous epithelial cell', 'sebum secreting cell', 'enterocyte of epithelium proper of ileum',
-        'enterocyte of epithelium proper of duodenum', 'paneth cell of epithelium of small intestine',
-        'paneth cell of colon', 'mature enterocyte', 'intestinal tuft cell',
-        'tuft cell of colon'
+    
+    # === NK/ILC ===
+    'NK_ILC': [
+        'nk cell', 'natural killer cell', 'nk t cell', 'innate lymphoid cell', 
+        'mature nk t cell', 'type i nk t cell', 'uterine nk cell', 
+        'proliferating nk cell', 'immature natural killer cell'
     ],
-    'Endothelial': [
-        'endothelial cell', 'capillary endothelial cell', 'arterial endothelial cell',
-        'vein endothelial cell', 'endothelial cell of vascular tree', 'endothelial cell of lymphatic vessel',
-        'cardiac endothelial cell', 'colon endothelial cell', 'retinal blood vessel endothelial cell',
-        'endothelial cell of arteriole', 'venous capillary endothelial cell', 'blood vessel endothelial cell',
-        'endothelial cell of venule', 'endothelial cell of artery', 'vascular endothelial cell'
+    
+    # === EPITHELIAL - Split by organ system ===
+    'Respiratory_Epithelial': [
+        'club cell', 'ionocyte', 'goblet cell', 'ciliated epithelial cell',
+        'pulmonary ionocyte', 'serous cell of epithelium of bronchus',
+        'respiratory goblet cell', 'ciliated columnar cell of tracheobronchial tree',
+        'tracheal goblet cell'
     ],
-    'Glia': [
-        'Astrocyte', 'OPC', 'Oligodendrocyte', 'retina - muller glia', 'mueller cell',
-        'enteroglial cell', 'schwann cell', 'glial cell'
+    'GI_Epithelial': [
+        'enterocyte of epithelium of large intestine', 
+        'enterocyte of epithelium proper of small intestine',
+        'large intestine goblet cell', 'best4+ intestinal epithelial cell',
+        'small intestine goblet cell', 'enterocyte of epithelium proper of ileum',
+        'enterocyte of epithelium proper of duodenum', 
+        'paneth cell of epithelium of small intestine', 'paneth cell of colon',
+        'mature enterocyte', 'intestinal tuft cell', 'tuft cell of colon'
     ],
-    'Muscle': [
-        'smooth muscle cell', 'skeletal muscle satellite stem cell', 'fast muscle cell',
-        'slow muscle cell', 'atrial cardiac muscle cell', 'muscle cell', 'tongue muscle cell',
-        'ventricular cardiac muscle cell', 'airway smooth muscle cell', 'tendon cell',
-        'vascular associated smooth muscle cell'
+    'Urogenital_Epithelial': [
+        'bladder urothelial cell', 'basal bladder urothelial cell', 
+        'intermediate bladder urothelial cell', 'epithelial cell of uterus'
     ],
-    'Stromal': [
-        'fibroblast', 'stromal cell', 'myofibroblast cell', 'adventitial fibroblast', 'cd34+ fibroblasts',
-        'VLMC', 'fat cell', 'adventitial cell', 'cornea - mesenchymal cell - stromal keratinocytes',
-        'limbal stromal cell', 'follicle', 'granulosa cell', 'mesothelial cell', 'theca cell',
-        'connective tissue cell', 'endometrial stromal fibroblast'
+    'Mammary_Epithelial': [
+        'HR positive luminal epithelial cell of mammary gland',
+        'secretory luminal epithelial cell of mammary gland',
+        'luminal epithelial cell'
     ],
-    'Fibroblast': [
-        'alveolar fibroblast', 'fibroblast of breast', 'fibroblast of cardiac tissue', 'uterine fibroblast',
-        'stellate_fibroblast'
+    'Other_Epithelial': [
+        'epithelial cell', 'duct epithelial cell', 'ltf+ epithelial cell',
+        'basal epithelial cell', 'salivary gland cell', 'medullary thymic epithelial cell',
+        'conjunctival epithelial cell', 'corneal epithelial cell', 'glandular epithelial cell',
+        'cycling epithelial cell', 'mucus secreting cell', 'biliary epithelial cell',
+        'pancreatic ductal cell', 'stratified squamous epithelial cell', 'sebum secreting cell'
     ],
+    
+    # === ENDOTHELIAL - Split by vessel type ===
+    'Arterial_Endothelial': [
+        'arterial endothelial cell', 'endothelial cell of arteriole', 'endothelial cell of artery'
+    ],
+    'Venous_Endothelial': [
+        'vein endothelial cell', 'venous capillary endothelial cell', 'endothelial cell of venule'
+    ],
+    'Capillary_Endothelial': [
+        'capillary endothelial cell', 'blood vessel endothelial cell'
+    ],
+    'Lymphatic_Endothelial': [
+        'endothelial cell of lymphatic vessel'
+    ],
+    'Specialized_Endothelial': [
+        'endothelial cell', 'endothelial cell of vascular tree', 'cardiac endothelial cell',
+        'colon endothelial cell', 'retinal blood vessel endothelial cell', 'vascular endothelial cell'
+    ],
+    
+    # === GLIA - Split by CNS vs PNS ===
+    'CNS_Glia': [
+        'Astrocyte', 'OPC', 'Oligodendrocyte', 'retina - muller glia', 'mueller cell'
+    ],
+    'PNS_Glia': [
+        'enteroglial cell', 'schwann cell'
+    ],
+    'Glia_Other': [
+        'glial cell'
+    ],
+    
+    # === MUSCLE - Split by muscle type ===
+    'Smooth_Muscle': [
+        'smooth muscle cell', 'airway smooth muscle cell', 'vascular associated smooth muscle cell'
+    ],
+    'Cardiac_Muscle': [
+        'atrial cardiac muscle cell', 'ventricular cardiac muscle cell'
+    ],
+    'Skeletal_Muscle': [
+        'skeletal muscle satellite stem cell', 'fast muscle cell', 'slow muscle cell',
+        'tongue muscle cell'
+    ],
+    'Muscle_Other': [
+        'muscle cell', 'tendon cell'
+    ],
+    
+    # === STROMAL/FIBROBLAST - More specific organ groupings ===
+    'General_Fibroblast': [
+        'fibroblast', 'stromal cell', 'myofibroblast cell', 'adventitial fibroblast',
+        'cd34+ fibroblasts', 'VLMC', 'adventitial cell', 'connective tissue cell'
+    ],
+    'Organ_Specific_Fibroblast': [
+        'alveolar fibroblast', 'fibroblast of breast', 'fibroblast of cardiac tissue',
+        'uterine fibroblast', 'stellate_fibroblast', 'endometrial stromal fibroblast'
+    ],
+    'Specialized_Stromal': [
+        'fat cell', 'cornea - mesenchymal cell - stromal keratinocytes',
+        'limbal stromal cell', 'follicle', 'granulosa cell', 'mesothelial cell', 'theca cell'
+    ],
+    
+    # === LIVER - Split by major cell types ===
+    'Hepatocyte': [
+        'hepatocyte'
+    ],
+    'Liver_Non_Parenchymal': [
+        'hepatic stellate cell', 'intrahepatic cholangiocyte'
+    ],
+    
+    # === SPECIALIZED CELLS ===
     'Pericyte': [
         'pericyte', 'Pericyte', 'myofibroblast cell and pericyte', 'mural cell'
     ],
-    'Liver': [
-        'hepatocyte', 'hepatic stellate cell', 'intrahepatic cholangiocyte'
-    ],
+    
     'Photoreceptor': [
         'retinal pigment epithelial cell', 'retina - photoreceptor cell', 'eye photoreceptor cell'
     ],
-    'Alveolar cell': [
-        'type ii pneumocyte', 'type i pneumocyte', 'capillary aerocyte', 'respiratory goblet cell',
-        'ciliated columnar cell of tracheobronchial tree', 'tracheal goblet cell'
+    
+    'Alveolar_cell': [
+        'type ii pneumocyte', 'type i pneumocyte', 'capillary aerocyte'
     ],
-    'Endocrine': [
-        'enteroendocrine cell of small intestine', 'type l enteroendocrine cell', 'enterochromaffin-like cell'
+    
+    'Enteroendocrine': [
+        'enteroendocrine cell of small intestine', 'type l enteroendocrine cell',
+        'enterochromaffin-like cell'
     ],
-    'Hematopoietic': [
-        'platelet', 'erythroid progenitor cell', 'erythrocyte'
+    
+    'Hematopoietic_Mature': [
+        'platelet', 'erythrocyte'
     ],
-    'Stem/Progenitor': [
-        'hematopoietic stem cell', 'mesenchymal stem cell', 'myeloid progenitor', 'common myeloid progenitor',
-        'mesenchymal stem cell of adipose tissue'
+    
+    'Hematopoietic_Progenitor': [
+        'erythroid progenitor cell', 'hematopoietic stem cell', 'myeloid progenitor',
+        'common myeloid progenitor'
     ],
-    'Progenitor': [
+    
+    'Mesenchymal_Stem': [
+        'mesenchymal stem cell', 'mesenchymal stem cell of adipose tissue'
+    ],
+    
+    'Stem_Progenitor_Other': [
         'oocyte', 'radial glia progenitor cell', 'intestinal crypt stem cell of small intestine',
         'intestinal crypt stem cell of large intestine'
     ],
-    'Secretory': [
+    
+    'Secretory_Gland': [
         'acinar cell of salivary gland', 'lacrimal gland functional unit cell', 'myoepithelial cell'
     ],
-    'Pigment cell': [
+    
+    'Pigment_cell': [
         'melanocyte', 'melanocyte or limbal stem cell'
     ],
-    'Sensory': [
+    
+    'Sensory_cell': [
         'taste receptor cell'
     ],
-    'Skin': [
+    
+    'Skin_cell': [
         'keratocyte'
     ],
-    'Myeloid': [
+    
+    'Myeloid_Other': [
         'myeloid cell', 'mononuclear phagocyte'
     ],
-    'Immune other': [
+    
+    'Immune_Other': [
         'leukocyte', 'langerhans cell', 'immune cell'
     ],
+    
     'Unknown': [
         'unknown'
-    ],
+    ]
 }
 
-# 1. Define flatten function once
+# === Map cell types to broad cell types ===
 def flatten_grouped_map(grouped_map):
     return {label: broad_type for broad_type, labels in grouped_map.items() for label in labels}
-
-# 2. Create the flat map once (outside the loop)
-grouped_broad_map_flat = flatten_grouped_map(grouped_broad_map)
-combined_metadata['broad_cell_type'] = (combined_metadata['cell_type_grouped'].map(grouped_broad_map_flat).fillna('Other'))
+grouped_broad_map_flat = flatten_grouped_map(grouped_refined_map)
+combined_metadata['broad_cell_type'] = (combined_metadata['cell_type'].map(grouped_broad_map_flat).fillna('Other'))
+# For cell type that remain Other just use "cell_type" value for them
+combined_metadata.loc[combined_metadata["broad_cell_type"] == "Other", "broad_cell_type"] = combined_metadata["cell_type"]
 
 # Determine shared cell types with at least 50 cells per dataset
 broad_counts = (
@@ -288,19 +371,15 @@ broad_counts = (
 
 pivot_counts = broad_counts.pivot(index="broad_cell_type", columns="dataset", values="count").fillna(0)
 shared_broad_cell_types = pivot_counts[(pivot_counts >= 50).all(axis=1)].index.tolist()
-    
 print(f"Shared broad cell types (≥50 per dataset): {shared_broad_cell_types}")
 
 combined_metadata.to_csv(
     "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/human_metadata_combined.tsv",
     sep="\t", index=False
 )
-
 print("Done saving metadata!")
 
 # Ensure only samples with metadata go through Leaflet and ATSEmapper pipeline
-from pathlib import Path
-
 # Paths generated via /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/ATSEmap_SLURM/01_split_junctions.sh
 ab_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_AB.txt"
 ts_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS.txt"

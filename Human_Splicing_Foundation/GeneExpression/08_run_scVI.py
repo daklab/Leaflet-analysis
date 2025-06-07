@@ -31,7 +31,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250513_035938.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/ge_adata_matched_2025-06-06.h5ad"
 
 # Model configuration
 LINEAR_LATENT = 50
@@ -322,4 +322,4 @@ print("========================================\n")
 
 # conda activate scvi-env
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/scVI
-# sbatch --mem=250G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/08_run_scVI.py"
+# sbatch --mem=200G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/08_run_scVI.py"

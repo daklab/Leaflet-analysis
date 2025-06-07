@@ -4,9 +4,9 @@ import datetime
 
 # Define where to save outputs 
 # Should be directory in which model params are saved
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-20"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-06"
 leafletfa_script = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/02_run_leaflet.py"
-anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250519_172401.h5ad"
+anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250519_172401.h5ad" 
 
 # Load parameter list from JSON file
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -28,7 +28,7 @@ job_script_template = """#!/bin/bash
 #SBATCH --time=5-00:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=800G
-#SBATCH --partition=cpu,bigmem
+#SBATCH --partition=bigmem
 
 # Set Python to run in unbuffered mode to ensure real-time output
 export PYTHONUNBUFFERED=1
@@ -59,5 +59,5 @@ for i, params in enumerate(param_list):
 
 print(f"\nSubmitted {len(param_list)} jobs to Slurm.")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-20
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-06
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/03_submit_jobs.py

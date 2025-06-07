@@ -237,7 +237,7 @@ def normalize_and_log_transform(adata, norm_layer="length_norm", output_layer="l
         # Check for cells with zero counts
         zero_cells = (lib_size == 0)
         if zero_cells.any():
-            print(f"   ⚠️ Warning: Found {zero_cells.sum()} cells with zero total counts - setting size factor to 1")
+            print(f"Warning: Found {zero_cells.sum()} cells with zero total counts - setting size factor to 1")
             lib_size[zero_cells] = 1
         
         # Normalize by library size to CPM (counts per million)
@@ -252,5 +252,5 @@ def normalize_and_log_transform(adata, norm_layer="length_norm", output_layer="l
         return adata
         
     except Exception as e:
-        print(f"   ❌ Error in normalization and log transformation: {str(e)}")
+        print(f"Error in normalization and log transformation: {str(e)}")
         raise

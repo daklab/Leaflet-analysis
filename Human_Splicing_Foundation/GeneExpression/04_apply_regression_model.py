@@ -32,79 +32,19 @@ from scipy.sparse import csr_matrix
 import pickle
 from datetime import date
 
+# Add the directory containing the shared utils to the Python path
+sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
 
-# %%
-def extract_gene_transcript_info(gtf_file, db_file):
-    """
-    Parses a GENCODE GTF file to compute:
-    - Mean transcript length per gene (sum of exons)
-    - Mean intron length per gene (transcript span - exon length)
-    - Number of transcripts per gene
-    - Transcript biotypes
-    - Gene name
-    
-    Returns a DataFrame with gene_id, gene_name, mean_transcript_length, mean_intron_length, 
-    num_transcripts, and transcript_biotypes.
-    """
+# Import utility functions
+from gene_processing import (
+    extract_gene_transcript_info, 
+    normalize_by_gene_length,
+    safe_stringify_obs,
+    preprocess_anndata,
+    normalize_and_log_transform
+)
 
-    if os.path.exists(db_file):
-        print("Using existing GTF database.")
-        db = gffutils.FeatureDB(db_file, keep_order=True)
-        print("Database loaded successfully!")
-    else:
-        print("Creating GTF database (this may take a few minutes)...")
-        db = gffutils.create_db(
-            gtf_file,
-            db_file,
-            force=True,
-            keep_order=True,
-            disable_infer_transcripts=False,
-            disable_infer_genes=True
-        )
-        print("Database created successfully!")
-
-    gene_exon_lengths = defaultdict(list)
-    gene_intron_lengths = defaultdict(list)
-    gene_names = {}
-    gene_biotypes = defaultdict(set)
-    transcript_counts = defaultdict(int)
-
-    print("Processing transcripts to compute exon and intron lengths...")
-    for transcript in tqdm(db.features_of_type("transcript"), desc="Processing Transcripts", unit=" transcript"):
-        gene_id = transcript.attributes["gene_id"][0]
-        gene_name = transcript.attributes.get("gene_name", ["unknown"])[0]
-        transcript_biotype = transcript.attributes.get("transcript_type", ["unknown"])[0]
-
-        exons = list(db.children(transcript, featuretype="exon", order_by="start"))
-        if len(exons) == 0:
-            continue  # skip transcripts with no exons
-
-        exon_length = sum(exon.end - exon.start + 1 for exon in exons)
-        transcript_start = exons[0].start
-        transcript_end = exons[-1].end
-        transcript_span = transcript_end - transcript_start + 1
-        intron_length = transcript_span - exon_length  # includes gaps between exons
-
-        gene_exon_lengths[gene_id].append(exon_length)
-        gene_intron_lengths[gene_id].append(max(0, intron_length))  # avoid negative values
-        gene_names[gene_id] = gene_name
-        gene_biotypes[gene_id].add(transcript_biotype)
-        transcript_counts[gene_id] += 1
-
-    print("Finished processing transcripts.")
-
-    gene_ids = list(gene_exon_lengths.keys())
-    gene_info_df = pd.DataFrame({
-        "gene_id": gene_ids,
-        "gene_name": [gene_names[g] for g in gene_ids],
-        "mean_transcript_length": [sum(gene_exon_lengths[g]) / len(gene_exon_lengths[g]) for g in gene_ids],
-        "mean_intron_length": [sum(gene_intron_lengths[g]) / len(gene_intron_lengths[g]) for g in gene_ids],
-        "num_transcripts": [transcript_counts[g] for g in gene_ids],
-        "transcript_biotypes": [", ".join(sorted(gene_biotypes[g])) for g in gene_ids]
-    })
-
-    return gene_info_df
-
+# === Genome Paths ===
 gtf_hg38 = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
 db_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode_hg38.db"
 
@@ -112,8 +52,15 @@ db_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/
 gene_info_df = extract_gene_transcript_info(gtf_hg38, db_file)
 gene_info_df = gene_info_df.drop_duplicates(subset="gene_id")
 gene_info_df = gene_info_df.drop_duplicates(subset="gene_name")
+valid_gene_info = gene_info_df[
+    (gene_info_df["mean_transcript_length"] > 0) &
+    (gene_info_df["mean_intron_length"] > 0)
+].copy()
 
-# === Paths and output ===
+print(f"Retaining {len(valid_gene_info)} genes with nonzero transcript/intron length.")
+valid_genes = set(valid_gene_info["gene_name"])
+
+# === Paths and output directories for anndatas ===
 print(f"Reading in the anndata objects...")
 outdir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/"
 ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_2025-04-15.h5ad")
@@ -129,12 +76,16 @@ for adata in [ab_exons, ab_introns, ts_adata]:
 
 # === Subset to shared genes ===
 print(f"Subsetting to shared genes...")
-common_genes = set(ab_exons.var_names).intersection(ab_introns.var_names).intersection(ts_adata.var_names)
-for adata in [ab_exons, ab_introns, ts_adata]:
-    adata._inplace_subset_var([g in common_genes for g in adata.var_names])
+common_genes = set(ab_exons.var_names).intersection(ab_introns.var_names).intersection(ts_adata.var_names).intersection(valid_genes)
+print(f"Number of common genes across all datasets: {len(common_genes)}")
+# Subset all adatas to common genes 
+ab_exons = ab_exons[:, ab_exons.var_names.isin(common_genes)].copy()
+ab_introns = ab_introns[:, ab_introns.var_names.isin(common_genes)].copy()
+ts_adata = ts_adata[:, ts_adata.var_names.isin(common_genes)].copy()
 
 # === Refined cell type mapping with intermediate granularity ===
 grouped_refined_map = {
+
     # === NEURONS - Split by major functional classes ===
     'Excitatory_Neuron': [
         'IT', 'L4 IT', 'L5 ET', 'L6 CT', 'L6b', 'L5/6 IT Car3', 'L5/6 NP'
@@ -366,148 +317,103 @@ grouped_refined_map = {
     ]
 }
 
-# 1. Define flatten function once
+# === Map cell types to broad cell types ===
 def flatten_grouped_map(grouped_map):
     return {label: broad_type for broad_type, labels in grouped_map.items() for label in labels}
-
-# 2. Create the flat map once (outside the loop)
 grouped_broad_map_flat = flatten_grouped_map(grouped_refined_map)
-
 ts_adata.obs["broad_cell_type"] = ts_adata.obs["free_annotation"].map(grouped_broad_map_flat).fillna('Other')
 ab_exons.obs["broad_cell_type"] = ab_exons.obs["subclass_label"].map(grouped_broad_map_flat).fillna('Other')
 ab_introns.obs["broad_cell_type"] = ab_introns.obs["subclass_label"].map(grouped_broad_map_flat).fillna('Other')
 
-# Find common broad cell types across ts_adata and ab_exons 
-common_broad_types = set(ts_adata.obs["broad_cell_type"]).intersection(set(ab_exons.obs["broad_cell_type"]))
-
-# Removed Other from common_broad_types
-common_broad_types = [broad_type for broad_type in common_broad_types if broad_type != 'Other']
-print(f"Common broad cell types: {common_broad_types}")
-
 # === Make sparse if needed ===
 for adata in [ab_exons, ab_introns, ts_adata]:
-    if not sp.issparse(adata.X):
-        adata.X = csr_matrix(adata.X)
+    print(f"Checking {adata} for sparse matrix")
+    if not sp.issparse(adata.layers["raw_counts"]):
+        adata.layers["raw_counts"] = csr_matrix(adata.layers["raw_counts"]).copy()
+        print(f"Converted layer to sparse matrix!")
 
+# === Subset to shared genes ===
 ts_adata.var["gene_name"] = ts_adata.var["gene_symbol"]
-ts_adata = ts_adata[:, ts_adata.var["gene_name"].isin(gene_info_df["gene_name"])].copy()
-
-# Clean up allen brain exon and intron datasets 
 ab_introns.var["gene_name"] = ab_introns.var["gene_symbol"]
-ab_introns = ab_introns[:, ab_introns.var["gene_name"].isin(gene_info_df["gene_name"])]
-
 ab_exons.var["gene_name"] = ab_exons.var["gene_symbol"]
-ab_adata_exons = ab_exons[:, ab_exons.var["gene_name"].isin(gene_info_df["gene_name"])]
 
 # merge tms_adata and ab_adata with gene_info_df 
-ts_adata.var = ts_adata.var.reset_index().merge(gene_info_df, on="gene_name").set_index("index")
-ab_introns.var = ab_introns.var.reset_index().merge(gene_info_df, on="gene_name").set_index("index")
-ab_exons.var = ab_exons.var.reset_index().merge(gene_info_df, on="gene_name").set_index("index")
+ts_adata.var = ts_adata.var.reset_index().merge(valid_gene_info, on="gene_name").set_index("index")
+ab_introns.var = ab_introns.var.reset_index().merge(valid_gene_info, on="gene_name").set_index("index")
+ab_exons.var = ab_exons.var.reset_index().merge(valid_gene_info, on="gene_name").set_index("index")
 
-# Load model for mapping exon + intron log1p length normalized counts to total spliced counts (single cell from single nuclei estimatoin)
-linear_model_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/linear_norm_ts_model.pkl"
-
-# Load the model
-with open(linear_model_file, 'rb') as f:
-    model_linear = pickle.load(f)
-
-print("Linear Model Summary:")
-print(model_linear.summary())
-
-# Estimate total spliced counts from exons and introns (from single nuclei data to single cell data as a way to account for differences in spliced products)
-# For each gene, we will estimate the total spliced counts using the linear model for each cell, if its counts were missing, we will not include it 
-
-# Step 1: Filter genes in gene_info_df
-valid_gene_info = gene_info_df[
-    (gene_info_df["mean_transcript_length"] > 0) &
-    (gene_info_df["mean_intron_length"] > 0)
-].copy()
-
-print(f"Retaining {len(valid_gene_info)} genes with nonzero transcript/intron length.")
-
-# Step 2: Subset all adata objects to valid genes
-valid_genes = set(valid_gene_info["gene_name"])
-
-for adata in [ts_adata, ab_exons, ab_introns]:
-    adata._inplace_subset_var(adata.var["gene_name"].isin(valid_genes))
-
-# Extract exon and intron raw counts
-exon_counts = ab_exons.X  # shape: cells x genes
-intron_counts = ab_introns.X  # same shape
-tot_counts = ts_adata.X  # shape: cells x genes
+# assert that order of genes in ts_adata, ab_introns, and ab_adata_exons is the same 
+assert np.array_equal(ts_adata.var["gene_name"], ab_introns.var["gene_name"]), "ERROR: Gene order mismatch between ts_adata and ab_introns!"
+assert np.array_equal(ts_adata.var["gene_name"], ab_exons.var["gene_name"]), "ERROR: Gene order mismatch between ts_adata and ab_adata_exons!"
 
 # === Sanity check: ensure gene order is the same across all AnnData objects ===
 gene_order = ab_exons.var["gene_name"].values
-
 assert np.array_equal(gene_order, ab_introns.var["gene_name"].values), \
-    "Gene order mismatch between ab_exons and ab_introns!"
-
+    "Gene order mismatch between ab_adata_exons and ab_introns!"
 assert np.array_equal(gene_order, ts_adata.var["gene_name"].values), \
-    "Gene order mismatch between ab_exons and ts_adata!"
-
-print("✅ Gene order is consistent across ab_exons, ab_introns, and ts_adata.")
+    "Gene order mismatch between ab_adata_exons and ts_adata!"
+print("Gene order is consistent across ab_adata_exons, ab_introns, and ts_adata.")
 
 # Get gene lengths
 gene_lengths = ts_adata.var.loc[ab_exons.var_names, ['mean_transcript_length', 'mean_intron_length']]
 
-# Broadcast normalization
-length_norm_exons = exon_counts / gene_lengths['mean_transcript_length'].values
-length_norm_introns = intron_counts / gene_lengths['mean_intron_length'].values
-length_norm_tot = tot_counts / gene_lengths['mean_transcript_length'].values
-
-ab_exons.layers["length_norm"] = csr_matrix(length_norm_exons)
-ab_introns.layers["length_norm"] = csr_matrix(length_norm_introns)
-ts_adata.layers["length_norm"] = csr_matrix(length_norm_tot)
+# === Extract exon and intron RAW counts ===
+normalize_by_gene_length(ab_exons)
+normalize_by_gene_length(ab_introns)
+normalize_by_gene_length(ts_adata)
 
 # Confirm no cells with zero counts across the board 
-# === Check for cells with zero total normalized expression before library size adjustment ===
 for name, adata in zip(["ab_exons", "ab_introns", "ts_adata"], [ab_exons, ab_introns, ts_adata]):
     length_norm = adata.layers["length_norm"]
     row_sums = length_norm.sum(axis=1).A1  # get sum per cell
     zero_cells = np.sum(row_sums == 0)
     print(f"{zero_cells} cells in {name} have zero length-normalized counts before library size adjustment.")
-    assert zero_cells == 0, f"🚨 ERROR: {zero_cells} all-zero cells found in {name}!"
+    assert zero_cells == 0, f"ERROR: {zero_cells} all-zero cells found in {name}!"
 
 # Now normalize by library size 
-length_norm_exons = length_norm_exons.multiply(1e4 / length_norm_exons.sum(axis=1).A1[:, None])
-length_norm_introns = length_norm_introns.multiply(1e4 / length_norm_introns.sum(axis=1).A1[:, None])
-length_norm_tot = length_norm_tot.multiply(1e4 / length_norm_tot.sum(axis=1).A1[:, None])
+normalize_and_log_transform(ab_exons)
+normalize_and_log_transform(ab_introns)
+normalize_and_log_transform(ts_adata)
 
-# Apply log1p transformation
-log_norm_exons = np.log1p(length_norm_exons)
-log_norm_introns = np.log1p(length_norm_introns)
-log_norm_tot = np.log1p(length_norm_tot)
-
-# Add as new layers
-ab_exons.layers["log_norm"] = csr_matrix(log_norm_exons)
-ab_introns.layers["log_norm"] = csr_matrix(log_norm_introns)
-ts_adata.layers["log_norm"] = csr_matrix(log_norm_tot)
-
+# Confirm no cells with zero counts across the board after library size adjustment 
 for name, adata in zip(["ab_exons", "ab_introns", "ts_adata"], [ab_exons, ab_introns, ts_adata]):
-    length_norm = adata.layers["log_norm"]
-    row_sums = length_norm.sum(axis=1).A1  # get sum per cell
+    log_norm = adata.layers["log_norm"]
+    row_sums = log_norm.sum(axis=1).A1  # get sum per cell
     zero_cells = np.sum(row_sums == 0)
     print(f"{zero_cells} cells in {name} have zero length-normalized counts before library size adjustment.")
-    assert zero_cells == 0, f"🚨 ERROR: {zero_cells} all-zero cells found in {name}!"
+    assert zero_cells == 0, f" ERROR: {zero_cells} all-zero cells found in {name}!"
 
+# === Load linear regression model ===
+linear_model_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/linear_log_norm_ts_model.pkl"
+with open(linear_model_file, 'rb') as f:
+    model_linear = pickle.load(f)
+print("Linear Model Summary:")
+print(model_linear.summary())
+
+# Estimate total spliced counts from exons and introns (from single nuclei data to single cell data as a way to account for differences in spliced products)
+# For each gene, we will estimate the total spliced counts using the linear model for each cell, if its counts were missing, we will not include it 
 intercept = model_linear.params["const"]
 coef_exons = model_linear.params["exons"]
 coef_introns = model_linear.params["introns"]
+print(f"   ✓ Model coefficients: intercept={intercept:.4f}, exons={coef_exons:.4f}, introns={coef_introns:.4f}")
 
 log_exons = ab_exons.layers["log_norm"]  # CSR sparse matrix
 log_introns = ab_introns.layers["log_norm"]  # CSR sparse matrix
-
 log_pred_tot = log_exons.multiply(coef_exons) + log_introns.multiply(coef_introns)
-
 log_pred_tot_with_intercept = log_pred_tot.copy()
 log_pred_tot_with_intercept.data += intercept
 
 # Create a new object using ab_exons as base
 ab_adata = ab_exons.copy()
-# Store adjusted log-normalized total spliced counts
+ab_adata.layers["predicted_log_norm_ts"] = ab_adata.layers["log_norm"].copy()
+# Store adjusted log-normalized total spliced counts (predicted values)
 ab_adata.layers["predicted_log_norm_ts"] = log_pred_tot_with_intercept
-# Preserve raw counts explicitly
+
+# Preserve raw counts explicitly and ensure CSR format
 ab_adata.layers["raw_counts"] = csr_matrix(ab_adata.layers["raw_counts"])
+ab_adata.layers["length_norm"] = csr_matrix(ab_adata.layers["length_norm"])
+ab_adata.layers["predicted_log_norm_ts"] = csr_matrix(ab_adata.layers["predicted_log_norm_ts"])
+
 # Clean up obs to only necessary metadata (optional but clean)
 ab_adata.obs = ab_adata.obs[["sample_name"]]
 
@@ -518,19 +424,19 @@ if "log_norm" in ab_adata.layers:
 # === Sanity check 1: Non-zero total raw counts per cell ===
 raw_sums = ab_adata.layers["raw_counts"].sum(axis=1).A1
 zero_raw = np.sum(raw_sums == 0)
-print(f"🔍 Cells with zero raw counts: {zero_raw}")
-assert zero_raw == 0, "🚨 ERROR: Some cells have zero total raw counts!"
+print(f"Cells with zero raw counts: {zero_raw}")
+assert zero_raw == 0, "ERROR: Some cells have zero total raw counts!"
 
 # === Sanity check 2: Non-zero total predicted log counts per cell ===
 pred_sums = ab_adata.layers["predicted_log_norm_ts"].sum(axis=1).A1
 zero_pred = np.sum(pred_sums == 0)
-print(f"🔍 Cells with zero predicted log counts: {zero_pred}")
-assert zero_pred == 0, "🚨 ERROR: Some cells have zero total predicted log counts!"
+print(f"Cells with zero predicted log counts: {zero_pred}")
+assert zero_pred == 0, "ERROR: Some cells have zero total predicted log counts!"
 
 # === Sanity check: ensure gene order is the same in ab_adata and ts_adata ===
 assert np.array_equal(ab_adata.var_names, ts_adata.var_names), \
-    "🚨 ERROR: Gene order mismatch between ab_adata and ts_adata!"
-print("✅ Gene order is consistent between ab_adata and ts_adata.")
+    "ERROR: Gene order mismatch between ab_adata and ts_adata!"
+print("Gene order is consistent between ab_adata and ts_adata.")
 
 # Save the object
 today = date.today().strftime("%Y-%m-%d")
@@ -538,9 +444,16 @@ outfile = os.path.join(outdir, f"AB_adjusted_GeneExpression_via_exon_intron_regr
 ab_adata.write_h5ad(outfile, compression="lzf")
 print(f"Saved the object to {outfile}")
 
+# Ensure all sparse matrices in ts_adata are in CSR format
+print("Converting ts_adata sparse matrices to CSR format...")
+for layer in ts_adata.layers:
+    if sp.issparse(ts_adata.layers[layer]):
+        ts_adata.layers[layer] = csr_matrix(ts_adata.layers[layer])
+        print(f"Converted {layer} to CSR format")
+
 outfile = os.path.join(outdir, f"TS_GeneExpression_with_length_norm_{today}.h5ad")
 ts_adata.write_h5ad(outfile, compression="lzf")
 print(f"Saved the object to {outfile}")
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
-# sbatch --mem=100G --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/TabulaSapien_vs_Allen_pseudobulk_analysis_4.py"
+# sbatch --mem=140G --partition cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/04_apply_regression_model.py"
