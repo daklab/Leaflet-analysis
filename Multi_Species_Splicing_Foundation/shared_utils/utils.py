@@ -26,6 +26,13 @@ import gzip
 import pickle
 import glob
 from tqdm import tqdm
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import os
+from scipy.stats import pearsonr
+from statsmodels.stats.multitest import multipletests
 
 # Configure plotting defaults
 #sns.set_theme(style="whitegrid")
@@ -75,9 +82,12 @@ def load_aging_genes(filepath):
     """Load aging-related genes list"""
     # Load global aging genes
     global_aging_genes = pd.read_csv(filepath, sep='\t')
-    aging_genes = global_aging_genes["global_aging_genes"].unique()
-    print(f"Loaded {len(aging_genes)} aging-related genes")
-    return aging_genes.tolist()
+    aging_genes_mouse = global_aging_genes["global_aging_genes"].unique()
+    print(f"Loaded {len(aging_genes_mouse)} aging-related genes (mouse)")
+    # Convert to uppercase
+    aging_genes_human = [gene.upper() for gene in aging_genes_mouse]
+    print(f"Loaded {len(aging_genes_human)} aging-related genes (human)")
+    return aging_genes_mouse, aging_genes_human
 
 def load_rbp_genes(filepath):
     """Load RNA binding protein gene list"""
@@ -166,52 +176,112 @@ def process_dataset(splice_adata, ge_adata, leaflet_model, rbps, aging_genes):
 ### Visualization Functions #
 #############################
 
-def plot_correlation_matrix(PHI, PLOTS_DIR):
-    """Plot correlation matrix of latent factors"""
-    # Compute correlation matrix (pearson correlation)
-    corr_matrix = np.corrcoef(PHI.T)  # K × K
+def plot_correlation_matrix(PHI, PLOTS_DIR, fdr_threshold=0.01):
+    """Plot simple correlation matrix with significance stars"""
     
-    # Generate factor labels
-    factor_labels = [f"factor{i}" for i in range(PHI.shape[1])]
+    n_factors = PHI.shape[1]
+    factor_labels = [f"factor{i}" for i in range(n_factors)]
     
-    # Create clustermap
+    # Compute correlation matrix
+    corr_matrix = np.corrcoef(PHI.T)
+    
+    # Compute p-values for all pairs
+    p_matrix = np.ones((n_factors, n_factors))
+    for i in range(n_factors):
+        for j in range(n_factors):
+            if i != j:
+                _, p = pearsonr(PHI[:, i], PHI[:, j])
+                p_matrix[i, j] = p
+    
+    # FDR correction on off-diagonal elements
+    off_diag_mask = ~np.eye(n_factors, dtype=bool)
+    p_values = p_matrix[off_diag_mask]
+    _, p_adj_flat, _, _ = multipletests(p_values, method="fdr_bh")
+    
+    # Put corrected p-values back into matrix
+    p_adj_matrix = np.ones((n_factors, n_factors))
+    p_adj_matrix[off_diag_mask] = p_adj_flat
+    
+    # Create significance annotations
+    annot = np.full((n_factors, n_factors), "", dtype=object)
+    for i in range(n_factors):
+        for j in range(n_factors):
+            if i != j:  # Skip diagonal
+                is_significant = (p_adj_matrix[i, j] < fdr_threshold) & (abs(corr_matrix[i, j]) > 0.2)
+                if is_significant:
+                    annot[i, j] = "*"
+    
+    # Create DataFrame for clustermap
+    df_corr = pd.DataFrame(corr_matrix, index=factor_labels, columns=factor_labels)
+    
+    # Plot with clustermap
     g = sns.clustermap(
-        corr_matrix, 
-        cmap="coolwarm", 
-        center=0, 
-        xticklabels=factor_labels, 
-        yticklabels=factor_labels, 
+        df_corr,
+        cmap="PRGn",
+        center=0,
         figsize=(8, 8),
-        linewidths=0.1
+        xticklabels=True,
+        yticklabels=True,
+        linewidths=0.5,
+        cbar_pos=(0.02, 0.83, 0.03, 0.15),
+        dendrogram_ratio=0.15
     )
-
-    # Increase font size of tick labels
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
     
-    # Add title
-    plt.suptitle("Clustered Correlation Matrix of Latent Factors (PHI)", y=1.02)
-    plt.savefig(os.path.join(PLOTS_DIR, "correlation_matrix_PHI.png"), dpi=300, bbox_inches="tight")    
-    return corr_matrix
+    # Set publication-ready font sizes
+    plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", fontsize=14)
+    plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=14)
+    
+    # Add significance annotations after clustering
+    ax = g.ax_heatmap
+    # Get the reordered indices from clustering
+    row_order = g.dendrogram_row.reordered_ind
+    col_order = g.dendrogram_col.reordered_ind
+    
+    for i, orig_i in enumerate(row_order):
+        for j, orig_j in enumerate(col_order):
+            if annot[orig_i, orig_j] == "*":
+                ax.text(j + 0.5, i + 0.5, "*", ha='center', va='center', 
+                       color='black', fontsize=16, weight='bold')
+    
+    # Save with high DPI for publication
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+    out_pdf = os.path.join(PLOTS_DIR, "correlation_matrix_PHI.pdf")
+    g.savefig(out_pdf, bbox_inches="tight", dpi=300)
+    plt.close()
+    
+    return pd.DataFrame(corr_matrix, index=factor_labels, columns=factor_labels)
 
 def plot_factor_pi_distribution(PI, alpha_pi, PLOTS_DIR):
     """Plot the distribution of factor PI values"""
     PI_df = pd.DataFrame(PI, columns=["PI"])
-    PI_df["Factor"] = PI_df.index
+    PI_df["Factor"] = [f"Factor {i}" for i in range(len(PI))]  # Create Factor X labels
     PI_df = PI_df.sort_values(by="PI", ascending=False)
     
-    plt.figure(figsize=(10, 5))
-    sns.barplot(x="Factor", y="PI", data=PI_df, order=PI_df["Factor"])
-    plt.title(f"Factor PI Probabilities (Sorted) - alpha_pi: {alpha_pi:.4f}")
-    plt.xlabel("Factor K")
-    plt.ylabel("Global Assignment Probability")
-    plt.axhline(0.01, color="red", linestyle="--")
-    plt.xticks(rotation=90)
+    plt.figure(figsize=(8, 5))  # Less wide, slightly taller
+    sns.barplot(
+        x="Factor", 
+        y="PI", 
+        data=PI_df, 
+        order=PI_df["Factor"],
+        palette="Greys_r"  # Reversed viridis colormap
+    )
+    
+    plt.title(f"Factor PI Probabilities (Sorted) - learned α: {alpha_pi:.4f}", fontsize=14)
+    plt.xlabel("Factor", fontsize=14)
+    plt.ylabel("π", fontsize=14)  # Use π symbol for y-axis
+    plt.axhline(0.01, color="red", linestyle="--", alpha=0.7)
+    
+    # Adjust tick labels
+    plt.xticks(rotation=45, ha='right', fontsize=12)
+    plt.yticks(fontsize=14)
+    
+    # Add grid for better readability
+    plt.grid(True, axis='y', linestyle='--', alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "factor_pi_distribution.png"), dpi=300)
+    plt.savefig(os.path.join(PLOTS_DIR, "factor_pi_distribution.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
-    print(f"Saved PI distribution plot to {PLOTS_DIR}/factor_pi_distribution.png")
+    print(f"Saved PI distribution plot to {PLOTS_DIR}/factor_pi_distribution.pdf")
     return PI_df
 
 def plot_factor_distribution_by_variable(adata, factor_idx, variable_col, continuous=False, 

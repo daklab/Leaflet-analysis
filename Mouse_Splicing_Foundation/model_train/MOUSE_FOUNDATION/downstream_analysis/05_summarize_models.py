@@ -24,8 +24,10 @@ def main():
     model_params_df = pd.read_csv(MODEL_CONFIG_MAPPING_FILE)
     model_params_df["likelihood_type"] = "Beta-Binomial"
     model_params_df.loc[model_params_df["input_conc"] == np.inf, "likelihood_type"] = "Binomial"
-
+    print(model_params_df.head())
     model_output_dirs = glob.glob(os.path.join(BASE_RESULTS_DIR, "*"))
+    # only keep the directories that contain "param_id" in the name
+    model_output_dirs = [d for d in model_output_dirs if "param_id" in os.path.basename(d)]
     print(f"Found {len(model_output_dirs)} model output directories")
 
     model_summaries = []

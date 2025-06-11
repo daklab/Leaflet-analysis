@@ -16,6 +16,12 @@ import matplotlib.colors as mcolors
 import sys
 import statsmodels.formula.api as smf
 from statsmodels.stats.anova import anova_lm
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+import os
+from scipy import stats
 
 import importlib
 import datetime
@@ -41,6 +47,7 @@ import gzip
 import pickle
 import glob
 from scipy.sparse import csr_matrix
+from matplotlib.colors import LinearSegmentedColormap
 
 # Configure plotting styles
 #sns.set_theme()
@@ -54,91 +61,139 @@ from utils import *
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-#############################
-### Configuration Section ###
-#############################
-
-# Input/Output paths - all these need to be parameters from the command line or it's fine to just edit here with human paths
-BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250519_172401.h5ad"
-ATSE_FILE_PATH = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
-GENOME_DB_PATH = "/gpfs/commons/home/kisaev/Leaflet-private/src/clustering/gencodeVM19"
-
-# Reference gene lists
-RBP_FILE_PATH = "/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
-AGING_GENES_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
-
-# Gene expression data
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
-
 ######################
 ### Helper Functions #
 ######################
 
 def compute_factor_activity_by_group(adata, groupby="broad_cell_type", DATA_DIR=None, PLOTS_DIR=None):
     """
-    Compute mean and median factor expression across different cell types
+    Compute non-zero-aware mean and median factor activity across cell groups.
+    Visualize mean activity in a clustermap, with outline strength reflecting how many cells had non-zero activity.
     
-    Args:
-        adata: AnnData object with X_PHI in obsm
-        groupby: Column name to group cells by (default: "broad_cell_type")
-        output_dir: Directory to save the data files
-        plots_dir: Directory to save the plot files
-        
     Returns:
-        Tuple of (mean_df, median_df) DataFrames with cell types as rows and factors as columns
+        Tuple of (mean_expression, median_expression) DataFrames.
     """
+
     print(f"   :gear: Computing factor expression summary by {groupby}...")
     
     # Extract PHI matrix
     X_PHI = adata.obsm["X_PHI"]
     n_factors = X_PHI.shape[1]
-    
-    # Create DataFrame with factor values and grouping variable
     factor_cols = [f"factor_{i}" for i in range(n_factors)]
+    
+    # Build DataFrame
     df = pd.DataFrame(X_PHI, columns=factor_cols)
     df[groupby] = adata.obs[groupby].values
     
-    # Compute mean and median by group
-    mean_expression = df.groupby(groupby, observed=True)[factor_cols].mean()
-    median_expression = df.groupby(groupby, observed=True)[factor_cols].median()
+    # Grouping
+    grouped = df.groupby(groupby, observed=True)
     
-    # Add cell count for reference
-    cell_counts = df.groupby(groupby, observed=True).size().rename("cell_count")
-    mean_expression = mean_expression.join(cell_counts)
-    median_expression = median_expression.join(cell_counts)
+    # Compute metrics
+    mean_expression = grouped[factor_cols].apply(lambda x: x.where(x != 0).mean())
+    median_expression = grouped[factor_cols].median()
+    nonzero_counts = grouped[factor_cols].apply(lambda x: (x > 0.01).sum())
+    total_counts = grouped.size()
+    nonzero_fraction = nonzero_counts.div(total_counts, axis=0)
     
-    # Sort by cell count (descending)
-    mean_expression = mean_expression.sort_values("cell_count", ascending=False)
-    median_expression = median_expression.sort_values("cell_count", ascending=False)
+    # Clean up any NaN values that might cause issues
+    mean_expression = mean_expression.fillna(0)
+    median_expression = median_expression.fillna(0)
+    nonzero_fraction = nonzero_fraction.fillna(0)
     
-    # Save CSV files to DATA_DIR
-    mean_filename = os.path.join(DATA_DIR, f"mean_factor_expression_by_{groupby}.csv")
-    median_filename = os.path.join(DATA_DIR, f"median_factor_expression_by_{groupby}.csv")
+    # Attach metadata
+    mean_expression_with_meta = mean_expression.copy()
+    median_expression_with_meta = median_expression.copy()
+    mean_expression_with_meta["cell_count"] = total_counts
+    median_expression_with_meta["cell_count"] = total_counts
     
-    mean_expression.to_csv(mean_filename)
-    median_expression.to_csv(median_filename)
+    if DATA_DIR:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        mean_expression_with_meta.to_csv(os.path.join(DATA_DIR, f"mean_factor_expression_by_{groupby}.csv"))
+        median_expression_with_meta.to_csv(os.path.join(DATA_DIR, f"median_factor_expression_by_{groupby}.csv"))
+        nonzero_fraction.to_csv(os.path.join(DATA_DIR, f"nonzero_fraction_by_{groupby}.csv"))
+        print(f"✓ Saved to {DATA_DIR}")
     
-    print(f"   ✓ Mean factor expression saved to: {mean_filename}")
-    print(f"   ✓ Median factor expression saved to: {median_filename}")
-    
-    # Create clustermap for mean expression
-    mean_expr_for_plot = mean_expression.drop(columns=["cell_count"])
-    
-    plt.figure(figsize=(14, 10))
-    sns.clustermap(
-        mean_expr_for_plot,
-        cmap="viridis",
-        figsize=(14, 10),
-        xticklabels=True,
-        yticklabels=True
-    )
-    plt.suptitle(f"Mean Factor Expression by {groupby}", y=0.98, fontsize=14)
-    plt.savefig(os.path.join(PLOTS_DIR, f"mean_factor_expression_by_{groupby}_clustermap.png"), dpi=300)
-    plt.close()
-    
-    print(f"   ✓ Clustermap saved to: {os.path.join(PLOTS_DIR, f'mean_factor_expression_by_{groupby}_clustermap.png')}")
-    return mean_expression, median_expression
+    if PLOTS_DIR:
+        os.makedirs(PLOTS_DIR, exist_ok=True)
+        
+        # --------- Clustermap 1: Mean Activity ---------
+        plot_data = mean_expression.copy()  # Use version without metadata
+        
+        # Check for any remaining issues with the data
+        print(f"Plot data shape: {plot_data.shape}")
+        print(f"Data range: {plot_data.min().min():.3f} to {plot_data.max().max():.3f}")
+        
+        # Create clustermap with error handling
+        g = sns.clustermap(
+            plot_data,
+            cmap="PRGn",
+            center=0,
+            figsize=(7, 7),  # Made larger for better visibility
+            xticklabels=True,
+            yticklabels=True,
+            cbar_kws={'label': 'Mean Activity'},
+            linewidths=0.2,
+            linecolor='gray',
+            method='ward',  # Specify clustering method
+            metric='euclidean'  # Specify distance metric
+        )
+        
+        # Improve label formatting
+        plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+        plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+        
+        # Save first plot
+        path1 = os.path.join(PLOTS_DIR, f"mean_factor_expression_by_{groupby}_clustermap.pdf")
+        g.savefig(path1, bbox_inches='tight', dpi=300)
+        print(f"✓ Mean activity clustermap saved to: {path1}")
+        plt.close(g.fig)
+
+        # Make one also using median expression
+        g2 = sns.clustermap(
+            median_expression,
+            cmap="PRGn",
+            center=0,
+            figsize=(7, 7),  # Made larger for better visibility
+            xticklabels=True,
+            yticklabels=True,
+            cbar_kws={'label': 'Median Activity'},
+            linewidths=0.2,
+            linecolor='gray',
+            method='ward',
+            metric='euclidean'
+        )   
+        plt.setp(g2.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+        plt.setp(g2.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+        path2 = os.path.join(PLOTS_DIR, f"median_factor_expression_by_{groupby}_clustermap.pdf")
+        g2.savefig(path2, bbox_inches='tight', dpi=300)
+        print(f"✓ Median activity clustermap saved to: {path2}")
+        plt.close(g2.fig)
+
+        # Get normalized clustermap to see relative factor activities across cell types
+        # Z-score normalize each factor (column) across cell types (rows)
+        mean_zscore = mean_expression.apply(lambda x: stats.zscore(x), axis=0).fillna(0)
+        
+        g3 = sns.clustermap(
+            mean_zscore,
+            cmap="PRGn",
+            center=0,
+            figsize=(7, 7),  # Made larger for better visibility
+            xticklabels=True,
+            yticklabels=True,
+            cbar_kws={'label': 'Relative Activity (Z-score)'},
+            linewidths=0.2,
+            linecolor='gray',
+            method='ward',
+            metric='euclidean'
+        )
+        plt.setp(g3.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+        plt.setp(g3.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+        path3 = os.path.join(PLOTS_DIR, f"zscore_factor_expression_by_{groupby}_clustermap.pdf")
+        g3.savefig(path3, bbox_inches='tight', dpi=300)
+        print(f"✓ Z-score normalized clustermap saved to: {path3}")
+        plt.close(g3.fig)
+
+    return mean_expression_with_meta, median_expression_with_meta
 
 def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None, DATA_DIR=None, PLOTS_DIR=None):
     """
@@ -178,6 +233,22 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
         groups = adata.obs[groupby].astype(str).values
     else:
         groups = adata.obs[groupby].values
+
+    # If groupby is numeric, split into three quantile-based groups
+    if groupby == "age_numeric" or groupby == "age":
+        lower_q = np.quantile(groups, 1/3)
+        upper_q = np.quantile(groups, 2/3)
+        print(f"   :information_source: '{groupby}' is numeric — splitting into tertiles at {lower_q:.2f} and {upper_q:.2f}")
+        
+        def assign_tertile(val):
+            if val <= lower_q:
+                return "group1"  # young
+            elif val <= upper_q:
+                return "group2"  # middle
+            else:
+                return "group3"  # old
+
+        groups = np.array([assign_tertile(v) for v in groups])
     
     # Process each factor using one-way ANOVA decomposition
     for factor_idx in range(n_factors):
@@ -245,7 +316,7 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
     print(f"   :gear: Creating variance component visualizations for {groupby}...")
         
     # 1. Total Variance vs Explained Variance, colored by PI
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(5,5))
     scatter = plt.scatter(
         anova_df["Total_Variance"], 
         anova_df["Explained_Variance"],
@@ -263,23 +334,30 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
             (row["Total_Variance"], row["Explained_Variance"]),
             xytext=(5, 0),
             textcoords='offset points',
-            fontsize=9,
+            fontsize=12,
             weight='bold'
         )
         
-    plt.colorbar(scatter, label="Factor PI (Global Assignment Probability)")
-    plt.xlabel("Total Variance")
-    plt.ylabel(f"Variance Explained by {groupby}")
-    plt.title(f"Factor Variance Explained by {groupby} vs Total Variance")
+    # Add colorbar with smaller tick labels
+    cbar = plt.colorbar(scatter, label="Factor PI (Global Assignment Probability)")
+    cbar.ax.tick_params(labelsize=8)  # Reduce legend tick label size
+    
+    # Increase x-axis tick label size
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    
+    plt.xlabel("Total Variance", fontsize=14)
+    plt.ylabel(f"Variance Explained by {groupby}", fontsize=14)
+    plt.title(f"Factor Variance Explained by {groupby} vs Total Variance", fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
     
-    variance_plot_file = os.path.join(PLOTS_DIR, f"variance_explained_by_{groupby}_scatter.png")
-    plt.savefig(variance_plot_file, dpi=300)
+    variance_plot_file = os.path.join(PLOTS_DIR, f"variance_explained_by_{groupby}_scatter.pdf")
+    plt.savefig(variance_plot_file, format='pdf', bbox_inches='tight')
     plt.close()
         
     # 2. Barplot of factors sorted by explained variance
-    plt.figure(figsize=(14, 7))
+    plt.figure(figsize=(8, 6))
         
     # Sort by explained variance (descending)
     sorted_df = anova_df.sort_values("Explained_Variance", ascending=False)
@@ -306,8 +384,10 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
     # Set x-axis labels to factor indices in sorted order
     plt.xticks(
         range(len(sorted_df)),
-        sorted_df["Factor_Index"],
-        rotation=0
+        [f"Factor {idx}" for idx in sorted_df["Factor_Index"]],
+        rotation=30,
+        fontsize=12,
+        ha='right'
     )
     
     # Add PI values as text on bars
@@ -320,83 +400,24 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
             ha='center', 
             va='bottom',
             rotation=90,
-            fontsize=8
+            fontsize=12
         )
     
-    plt.xlabel("Factor Index (ordered by explained variance)")
-    plt.ylabel(f"Variance Explained by {groupby}")
-    plt.title(f"Proportion of Factor Variance Explained by {groupby}")
-    plt.axhline(0.5, color='red', linestyle='--', alpha=0.7, label="High (>0.5): Strong cell type marker")
-    plt.axhline(0.25, color='orange', linestyle='--', alpha=0.7, label="Medium (>0.25): Partial cell type association")
-    plt.legend(loc='upper right')
+    plt.xlabel("Factor Index (ordered by explained variance)", fontsize=16)
+    plt.ylabel(f"Variance Explained by {groupby}", fontsize=16)
+    plt.axhline(0.5, color='red', linestyle='--', alpha=0.7, label="High (>0.5): Higher proportion of variance explained")
+    plt.axhline(0.25, color='orange', linestyle='--', alpha=0.7, label="Medium (>0.25): Lower proportion of variance explained")
+    plt.legend(loc='upper right', fontsize=10)
     plt.ylim(0, 1)
     plt.tight_layout()
     
-    barplot_file = os.path.join(PLOTS_DIR, f"variance_explained_by_{groupby}_barplot.png")
-    plt.savefig(barplot_file, dpi=300)
+    barplot_file = os.path.join(PLOTS_DIR, f"variance_explained_by_{groupby}_barplot.pdf")
+    plt.savefig(barplot_file, format='pdf', bbox_inches='tight')
     plt.close()
             
-    print(f"   ✓ Variance component visualizations saved to {PLOTS_DIR}")
-    print(f"   ✓ Variance component data saved to {DATA_DIR}")
-    
+    print(f"✓ Variance component visualizations saved to {PLOTS_DIR}")
+    print(f"✓ Variance component data saved to {DATA_DIR}")
     return anova_df
-
-def plot_factor_distribution_by_group(adata, factors, group_column, n_groups=5, DATA_DIR=None, PLOTS_DIR=None):
-    """Plot factor activity distribution across groups"""
-    # Get factor matrix
-    phi = adata.obsm["X_PHI"]
-    
-    # Ensure factors is a list
-    if not isinstance(factors, list):
-        factors = [factors]
-    
-    # Limit to top N groups by size
-    top_groups = adata.obs[group_column].value_counts().head(n_groups).index
-    
-    # Set up the figure
-    n_plots = len(factors)
-    fig, axes = plt.subplots(n_plots, 1, figsize=(10, 4 * n_plots))
-    
-    # Handle the case where there's only one factor
-    if n_plots == 1:
-        axes = [axes]
-
-    # Plot each factor
-    for i, factor_idx in enumerate(factors):
-        ax = axes[i]
-        
-        # Create data for violin plot
-        plot_data = []
-        plot_groups = []
-        
-        for group in top_groups:
-            mask = adata.obs[group_column] == group
-            values = phi[mask, factor_idx]
-            plot_data.extend(values)
-            plot_groups.extend([group] * len(values))
-        
-        plot_df = pd.DataFrame({
-            "Factor Activity": plot_data,
-            group_column: plot_groups
-        })
-        
-        # Create violin plot
-        sns.violinplot(x=group_column, y="Factor Activity", data=plot_df, ax=ax)
-        
-        # Add title and adjust layout
-        ax.set_title(f"Factor {factor_idx} Distribution by {group_column}")
-        ax.set_xlabel(group_column)
-        ax.set_ylabel("Factor Activity")
-        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
-    
-    plt.tight_layout()
-    
-    # Save or show
-    factors_str = "_".join(str(f) for f in factors)
-    output_file = os.path.join(PLOTS_DIR, f"factor_{factors_str}_distribution_by_{group_column}.png")
-    plt.savefig(output_file, dpi=300)
-    plt.close()
-
 
 def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PLOTS_DIR=None):
     """
@@ -413,22 +434,23 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
     perplexity_dir = os.path.join(PLOTS_DIR, "perplexity")
     os.makedirs(perplexity_dir, exist_ok=True)      
     
-    print(f"   :gear: Visualizing cell perplexity{' by '+color_by if color_by else ''}...")
+    print(f"Visualizing cell perplexity{' by '+color_by if color_by else ''}...")
     
     # 1. Basic histogram of perplexity (only create once)
     if color_by is None:
-        plt.figure(figsize=(10, 6))
-        sns.histplot(adata.obs['perplexity'], bins=n_bins, kde=True)
-        plt.title('Distribution of Cell Perplexity')
+        plt.figure(figsize=(4, 4))
+        # Add line to indicate median perplexity
+        plt.axvline(adata.obs['perplexity'].median(), color='red', linestyle='--', label='Median Perplexity')
+        sns.histplot(adata.obs['perplexity'], bins=n_bins, kde=True, color='lightgray')
         plt.xlabel('Perplexity')
         plt.ylabel('Count')
         plt.tight_layout()
-        plt.savefig(os.path.join(perplexity_dir, "perplexity_histogram.png"), dpi=300)
+        plt.savefig(os.path.join(perplexity_dir, "perplexity_histogram.pdf"), format='pdf', bbox_inches='tight')
         plt.close()
         
         # 2. UMAP colored by perplexity if UMAP coordinates exist (only create once)
         if 'X_umap' in adata.obsm:
-            plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(8, 8))
             sc.pl.umap(
                 adata, 
                 color='perplexity', 
@@ -438,7 +460,7 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
             )
             plt.title('UMAP Colored by Cell Perplexity')
             plt.tight_layout()
-            plt.savefig(os.path.join(perplexity_dir, "umap_perplexity.png"), dpi=300)
+            plt.savefig(os.path.join(perplexity_dir, "umap_perplexity.pdf"), format='pdf', bbox_inches='tight')
             plt.close()
     
     # 3. Perplexity distribution colored by metadata (if specified)
@@ -460,7 +482,7 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
             color_column = color_by
         
         # Violin plot by category
-        plt.figure(figsize=(14, 8))
+        plt.figure(figsize=(6, 4))
         order = perplexity_df.groupby(color_column)['perplexity'].median().sort_values(ascending=False).index
         sns.violinplot(
             data=perplexity_df,
@@ -471,10 +493,38 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
         plt.title(f'Cell Perplexity Distribution by {color_by}')
         plt.xticks(rotation=45, ha='right')
         plt.tight_layout()
-        plt.savefig(os.path.join(perplexity_dir, f"perplexity_violin_by_{color_by}.png"), dpi=300)
+        plt.savefig(os.path.join(perplexity_dir, f"perplexity_violin_by_{color_by}.pdf"), format='pdf', bbox_inches='tight')
         plt.close()
     
-    print(f"   ✓ Cell perplexity visualizations saved to {perplexity_dir}")
+    # Plot scatter plot of perplexity vs library size
+    plt.figure(figsize=(6, 6))
+    scatter = sns.scatterplot(
+        x='library_size', 
+        y='perplexity', 
+        data=adata.obs,
+        hue='age_numeric',
+        palette='viridis',
+        alpha=0.6,
+        s=20  # smaller point size
+    )
+    
+    # Add colorbar label
+    plt.colorbar(scatter.collections[0]).set_label('Age')
+    
+    plt.title('Perplexity vs Library Size', fontsize=14)
+    plt.xlabel('Library Size', fontsize=12)
+    plt.ylabel('Perplexity', fontsize=12)
+    
+    # Add grid for better readability
+    plt.grid(True, linestyle='--', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, "perplexity_vs_library_size.pdf"), 
+                format='pdf', 
+                bbox_inches='tight',
+                dpi=300)
+    plt.close()    
+    print(f"✓ Cell perplexity visualizations saved to {perplexity_dir}")
 
 ###########################
 ### Main Analysis Script ##
@@ -484,8 +534,18 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
 if len(sys.argv) > 1:
     param_id = sys.argv[1]
     MODEL_OUTPUTS_DIR = sys.argv[2]
+    ATSE_ANNDATA_PATH = sys.argv[3]
+    GE_ANNDATA_scVI_PATH = sys.argv[4]
+    AGING_GENES_PATH = sys.argv[5]
+    RBP_FILE_PATH = sys.argv[6]
+    OUTPUT_DIR = sys.argv[7]
     print(f"Using specified param_id: {param_id}")
     print(f"Using specified MODEL_OUTPUTS_DIR: {MODEL_OUTPUTS_DIR}")
+    print(f"Using specified ATSE_ANNDATA_PATH: {ATSE_ANNDATA_PATH}")
+    print(f"Using specified GE_ANNDATA_scVI_PATH: {GE_ANNDATA_scVI_PATH}")
+    print(f"Using specified AGING_GENES_PATH: {AGING_GENES_PATH}")
+    print(f"Using specified RBP_FILE_PATH: {RBP_FILE_PATH}")
+    print(f"Using output directory: {OUTPUT_DIR}")
 
 def main():
     print("\n========================================")
@@ -504,29 +564,31 @@ def main():
     # Add "library_size" from ge_adata to splice_adata
     splice_adata.obs["library_size"] = ge_adata.obs["library_size"]
 
-    # if "mouse.id" is in splice_adata.obs rename it to donor_id 
-    if "mouse.id" in splice_adata.obs.columns:
-        splice_adata.obs.rename(columns={"mouse.id": "donor_id"}, inplace=True)
-            
     # Load aging gene lists
-    aging_genes = load_aging_genes(AGING_GENES_PATH)
+    aging_genes_mouse, aging_genes_human = load_aging_genes(AGING_GENES_PATH)
     
     # Load RBP genes
     rbps = load_rbp_genes(RBP_FILE_PATH)
+
+    # if "mouse.id" is in splice_adata.obs rename it to donor_id 
+    if "mouse.id" in splice_adata.obs.columns:
+        print(f"Renaming mouse.id to donor_id in splice_adata.obs")
+        splice_adata.obs.rename(columns={"mouse.id": "donor_id"}, inplace=True)
+        # Update gene annotations
+        splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
+        splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_mouse)
     
+    else:
+        splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["gene_name"]) # when running with Human data... 
+        splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_human)
+    
+    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
+               
     # Choose model based on param_id or best performance
     model_path = f"{MODEL_OUTPUTS_DIR}/run_{param_id}/leafletfa_model.pkl.xz"
     print(f"Using specified model: run_{param_id} with model path {model_path}")
     
     # Create output directory
-    from datetime import datetime
-    import os 
-    # ensure os is imported
-    print(f"os is imported: {os}")
-    timestamp = datetime.now().strftime("%Y-%m-%d")
-    # OUTPUT_DIR should represent the date of actual model training from MODEL_OUTPUTS_DIR which would be the last folder in the path
-    train_date = MODEL_OUTPUTS_DIR.split("/")[-1]
-    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{train_date}/param_id_{param_id}"
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
     
@@ -535,12 +597,7 @@ def main():
 
     # Load the model
     leaflet_model = load_model(model_path)
-    
-    # Update gene annotations
-    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
-    splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
-    splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes)
-    
+        
     # Handle age data which is categorical
     print("   :gear: Processing age data...")
     # Create numeric age values (extract the numbers from strings like "18m" for mouse age)
@@ -568,7 +625,6 @@ def main():
     # Extract factor activities and usage
     PHI = leaflet_model["assign_post"]
     PI = leaflet_model["pi"]
-    PSI = leaflet_model["psi_learned"]
     K = leaflet_model["K"]
             
     # Add PHI to adata
@@ -615,12 +671,9 @@ def main():
     # Save to a gzipped CSV
     cell_meta_df.to_csv(output_file_path, index=False, compression='gzip')
     print(f"   ✓ Cell metadata with perplexity saved to: {output_file_path}")
- 
-    # Print model parameters
+     # Print model parameters
     print(f"   ✓ Extracted {K} factors from the model")
     print(alpha_pi, bb_conc, dir_conc)
-
-#    print(f"   ✓ Model parameters: alpha_pi={alpha_pi:.4f}, bb_conc={bb_conc:.4f}, dir_conc={dir_conc:.4f}")
     
     # Save model parameters to file
     model_params = {
@@ -650,7 +703,7 @@ def main():
 
     # Cell type UMAP
     # Identify top 15 cell types
-    top_cell_types = splice_adata.obs['broad_cell_type'].value_counts().head(10).index.tolist()
+    top_cell_types = splice_adata.obs['broad_cell_type'].value_counts().head(15).index.tolist()
 
     # Create highlighted column
     splice_adata.obs['cell_type_highlighted'] = 'Other'
@@ -664,23 +717,23 @@ def main():
     color_dict['Other'] = [0.9, 0.9, 0.9, 1.0]	  # gray for Other
 
     # Plot UMAP with legend in right margin
-    plt.figure(figsize=(8, 5))
+    plt.figure(figsize=(5, 5))
     sc.pl.umap(
         splice_adata,
         color='cell_type_highlighted',
         palette=color_dict,
         show=False,
         frameon=True,
-        legend_fontsize=10,
+        legend_fontsize=6,
         legend_loc='right margin'
     )
-    plt.title('UMAP by Cell Type (Top 10 Highlighted)')
+    plt.title('UMAP by Cell Type (Top 15 Highlighted)')
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(os.path.join(PLOTS_DIR, "umap_cell_type_top10.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(PLOTS_DIR, "umap_cell_type_top15.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
 
     # Get top five tissues by frequency
-    top_tissues = splice_adata.obs['tissue'].value_counts().head(5).index.tolist()
+    top_tissues = splice_adata.obs['tissue'].value_counts().head(10).index.tolist()
 
     # Create a temporary column for coloring tissues
     splice_adata.obs['tissue_highlighted'] = 'Other'
@@ -694,21 +747,21 @@ def main():
     tissue_color_dict['Other'] = [0.9, 0.9, 0.9, 1.0]	  # Light gray for "Other"
 
     # Plot the tissue UMAP
-    plt.figure(figsize=(6, 6))  # Increase figure size
+    plt.figure(figsize=(5, 5))  # Increase figure size
     sc.pl.umap(splice_adata, color='tissue_highlighted', palette=tissue_color_dict,
                show=False, frameon=True, legend_fontsize=12)
     plt.title('UMAP by Tissue (Top 5 Highlighted)')
     plt.tight_layout(rect=[0, 0, 1, 0.95])  # Add space for title
-    plt.savefig(os.path.join(PLOTS_DIR, "umap_tissue_top5.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(PLOTS_DIR, "umap_tissue_top10.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
 
     # Make a umap colored by dataset 
-    plt.figure(figsize=(6, 6))  # Increase figure size
+    plt.figure(figsize=(5, 5))  # Increase figure size
     sc.pl.umap(splice_adata, color='dataset', 
                show=False, frameon=True, legend_fontsize=12)
     plt.title('UMAP by Dataset')
     plt.tight_layout(rect=[0, 0, 1, 0.95])  # Add space for title
-    plt.savefig(os.path.join(PLOTS_DIR, "umap_dataset.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(PLOTS_DIR, "umap_dataset.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
 
     # Add visualization for cell perplexity
@@ -719,18 +772,6 @@ def main():
     for color_var in ['broad_cell_type', 'tissue', 'dataset', 'age_numeric']:
         if color_var in splice_adata.obs.columns:
             visualize_cell_perplexity(splice_adata, color_by=color_var, PLOTS_DIR=PLOTS_DIR, DATA_DIR=DATA_DIR)
-
-    # Plot scatter plot of perplexity vs library size
-    plt.figure(figsize=(6, 6))
-    sns.scatterplot(x='library_size', y='perplexity', data=splice_adata.obs)
-    plt.title('Perplexity vs Library Size')
-    plt.xlabel('Library Size')
-    plt.ylabel('Perplexity')
-    plt.savefig(os.path.join(PLOTS_DIR, "perplexity_vs_library_size.png"), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    # Test factor activity distribution by cell type (this will be more useful in a notebook/interactive environment)
-    plot_factor_distribution_by_group(splice_adata, 3, "broad_cell_type", n_groups=5, DATA_DIR=DATA_DIR, PLOTS_DIR=PLOTS_DIR)   
 
     ############################
     # 4. Advanced Factor Analysis
@@ -752,6 +793,16 @@ def main():
 
     # Compute variance components
     print("   :gear: Computing variance components...")
+    
+    # Compute variance components by numeric age
+    variance_components_age = compute_variance_components(
+        splice_adata, 
+        groupby="age_numeric",
+        pi_values=PI,  # Pass the PI values you already have
+        DATA_DIR=DATA_DIR,
+        PLOTS_DIR=PLOTS_DIR
+    )
+
     # Compute variance components by cell type using the PI values
     variance_components_celltype = compute_variance_components(
         splice_adata, 
@@ -782,5 +833,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025
-# sbatch --mem=250G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/01_evaluate_leafletFA_results.py"

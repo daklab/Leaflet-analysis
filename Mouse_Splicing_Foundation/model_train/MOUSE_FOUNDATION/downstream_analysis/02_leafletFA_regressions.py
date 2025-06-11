@@ -11,6 +11,20 @@ This script performs extended analysis on LeafletFA model results:
 """
 
 import os
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy.ma as ma
+from matplotlib.colors import ListedColormap
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.preprocessing import LabelEncoder
 import sys
 import numpy as np
 import pandas as pd
@@ -24,7 +38,7 @@ import scanpy as sc
 from sklearn.decomposition import PCA, NMF
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, accuracy_score, r2_score
+from sklearn.metrics import mean_squared_error, accuracy_score, r2_score, classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.utils import resample
 from mord import OrdinalRidge
@@ -44,22 +58,6 @@ from utils import *
 # Check if using CUDA
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-
-#############################
-### Configuration Section ###
-#############################
-
-# Input/Output paths
-BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829.h5ad"
-
-# Gene expression data
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_models_2025-05-16.h5ad"
-
-# Reference gene lists
-RBP_FILE_PATH = "/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
-AGING_GENES_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
 
 ######################
 ### Analysis Functions 
@@ -222,25 +220,25 @@ def predict_age_with_factors(splice_adata, NMF_ge_matrix, n_nmf_components, PLOT
 
         # Plot coefficients for the current model
         if PLOTS_DIR and not coef_df.empty:
-            plt.figure(figsize=(10, max(6, len(coef_df) * 0.3)))
+            plt.figure(figsize=(6, 9))
             errors = [
                 coef_df["Coefficient"] - coef_df["CI_Lower"],
                 coef_df["CI_Upper"] - coef_df["Coefficient"]
             ]
             
             plt.errorbar(x=coef_df["Coefficient"], y=coef_df["Feature"], 
-                         xerr=errors, fmt='o', ecolor='lightgray', capsize=3,
+                         xerr=errors, fmt='o', ecolor='black', capsize=5,
+                         markersize=4, 
                          label=f'Coefficient (alpha={alpha_val}) with 95% CI')
             
             plt.axvline(0, color='red', linestyle='--', lw=0.8, label='Zero effect')
             plt.yticks(coef_df["Feature"]) 
-            plt.xlabel("Coefficient Value", fontsize=12)
-            plt.ylabel("Feature", fontsize=12)
-            plt.title(f"Age Prediction Coefficients - Model: {model_name}", fontsize=14)
-            plt.tick_params(axis='both', which='major', labelsize=10)
+            plt.xlabel("Coefficient Value", fontsize=11)
+            plt.ylabel("Feature", fontsize=11)
+            plt.tick_params(axis='both', which='major', labelsize=8)
             plt.legend(fontsize=10)
             plt.tight_layout()
-            plt.savefig(os.path.join(PLOTS_DIR, f"age_prediction_coeffs_{model_name}_alpha{alpha_val}_CIs.png"), dpi=300)
+            plt.savefig(os.path.join(PLOTS_DIR, f"age_prediction_coeffs_{model_name}_alpha{alpha_val}_CIs.pdf"), format='pdf', bbox_inches='tight')
             plt.close()
 
         all_results[model_name] = {
@@ -358,27 +356,34 @@ def analyze_rbp_correlations(splice_adata, ge_adata, ge_layer_name="predicted_lo
         g = sns.clustermap(
             cor_matrix_rbp_nmf, 
             annot=False, 
-            cmap="coolwarm", 
+            cmap="PRGn", 
             center=0,
-            figsize=(10, 10), # Reduced width, kept height for clarity
-            linewidths=.5
+            figsize=(5, 5), 
+            linewidths=.5,
+            linecolor='black',
+            xticklabels=True,  # Ensure x tick labels are shown
+            yticklabels=True   # Ensure y tick labels are shown
         )
-        
-        # Set title with increased font size
-        g.fig.suptitle("Correlation Between RBP NMF Components and Splicing Programs", fontsize=16, y=1.03)
-        
+                
         # Set axis labels with increased font size for the heatmap part
         g.ax_heatmap.set_xlabel("Splicing Factors", fontsize=12)
         g.ax_heatmap.set_ylabel("RBP NMF Components", fontsize=12)
         
-        # Increase font size of tick labels
-        plt.setp(g.ax_heatmap.get_xticklabels(), fontsize=10, rotation=45, ha='right')
-        plt.setp(g.ax_heatmap.get_yticklabels(), fontsize=10)
+        # Force all ticks to be shown by explicitly setting them with correct clustering order
+        g.ax_heatmap.set_xticks(range(len(cor_matrix_rbp_nmf.columns)))
+        g.ax_heatmap.set_xticklabels(cor_matrix_rbp_nmf.columns[g.dendrogram_col.reordered_ind], 
+                                     rotation=45, ha='right', fontsize=10)
+        g.ax_heatmap.set_yticks(range(len(cor_matrix_rbp_nmf.index)))
+        g.ax_heatmap.set_yticklabels(cor_matrix_rbp_nmf.index[g.dendrogram_row.reordered_ind], 
+                                     rotation=0, fontsize=10)
         
-        # Adjust layout and save
+        # Force all ticks to be visible
+        g.ax_heatmap.tick_params(axis='x', which='major', labelsize=8, length=3)
+        g.ax_heatmap.tick_params(axis='y', which='major', labelsize=8, length=3)
+        
         g.fig.tight_layout(rect=[0, 0, 1, 0.99]) # Adjust rect to make space for suptitle
         if PLOTS_DIR:
-            g.savefig(os.path.join(PLOTS_DIR, "rbp_nmf_factor_correlations_clustermap.png"), dpi=300)
+            g.savefig(os.path.join(PLOTS_DIR, "rbp_nmf_factor_correlations_clustermap.pdf"), format='pdf', bbox_inches='tight')
         plt.close(g.fig) # Close the figure associated with ClusterGrid
     else:
         print("Correlation matrix is empty. Skipping clustermap.")
@@ -539,13 +544,12 @@ def logistic_regression_feature_prediction(splice_adata, gene_expression_adata, 
             
             # Plot heatmap for multiclass with more than 2 classes and if PLOTS_DIR is provided
             if PLOTS_DIR and coefs.shape[0] > 1 and len(classes) > 2: # Only plot heatmap if truly multiclass and multiple sets of coeffs
-                plt.figure(figsize=(max(10, coef_df.shape[0] * 0.3), max(8, coef_df.shape[1] * 0.4)))
-                sns.clustermap(coef_df, cmap="coolwarm", xticklabels=True, yticklabels=True)
-                plt.title(f"Logistic Regression Coefficients ({name}) for {feature}", fontsize=14)
-                plt.xticks(fontsize=14, rotation=45, ha="right")
-                plt.yticks(fontsize=14)
+                plt.figure(figsize=(7,7))
+                sns.clustermap(coef_df, cmap="PRGn", center=0, xticklabels=True, yticklabels=True, linecolor='black')
+                plt.xticks(fontsize=8, rotation=45, ha="right")
+                plt.yticks(fontsize=8)
                 plt.tight_layout()
-                plt.savefig(os.path.join(PLOTS_DIR, f"{feature}_prediction_coeffs_heatmap_{name}.png"), dpi=300)
+                plt.savefig(os.path.join(PLOTS_DIR, f"{feature}_prediction_coeffs_heatmap_{name}.pdf"), format='pdf', bbox_inches='tight')
                 plt.close()
 
             elif PLOTS_DIR and len(classes) == 2: # For binary, plot a bar chart of coefficients
@@ -562,7 +566,7 @@ def logistic_regression_feature_prediction(splice_adata, gene_expression_adata, 
                 plt.yticks(fontsize=10)
                 plt.xticks(fontsize=10)
                 plt.tight_layout()
-                plt.savefig(os.path.join(PLOTS_DIR, f"{feature}_prediction_coeffs_barchart_{name}.png"), dpi=300)
+                plt.savefig(os.path.join(PLOTS_DIR, f"{feature}_prediction_coeffs_barchart_{name}.pdf"), format='pdf', bbox_inches='tight')
                 plt.close()
     return accuracies, models, le, coefficients_dfs # Return LabelEncoder as le
 
@@ -645,15 +649,14 @@ def correlate_single_rbp_with_factors(splice_adata, ge_adata, rbp_gene_list, ge_
         plot_corr_df = corr_df
         plot_title = f"All {len(valid_rbps)} Single RBP-Splicing Factor Correlations (Spearman ρ)"
 
-    plt.figure(figsize=(min(12, n_factors * 0.5), min(15, len(plot_corr_df) * 0.3)))
-    sns.clustermap(plot_corr_df, cmap="coolwarm", xticklabels=True, yticklabels=True)
-    plt.title(plot_title, fontsize=14)
-    plt.xlabel("Splicing Factor", fontsize=14)
-    plt.ylabel("RBP Gene", fontsize=14)
-    plt.xticks(fontsize=14, rotation=45, ha='right')
-    plt.yticks(fontsize=14)
+    plt.figure(figsize=(7,7))
+    sns.clustermap(plot_corr_df, cmap="PRGn", center=0, xticklabels=True, yticklabels=True, linecolor='black')
+    plt.xlabel("Splicing Factor", fontsize=10)
+    plt.ylabel("RBP Gene", fontsize=10)
+    plt.xticks(fontsize=7, rotation=45, ha='right')
+    plt.yticks(fontsize=7)
     plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "single_rbp_factor_correlations_heatmap.png"), dpi=300)
+    plt.savefig(os.path.join(PLOTS_DIR, "single_rbp_factor_correlations_heatmap.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
     print(f"  Saved RBP-Factor correlation heatmap to {PLOTS_DIR}")
     return corr_df, pval_df
@@ -663,8 +666,8 @@ def run_variance_explained_analysis(
     ge_adata, 
     sample_id,
     rbp_nmf_latent_features,
-    n_rbp_nmf_to_use=10,
-    n_aging_nmf_to_use=10,
+    n_rbp_nmf_to_use=5,
+    n_aging_nmf_to_use=5,
     PLOTS_DIR=None, 
     DATA_DIR=None
 ):
@@ -743,9 +746,9 @@ def run_variance_explained_analysis(
     all_covariates = base_formula_covariates + rbp_nmf_cov_names + aging_nmf_cov_names
     
     # Define interaction term
-    interaction_terms = ['C(cell_type):age']
+    interaction_terms = ['C(cell_type):age', 'C(tissue):age']
 
-    # 3. Run ANOVA for each factor (simplified based on your working approach)
+    # 3. Run ANOVA for each factor (simplified based on working approach)
     r2_scores_list = []
     anova_results_list = []
     
@@ -797,8 +800,13 @@ def run_variance_explained_analysis(
     print(f"  Saved ANOVA proportions to {DATA_DIR}")
         
     # 5. Plot Heatmap    
-    min_prop_threshold = 0.01 
-        
+    min_prop_threshold = 0.00 
+    # Map: factor name → label with R²
+    factor_r2_map = {
+        row['factor']: f"{row['factor']} (R²={row['r2_overall']:.2f})"
+        for _, row in r2_df.set_index("factor").loc[anova_prop.index].reset_index().iterrows()
+    }
+    
     # Ensure plot_data has finite values for masking operations
     finite_anova_prop = anova_prop.fillna(0) # Use a copy filled with 0 for mask calculations
     factors_to_plot_mask = (finite_anova_prop.abs() > min_prop_threshold).any(axis=1)
@@ -807,31 +815,445 @@ def run_variance_explained_analysis(
     plot_data = anova_prop.loc[factors_to_plot_mask, covariates_to_plot_mask]
     plot_data = plot_data.fillna(0) 
         
-    height = max(8, plot_data.shape[0] * 0.4)
-    width = max(10, plot_data.shape[1] * 0.6)
-    height = min(height, 40) 
-    width = min(width, 40)
+    height = 5
+    width = 6
 
     # Ensure all data is float for clustermap
     plot_data = plot_data.astype(float)
+    # Rename index of plot_data (rows of the clustermap)
+    plot_data_annotated = plot_data.rename(index=factor_r2_map)
+
+    # Ensure all data is float
+    plot_data = plot_data.astype(float)
+
+    # Rename index of plot_data (rows of the clustermap)
+    plot_data_annotated = plot_data.rename(index=factor_r2_map)
+    
+    # Round the values for annotation and convert to string
+    annot_data = plot_data_annotated.round(2).astype(str)
+
+    # Compute clustermap
     cg = sns.clustermap(
-        plot_data, 
-        cmap="viridis", 
-        linewidths=0.5,
-        annot=False, 
+        plot_data_annotated, 
+        cmap="PRGn", 
+        center=0,             # ← center diverging colormap at zero (white)
+        linewidths=0.2,
+        linecolor='black',
+        annot=annot_data,
+        fmt='',  # Values already formatted as strings
+        annot_kws={"size": 5},  # Smaller font size for annotations
         figsize=(width, height),
-        vmin=0, vmax=max(1.0, plot_data.max().max()) if plot_data.size > 0 else 1.0 )
+        xticklabels=True,
+        yticklabels=True,
+        vmin=0,
+        vmax=max(1.0, plot_data.max().max()) if plot_data.size > 0 else 1.0
+    )
+
+    # Adjust tick labels
+    plt.setp(cg.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+    plt.setp(cg.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+    cg.ax_heatmap.tick_params(axis='x', which='major', labelsize=8, length=3)
+    cg.ax_heatmap.tick_params(axis='y', which='major', labelsize=8, length=3)
     
-    plt.setp(cg.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=10)
-    plt.setp(cg.ax_heatmap.get_yticklabels(), rotation=0, fontsize=10)
-    cg.fig.suptitle("Proportion of Explained Variance by Covariates for Splicing Factors", fontsize=16, y=1.03)
+    # Axis labels
+    cg.ax_heatmap.set_xlabel('Covariate Terms', fontsize=11, fontweight='bold')
+    cg.ax_heatmap.set_ylabel('LeafletFA Factors', fontsize=11, fontweight='bold')
     
-    plot_path = os.path.join(PLOTS_DIR, "variance_explained_heatmap.png")
-    cg.savefig(plot_path, dpi=300, bbox_inches="tight")
+    # Colorbar formatting
+    cbar = cg.ax_heatmap.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label('')
+    
+    # Save
+    plot_path = os.path.join(PLOTS_DIR, "variance_explained_heatmap.pdf")
+    cg.savefig(plot_path, format="pdf", bbox_inches="tight")
     print(f"  Saved variance explained heatmap to {plot_path}")
     plt.close(cg.fig)
-        
     print("Variance explained analysis complete.")
+
+def calculate_age_acceleration_by_cell_type(splice_adata, ge_adata, n_nmf_components=30, 
+                                          PLOTS_DIR=None, DATA_DIR=None):
+    """
+    Calculate age acceleration for different cell types using splicing factors, 
+    gene expression factors, and combined features.
+    
+    Args:
+        splice_adata: AnnData with X_PHI in obsm and age_numeric in obs
+        ge_adata: AnnData with X_nmf_standard_mb in obsm  
+        n_nmf_components: Number of NMF components to use from gene expression
+        PLOTS_DIR: Directory to save plots
+        DATA_DIR: Directory to save data files
+        
+    Returns:
+        dict: Age acceleration results for each feature set and cell type
+    """
+    print("Calculating age acceleration by cell type...")
+    
+    # Prepare feature sets
+    X_splicing = splice_adata.obsm["X_PHI"]
+    X_nmf = ge_adata.obsm["X_nmf_standard_mb"][:, :n_nmf_components]
+    X_combined = np.hstack([X_splicing, X_nmf])
+    
+    feature_sets = {
+        "splicing_factors": X_splicing,
+        "expression_nmf": X_nmf, 
+        "combined": X_combined
+    }
+    
+    # Get metadata
+    cell_types = splice_adata.obs["broad_cell_type"].unique()
+    age_values = splice_adata.obs["age_numeric"].values
+    cell_type_values = splice_adata.obs["broad_cell_type"].values
+    
+    # Store results
+    age_acceleration_results = {}
+    
+    for feature_name, X_features in feature_sets.items():
+        print(f"  Processing {feature_name}...")
+        
+        feature_results = {}
+        
+        for cell_type in cell_types:
+            # Subset to this cell type
+            mask = cell_type_values == cell_type
+            
+            if np.sum(mask) < 20:  # Skip cell types with too few cells
+                continue
+                
+            ct_features = X_features[mask]
+            ct_ages = age_values[mask]
+            
+            # Train age prediction model on this cell type
+            try:
+                model = Ridge(alpha=1.0)
+                model.fit(ct_features, ct_ages)
+                
+                # Calculate age acceleration
+                predicted_ages = model.predict(ct_features)
+                age_acceleration = predicted_ages - ct_ages
+                
+                # Store results
+                feature_results[cell_type] = {
+                    'mean_age_acceleration': np.mean(age_acceleration),
+                    'std_age_acceleration': np.std(age_acceleration),
+                    'median_age_acceleration': np.median(age_acceleration),
+                    'r2_age_prediction': model.score(ct_features, ct_ages),
+                    'n_cells': np.sum(mask),
+                    'age_acceleration_values': age_acceleration  # Store individual values
+                }
+                
+            except Exception as e:
+                print(f"    Warning: Could not fit model for {cell_type}: {e}")
+                continue
+        
+        age_acceleration_results[feature_name] = feature_results
+    
+    # Create summary DataFrames and plots
+    _plot_age_acceleration_results(age_acceleration_results, PLOTS_DIR, DATA_DIR)
+    filtered_results = _plot_age_acceleration_results(
+    results=age_acceleration_results, 
+    PLOTS_DIR=PLOTS_DIR, 
+    DATA_DIR=DATA_DIR,
+    adata=splice_adata,  
+    min_age_range=2,    # 3+ month span required
+    min_cells_per_age=5  # 5+ cells per age required
+    )
+    return age_acceleration_results, filtered_results
+
+def _plot_age_acceleration_results(results, PLOTS_DIR, DATA_DIR, adata=None, min_age_range=3, min_cells_per_age=5):
+    """
+    Helper function to plot and save age acceleration results with proper filtering.
+    
+    Args:
+        results: Age acceleration results dictionary
+        PLOTS_DIR: Directory for plots
+        DATA_DIR: Directory for data
+        adata: AnnData object to check age distributions (optional but recommended)
+        min_age_range: Minimum age range (months) required for reliable prediction
+        min_cells_per_age: Minimum cells per age group required
+    """    
+    # Create summary DataFrame
+    summary_data = []
+    for feature_type, cell_type_results in results.items():
+        for cell_type, metrics in cell_type_results.items():
+            summary_data.append({
+                'feature_type': feature_type,
+                'cell_type': cell_type,
+                'mean_age_acceleration': metrics['mean_age_acceleration'],
+                'std_age_acceleration': metrics['std_age_acceleration'], 
+                'median_age_acceleration': metrics['median_age_acceleration'],
+                'r2_age_prediction': metrics['r2_age_prediction'],
+                'n_cells': metrics['n_cells']
+            })
+    
+    summary_df = pd.DataFrame(summary_data)
+    
+    # ---- CRITICAL: Filter out unreliable cell types ----
+    
+    if adata is not None:
+        print(" Analyzing age distribution by cell type...")
+        
+        # Get age distribution for each cell type
+        age_analysis = []
+        for cell_type in summary_df['cell_type'].unique():
+            cell_mask = adata.obs['broad_cell_type'] == cell_type
+            if cell_mask.sum() == 0:
+                continue
+                
+            ages = adata.obs.loc[cell_mask, 'age_numeric']  
+            age_range = ages.max() - ages.min()
+            n_age_groups = ages.nunique()
+            min_cells_in_age = ages.value_counts().min()
+            max_cells_in_age = ages.value_counts().max()
+            
+            age_analysis.append({
+                'cell_type': cell_type,
+                'total_cells': cell_mask.sum(),
+                'age_range_months': age_range,
+                'n_age_groups': n_age_groups,
+                'min_age': ages.min(),
+                'max_age': ages.max(),
+                'min_cells_per_age': min_cells_in_age,
+                'max_cells_per_age': max_cells_in_age,
+                'age_distribution': dict(ages.value_counts().sort_index())
+            })
+        
+        age_df = pd.DataFrame(age_analysis)
+        
+        # Define reliability criteria (adjusted for 4 total age groups: 2,3,18,24 months)
+        reliable_mask = (
+            (age_df['age_range_months'] >= min_age_range) & 
+            (age_df['n_age_groups'] >= 2) &  # At least 2 different ages (reasonable with only 4 total)
+            (age_df['min_cells_per_age'] >= min_cells_per_age)
+        )
+        
+        reliable_cell_types = age_df.loc[reliable_mask, 'cell_type'].tolist()
+        unreliable_cell_types = age_df.loc[~reliable_mask, 'cell_type'].tolist()
+        
+        print(f"✅ Reliable cell types ({len(reliable_cell_types)}): {reliable_cell_types[:5]}...")
+        print(f"❌ Unreliable cell types ({len(unreliable_cell_types)}): {unreliable_cell_types[:5]}...")
+        
+        # Filter summary_df to only reliable cell types
+        summary_df_filtered = summary_df[summary_df['cell_type'].isin(reliable_cell_types)].copy()
+        summary_df_filtered['reliability'] = 'Reliable'
+        
+        # Keep unreliable for comparison but mark them
+        summary_df_unreliable = summary_df[summary_df['cell_type'].isin(unreliable_cell_types)].copy()
+        summary_df_unreliable['reliability'] = 'Unreliable'
+        
+        # Combine for full dataset
+        summary_df_annotated = pd.concat([summary_df_filtered, summary_df_unreliable], ignore_index=True)
+        
+        # Save age analysis
+        if DATA_DIR:
+            age_df.to_csv(os.path.join(DATA_DIR, "cell_type_age_analysis.csv"), index=False)
+            summary_df_annotated.to_csv(os.path.join(DATA_DIR, "age_acceleration_summary_annotated.csv"), index=False)
+    else:
+        print("⚠️ No adata provided - cannot filter by age distribution")
+        summary_df_filtered = summary_df.copy()
+        summary_df_annotated = summary_df.copy()
+        summary_df_annotated['reliability'] = 'Unknown'
+        reliable_cell_types = summary_df['cell_type'].unique().tolist()
+    
+    # Save summary
+    if DATA_DIR:
+        summary_df_filtered.to_csv(os.path.join(DATA_DIR, "age_acceleration_summary_filtered.csv"), index=False)
+    
+        # ---- Plot 2: Clustermap of mean age acceleration (FILTERED) ----
+        
+        pivot_mean = summary_df_filtered.pivot(index='cell_type', columns='feature_type', values='mean_age_acceleration')
+        
+        if not pivot_mean.empty:            
+            g = sns.clustermap(
+                pivot_mean, 
+                annot=False, 
+                xticklabels=True, yticklabels=True,
+                cmap='PRGn', 
+                center=0,
+                cbar_kws={'label': 'Mean Age Acceleration', 'orientation': 'horizontal'},
+                figsize=(5, 6),
+                linewidths=0.5
+            )
+            
+            plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+            plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=10)
+                        
+            g.savefig(os.path.join(PLOTS_DIR, "age_acceleration_clustermap_filtered.pdf"), 
+                     bbox_inches='tight', dpi=300)
+            plt.close(g.fig)
+        
+        # ---- Plot 2: Improved horizontal bar chart with reliability annotation ----
+        # Use summary_df_filtered for this plot (filtered)
+        pivot_r2 = summary_df_filtered.pivot(index='cell_type', columns='feature_type', values='r2_age_prediction')
+        
+        # Add reliability information only if reliability column exists
+        if 'reliability' in summary_df_filtered.columns:
+            reliability_map = summary_df_filtered.drop_duplicates('cell_type').set_index('cell_type')['reliability']
+            
+            # Sort by the "combined" feature type R² values, then by reliability
+            if 'combined' in pivot_r2.columns:
+                sort_key = pivot_r2['combined'].fillna(0)
+            else:
+                sort_key = pivot_r2.mean(axis=1, skipna=True)
+            
+            # Secondary sort by reliability (reliable first)
+            sort_df = pd.DataFrame({'r2': sort_key, 'reliability': reliability_map}).fillna({'reliability': 'Unknown'})
+            sort_df['reliable_first'] = (sort_df['reliability'] == 'Reliable').astype(int)
+            sort_df = sort_df.sort_values(['reliable_first', 'r2'], ascending=[False, True])
+            
+            pivot_r2_sorted = pivot_r2.loc[sort_df.index]
+        else:
+            # Simple sort by combined R² if no reliability info available
+            if 'combined' in pivot_r2.columns:
+                sort_key = pivot_r2['combined'].fillna(0)
+            else:
+                sort_key = pivot_r2.mean(axis=1, skipna=True)
+            
+            pivot_r2_sorted = pivot_r2.loc[sort_key.sort_values(ascending=True).index]
+        
+        # Create the plot with reliability colors
+        fig, ax = plt.subplots(figsize=(5, 7))
+        
+        # Plot bars
+        pivot_r2_sorted.plot(
+            kind='barh',
+            width=0.8,
+            color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'][:len(pivot_r2_sorted.columns)],
+            edgecolor='black',
+            linewidth=0.5,
+            ax=ax
+        )
+        
+        ax.set_xlabel('Age R² Score', fontsize=10, fontweight='bold')
+        ax.set_ylabel('Cell Type', fontsize=10, fontweight='bold')
+        ax.tick_params(axis='x', labelsize=9)
+        ax.tick_params(axis='y', labelsize=10)
+        ax.legend(title='Predictor', fontsize=10, title_fontsize=11)
+        ax.grid(True, axis='x', alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(PLOTS_DIR, "age_prediction_r2_by_celltype_annotated.pdf"), 
+                   bbox_inches='tight', dpi=300)
+        plt.close()
+            
+    return summary_df_filtered if adata is not None else summary_df
+
+
+def plot_feature_comparison_celltype_prediction(splice_adata, ge_adata, PLOTS_DIR, min_cells=1000):
+    """
+    Compare splicing vs expression vs combined features for predicting broad cell types.
+    Only includes cell types with at least `min_cells` instances.
+    """
+
+    # Filter to only cell types with enough representation
+    cell_type_counts = splice_adata.obs["broad_cell_type"].value_counts()
+    valid_cell_types = cell_type_counts[cell_type_counts >= min_cells].index.tolist()
+    valid_cells = splice_adata.obs["broad_cell_type"].isin(valid_cell_types)
+
+    splice_adata = splice_adata[valid_cells]
+    ge_adata = ge_adata[valid_cells]
+
+    # Extract feature matrices
+    feature_sets = {
+        'Splicing': splice_adata.obsm["X_PHI"],
+        'Expression': ge_adata.obsm["X_nmf_standard_mb"][:, :30],
+        'Combined': np.hstack([
+            splice_adata.obsm["X_PHI"],
+            ge_adata.obsm["X_nmf_standard_mb"][:, :30]
+        ])
+    }
+
+    # Target labels
+    labels = splice_adata.obs["broad_cell_type"]
+    le = LabelEncoder()
+    labels_encoded = le.fit_transform(labels)
+
+    all_results = {}
+    confusion_matrices = {}
+
+    for feature_name, X in feature_sets.items():
+        # Stratified train/test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, labels, test_size=0.3, stratify=labels, random_state=42
+        )
+
+        # Re-encode to match split sets
+        y_train_enc = le.transform(y_train)
+        y_test_enc = le.transform(y_test)
+
+        model = LogisticRegression(max_iter=500, multi_class='ovr')
+        model.fit(X_train, y_train_enc)
+        y_pred_enc = model.predict(X_test)
+
+        # Convert predictions to labels
+        y_pred = le.inverse_transform(y_pred_enc)
+        y_test_lbl = le.inverse_transform(y_test_enc)
+
+        # Store confusion matrix data
+        confusion_matrices[feature_name] = {
+            'y_true': y_test_lbl,
+            'y_pred': y_pred,
+            'labels': le.classes_
+        }
+
+        # Compute per-class recall
+        report = classification_report(y_test_lbl, y_pred, output_dict=True)
+
+        for cell_type in le.classes_:
+            recall = report.get(cell_type, {}).get('recall', 0.0)
+            all_results.setdefault(cell_type, {})[feature_name] = recall
+
+    # Convert results to DataFrame
+    comparison_df = pd.DataFrame(all_results).T.fillna(0.0)
+    comparison_df = comparison_df.sort_values(by='Combined', ascending=True)
+
+    # Plot 1: Horizontal bar chart of recall
+    fig, ax = plt.subplots(figsize=(5,7))
+    comparison_df.plot.barh(
+        ax=ax, width=0.75,
+        color=["#1f77b4", "#ff7f0e", "#2ca02c"],
+        edgecolor='black'
+    )
+
+#    # Add value labels
+#    for container in ax.containers:
+#        ax.bar_label(container, fmt="%.2f", label_type='edge', fontsize=8, padding=2)
+
+    # Draw a vertical line at y=0.5
+    ax.axvline(x=0.5, color='grey', linestyle='--', linewidth=0.8)
+    ax.set_xlabel('Prediction Recall', fontsize=14)
+    ax.set_ylabel('Cell Type', fontsize=14)
+    ax.set_xlim(0, 1.05)
+    ax.tick_params(labelsize=10)
+    ax.legend(title='Feature Set', fontsize=11, title_fontsize=12)
+    ax.grid(True, axis='x', linestyle='--', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, "celltype_prediction_feature_comparison.pdf"), dpi=300)
+    plt.close()
+
+    # Plot 2: Confusion matrices
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    for idx, (feature_name, cm_data) in enumerate(confusion_matrices.items()):
+        ax = axes[idx]
+        #cm = confusion_matrix(cm_data['y_true'], cm_data['y_pred'], labels=cm_data['labels'])
+        cm = confusion_matrix(
+            cm_data['y_true'], cm_data['y_pred'], 
+            labels=cm_data['labels'], normalize='true'  # Normalize rows
+        )
+
+        sns.heatmap(cm * 100, annot=False, cmap='Blues',
+            xticklabels=cm_data['labels'], yticklabels=cm_data['labels'], ax=ax,
+            cbar_kws={'label': 'Recall (%)'})
+        
+        ax.set_title(f'{feature_name} Features', fontsize=11)
+        ax.set_xlabel('Predicted', fontsize=10)
+        ax.set_ylabel('True', fontsize=10)
+        ax.tick_params(axis='x', labelsize=8)
+        ax.tick_params(axis='y', labelsize=8)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(PLOTS_DIR, "celltype_prediction_confusion_matrices.pdf"), dpi=300)
+    plt.close()
 
 ###########################
 ### Main Analysis Script ##
@@ -841,8 +1263,20 @@ def run_variance_explained_analysis(
 if len(sys.argv) > 1:
     param_id = sys.argv[1]
     MODEL_OUTPUTS_DIR = sys.argv[2]
+    ATSE_ANNDATA_PATH = sys.argv[3]
+    GE_ANNDATA_scVI_PATH = sys.argv[4]
+    GE_ANNDATA_NMF_PATH = sys.argv[5]
+    AGING_GENES_PATH = sys.argv[6]
+    RBP_FILE_PATH = sys.argv[7]
+    OUTPUT_DIR = sys.argv[8]
     print(f"Using specified param_id: {param_id}")
     print(f"Using specified MODEL_OUTPUTS_DIR: {MODEL_OUTPUTS_DIR}")
+    print(f"Using specified ATSE_ANNDATA_PATH: {ATSE_ANNDATA_PATH}")
+    print(f"Using specified GE_ANNDATA_scVI_PATH: {GE_ANNDATA_scVI_PATH}")
+    print(f"Using specified GE_ANNDATA_NMF_PATH: {GE_ANNDATA_NMF_PATH}")
+    print(f"Using specified AGING_GENES_PATH: {AGING_GENES_PATH}")
+    print(f"Using specified RBP_FILE_PATH: {RBP_FILE_PATH}")
+    print(f"Using output directory: {OUTPUT_DIR}")
 
 def main():
     print("\n========================================")
@@ -855,33 +1289,42 @@ def main():
     print("\n>> Loading data and model...")
     
     splice_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
-    # if "mouse.id" is in splice_adata.obs rename it to donor_id 
-    if "mouse.id" in splice_adata.obs.columns:
-        splice_adata.obs.rename(columns={"mouse.id": "donor_id"}, inplace=True)
-
     ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
     ge_adata_nmf = ad.read_h5ad(GE_ANNDATA_NMF_PATH)
+
+    # Load aging gene lists
+    aging_genes_mouse, aging_genes_human = load_aging_genes(AGING_GENES_PATH)
     
+    # Load RBP genes
+    rbps = load_rbp_genes(RBP_FILE_PATH)
+
+    # if "mouse.id" is in splice_adata.obs rename it to donor_id 
+    if "mouse.id" in splice_adata.obs.columns:
+        print(f"Renaming mouse.id to donor_id in splice_adata.obs")
+        splice_adata.obs.rename(columns={"mouse.id": "donor_id"}, inplace=True)
+        # Update gene annotations
+        splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
+        splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_mouse)
+        ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
+        ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_mouse)
+    
+    else:
+        splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["gene_name"]) # when running with Human data... 
+        splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_human)
+        ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["gene_name"])
+        ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_human)
+    
+    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
+
     assert np.all(ge_adata.obs_names == ge_adata_nmf.obs_names), "Cell IDs in ge_adata and ge_adata_nmf do not match or are not in the same order."
     assert np.all(ge_adata.var_names == ge_adata_nmf.var_names), "Gene names in ge_adata and ge_adata_nmf do not match or are not in the same order."
     ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
     ge_adata.varm["nmf_standard_mb_components"] = ge_adata_nmf.varm["nmf_standard_mb_components"]
-
-    aging_genes = load_aging_genes(AGING_GENES_PATH)
-    rbps_df = load_rbp_genes(RBP_FILE_PATH)
-    
-    ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps_df["mouse_gene_name"])
-    ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes)
     
     model_path = os.path.join(MODEL_OUTPUTS_DIR, f"run_{param_id}", "leafletfa_model.pkl.xz")
     print(f"Using specified model: run_{param_id} with model path {model_path}")
     
     # Create output directory
-    from datetime import datetime
-    timestamp = datetime.now().strftime("%Y-%m-%d")
-    train_date = MODEL_OUTPUTS_DIR.split("/")[-1]
-    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{train_date}/param_id_{param_id}"
-
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
     
@@ -890,12 +1333,7 @@ def main():
     
     # Load the model
     leaflet_model = load_model(model_path)
-
-    # Update gene annotations
-    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
-    splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps_df["mouse_gene_name"])
-    splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes)
-    print(f"   ✓ Data loaded successfully")
+    print(f"  ✓ Data loaded successfully")
     
     ############################
     # 2. Extract Model Parameters
@@ -905,7 +1343,7 @@ def main():
 
     PHI = leaflet_model["assign_post"]
     K_factors_model = leaflet_model["K"]
-    print(f"   ✓ Extracted {K_factors_model} factors from the model")
+    print(f"  ✓ Extracted {K_factors_model} factors from the model")
 
     splice_adata.obsm["X_PHI"] = PHI
     if "psi_learned" in leaflet_model and 'PSI_CELLS' not in splice_adata.layers:
@@ -926,6 +1364,7 @@ def main():
     ############################
     # 3. Run analysis functions 
     ############################
+
     print("\n>> Running analysis functions...")
 
     # Plot correlation between splicing factors
@@ -944,11 +1383,60 @@ def main():
     target_feature_logreg = "broad_cell_type" 
     logistic_regression_feature_prediction(
         splice_adata, ge_adata, feature=target_feature_logreg, 
-        n_nmf_components=min(10, n_nmf_main) if n_nmf_main > 0 else 0, 
+        n_nmf_components=min(30, n_nmf_main) if n_nmf_main > 0 else 0, 
         covariate_column="tissue", test_size=0.2, PLOTS_DIR=PLOTS_DIR, DATA_DIR=DATA_DIR)
 
-    # Combine splicing and gene expression latent space 
+    print("   :gear: Calculating age acceleration by cell type...")
+    age_accel_results, filtered_results = calculate_age_acceleration_by_cell_type(
+        splice_adata, 
+        ge_adata, 
+        n_nmf_components=min(30, n_nmf_main) if n_nmf_main > 0 else 0,
+        PLOTS_DIR=PLOTS_DIR, 
+        DATA_DIR=DATA_DIR
+    )
+
+    # ----------------------------------------------------------
+    # Variance Explained Analysis
+    print("   :gear: Running variance explained analysis...")
+    run_variance_explained_analysis(
+        splice_adata=splice_adata, 
+        ge_adata=ge_adata, 
+        sample_id = "dataset",
+        rbp_nmf_latent_features=rbp_latent_nmf_features, # Pass the RBP NMF features
+        n_rbp_nmf_to_use=10,          # Number of RBP NMF components to use
+        n_aging_nmf_to_use=10,        # Number of NMF components for aging genes
+        PLOTS_DIR=PLOTS_DIR, 
+        DATA_DIR=DATA_DIR
+    )
+
+    # Look at individual RBP-Factor correlations
+    print("   :gear: Correlating single RBP gene expression with splicing factors...")
+    list_of_rbps_for_corr = ge_adata.var_names[ge_adata.var["RBP_gene"]].tolist()
+    print(f"   :gear: Correlating single RBP gene expression with splicing factors for {len(list_of_rbps_for_corr)} RBPs")
+    correlate_single_rbp_with_factors(
+        splice_adata, ge_adata, rbp_gene_list=list_of_rbps_for_corr, 
+        ge_layer_name="predicted_log_norm_tms", PLOTS_DIR=PLOTS_DIR, DATA_DIR=DATA_DIR)
+
+    # Predict age from factor activities with/without covariate
+    print("   :gear: Predicting age from factor activities...")
+    
+    # Use NMF as the number of NMF components for gene expression
+    predict_age_with_factors(
+        splice_adata, 
+        NMF_ge_matrix=ge_adata.obsm["X_nmf_standard_mb"],
+        n_nmf_components=min(10, n_nmf_main) if n_nmf_main > 0 else 0,
+        PLOTS_DIR=PLOTS_DIR, 
+        DATA_DIR=DATA_DIR, 
+        tissue_col_name="tissue", # Assuming 'tissue' is the column for tissue source
+        n_bootstraps=100, # Reduced for faster testing, can be increased
+        alpha_val=1.0
+    )
+
+        # Combine splicing and gene expression latent space 
     print(f"Running UMAP on combined latent space...")
+
+    # Run some cell type prediction tasks 
+    plot_feature_comparison_celltype_prediction(splice_adata, ge_adata, PLOTS_DIR)
     
     # Run UMAP on the combined latent space using NMF components
     # NMF----------------------------------------------------------
@@ -957,7 +1445,7 @@ def main():
     combined_adata.obs = splice_adata.obs.copy()
     sc.pp.neighbors(combined_adata, use_rep="X")
     sc.tl.umap(combined_adata)
-    top_cell_types = combined_adata.obs['broad_cell_type'].value_counts().head(10).index.tolist()
+    top_cell_types = combined_adata.obs['broad_cell_type'].value_counts().head(15).index.tolist()
     combined_adata.obs['cell_type_highlighted'] = 'Other'
     combined_adata.obs.loc[combined_adata.obs['broad_cell_type'].isin(top_cell_types), 'cell_type_highlighted'] = \
     combined_adata.obs['broad_cell_type']
@@ -977,7 +1465,7 @@ def main():
     )
     plt.title('UMAP by Cell Type (Top 10 Highlighted)')
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(os.path.join(PLOTS_DIR, "combined_GE_AS_umap_cell_type_top10.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(PLOTS_DIR, "combined_NMF_GE_AS_umap_cell_type_top10.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
 
     # scVI----------------------------------------------------------
@@ -1005,45 +1493,8 @@ def main():
     )
     plt.title('UMAP by Cell Type (Top 10 Highlighted)')
     plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(os.path.join(PLOTS_DIR, "combined_scVI_linear_GE_AS_umap_cell_type_top10.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(PLOTS_DIR, "combined_scVI_linear_GE_AS_umap_cell_type_top10.pdf"), format='pdf', bbox_inches='tight')
     plt.close()
-
-    # ----------------------------------------------------------
-    # ----------------------------------------------------------
-    # Variance Explained Analysis
-    print("   :gear: Running variance explained analysis...")
-    run_variance_explained_analysis(
-        splice_adata=splice_adata, 
-        ge_adata=ge_adata, 
-        sample_id = "dataset",
-        rbp_nmf_latent_features=rbp_latent_nmf_features, # Pass the RBP NMF features
-        n_rbp_nmf_to_use=10,          # Number of RBP NMF components to use
-        n_aging_nmf_to_use=10,        # Number of NMF components for aging genes
-        PLOTS_DIR=PLOTS_DIR, 
-        DATA_DIR=DATA_DIR
-    )
-
-    # Look at individual RBP-Factor correlations
-    print("   :gear: Correlating single RBP gene expression with splicing factors...")
-    list_of_rbps_for_corr = rbps_df["mouse_gene_name"].unique().tolist()
-    correlate_single_rbp_with_factors(
-        splice_adata, ge_adata, rbp_gene_list=list_of_rbps_for_corr, 
-        ge_layer_name="predicted_log_norm_tms", PLOTS_DIR=PLOTS_DIR, DATA_DIR=DATA_DIR)
-
-    # Predict age from factor activities with/without covariate
-    print("   :gear: Predicting age from factor activities...")
-    
-    # Use n_nmf_main as the number of NMF components for gene expression
-    predict_age_with_factors(
-        splice_adata, 
-        NMF_ge_matrix=ge_adata.obsm["X_nmf_standard_mb"] if "X_nmf_standard_mb" in ge_adata.obsm else None,
-        n_nmf_components=min(10, n_nmf_main) if n_nmf_main > 0 else 0,
-        PLOTS_DIR=PLOTS_DIR, 
-        DATA_DIR=DATA_DIR, 
-        tissue_col_name="tissue", # Assuming 'tissue' is the column for tissue source
-        n_bootstraps=100, # Reduced for faster testing, can be increased
-        alpha_val=1.0
-    )
 
     print("\n========================================")
     print("LeafletFA Model Analysis Completed.")

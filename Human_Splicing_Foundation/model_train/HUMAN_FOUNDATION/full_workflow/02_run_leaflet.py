@@ -248,8 +248,8 @@ import gc
 gc.collect()  # Free memory
 print(f"Trying to free up memory before saving model...")
 
-# Save only if num_epochs > 100
-if params.get("num_epochs", 0) > 100:
+# Save only if num_epochs > 20
+if params.get("num_epochs", 0) > 20:
     with gzip.open(model_file, "wb") as f:
         print(f"Starting model save to {model_file}...")
 
@@ -261,6 +261,6 @@ if params.get("num_epochs", 0) > 100:
 
     print(f"Model saved to {model_file}")
 else:
-    print(f"Model not saved to {model_file} because num_epochs <= 100.")
+    print(f"Model not saved to {model_file} because num_epochs <= 20.")
 
 print("Run complete.")

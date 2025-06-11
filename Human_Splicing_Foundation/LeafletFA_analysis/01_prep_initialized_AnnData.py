@@ -44,13 +44,13 @@ SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN
 ATSE_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
 
 # Model configuration
-N_WAYPOINTS = 50
+N_WAYPOINTS = 30
 N_PCA_COMPONENTS = 50
 N_DIM_COMPONENTS = 30
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.3  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.75  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -300,8 +300,10 @@ def save_prepared_anndata(splice_adata):
     try:
         # Define output filename specify what waypoints were used 
         # N_WAYPOINTS is just a number, not a list
-        waypoint_str = "_".join(str(N_WAYPOINTS))
-        output_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_{waypoint_str}waypoints_{timestamp}.h5ad"
+        waypoint_str = str(N_WAYPOINTS)
+        # Add number of junctions used to the filename
+        num_junctions = splice_adata.shape[1]
+        output_filename = f"HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_{num_junctions}_junctions_{waypoint_str}_waypoints_{timestamp}.h5ad"
         output_path = os.path.join(OUTPUT_DIR, output_filename)
         
         # Remove unnecessary columns from var

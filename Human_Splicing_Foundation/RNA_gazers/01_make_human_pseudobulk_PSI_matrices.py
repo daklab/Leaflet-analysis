@@ -18,8 +18,6 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import scipy.sparse
-
-# Single-cell analysis
 import anndata as ad
 
 # ----- TO -DO! -----
@@ -44,6 +42,14 @@ print(f"Output directory: {output_dir}", flush=True)
 ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
 assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
 
+# Metadata file
+metadata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/human_metadata_combined.tsv"
+assert os.path.exists(metadata_file), f"Metadata file does not exist: {metadata_file}"
+
+# Load metadata
+metadata = pd.read_csv(metadata_file, sep="\t")
+print(metadata.head())
+
 # Load ATSE data
 atses = pd.read_csv(ATSE_file, sep="\t")
 assert "event_id" in atses.columns, "'event_id' column missing from ATSE file"
@@ -51,7 +57,7 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # Splicing input file
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025/splice_adata_matched_2025-05-12.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/splice_adata_matched_2025-06-11.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
 # Define which column to use for cell type grouping
@@ -64,7 +70,7 @@ print("Loading splicing AnnData file...", flush=True)
 splice_adata = ad.read_h5ad(input_file)
 
 # Add parameter for testing with subset of cells
-MAX_CELLS = 5000  # Set to None to use all cells
+MAX_CELLS = None  # Set to None to use all cells
 if MAX_CELLS is not None and MAX_CELLS < splice_adata.shape[0]:
     print(f"\nSubsampling to {MAX_CELLS} cells while maintaining cell type proportions...")
     
@@ -196,6 +202,7 @@ def create_pseudobulk(adata, group_by, layer=None):
     
     # Process each group
     for i, group in enumerate(tqdm(unique_groups)):
+
         # Get indices of cells in this group
         cell_indices = np.where(adata.obs[group_by] == group)[0]
         n_cells = len(cell_indices)
@@ -279,6 +286,46 @@ print("\n=== Creating pseudobulk ATSE cluster samples ===")
 pseudobulk_atse = create_pseudobulk(splice_adata, cell_type_column, layer=atse_layer)
 print(f"Created pseudobulk ATSE object with shape: {pseudobulk_atse.shape}")
 
+# ----- Add sanity check to confirm junction counts were correctly created -----
+
+# Sample cell type 
+cell_type_sample = pseudobulk_junction.obs.index[1]
+print(f"Sampled cell type: {cell_type_sample}")
+
+# sample junction_id_index 
+junc_sample = pseudobulk_junction.var["junction_id_index"].sample(1)
+junc_sample = junc_sample.values[0]
+print(f"Sampled junction_id_index: {junc_sample}")
+
+# Find ATSE event_id for this junction_id_index
+atse_event_id = pseudobulk_junction.var[pseudobulk_junction.var["junction_id_index"] == junc_sample]["event_id"].values[0]
+print(f"ATSE event_id: {atse_event_id}")
+
+# Get sum of counts for this junction_id_index in raw data
+# Find indices in splice_adata.obs that match cell_type_sample
+cell_indices = np.where(splice_adata.obs[cell_type_column] == cell_type_sample)[0]
+print(f"Found {len(cell_indices)} cells for cell type {cell_type_sample}")
+
+# Get the counts for this junction_id_index in the raw data
+junction_counts = splice_adata.layers[junction_layer][cell_indices, junc_sample]
+print(f"Junction counts: {junction_counts}")
+# print the sum of the counts
+print(f"Sum of junction counts: {junction_counts.sum()}")
+
+# Get sum of counts for this event_id in raw data
+atse_counts = splice_adata.layers[atse_layer][cell_indices, junc_sample]
+print(f"ATSE counts: {atse_counts}")
+# print the sum of the counts
+print(f"Sum of ATSE counts: {atse_counts.sum()}")
+
+# Subset pseudobulk just to this cell type
+pseudobulk_junction_cell_type = pseudobulk_junction[pseudobulk_junction.obs["cell_type"] == cell_type_sample]
+print(f"Junction counts for this cell type: {pseudobulk_junction_cell_type.X[:, junc_sample].data}")
+
+# Do the same for the ATSE counts
+pseudobulk_atse_cell_type = pseudobulk_atse[pseudobulk_atse.obs["cell_type"] == cell_type_sample]
+print(f"ATSE counts for this cell type: {pseudobulk_atse_cell_type.X[:, junc_sample].data}")
+
 # ----- Calculate PSI values -----
 
 def calculate_psi(junction_adata, atse_adata):
@@ -342,6 +389,9 @@ def calculate_psi(junction_adata, atse_adata):
 
 # Calculate PSI values
 pseudobulk_psi = calculate_psi(pseudobulk_junction, pseudobulk_atse)
+# Suset to just cell_type_sample
+pseudobulk_psi_cell_type = pseudobulk_psi[pseudobulk_psi.obs["cell_type"] == cell_type_sample]
+print(pseudobulk_psi_cell_type.X[:, junc_sample]) 
 
 # Print summary statistics
 print("\n=== Pseudobulk PSI summary ===")
@@ -484,128 +534,6 @@ long_df.to_csv(final_file, index=False, compression="gzip")
 
 print("\nPseudobulk creation and PSI calculation complete!")
 
-# ----- SANITY CHECK CODE BLOCK -----
-print("\n===== RUNNING SANITY CHECK =====")
 
-# 1. Choose a random cell type
-cell_types = splice_adata.obs[cell_type_column].unique()
-random_cell_type = random.choice(cell_types)
-print(f"Selected random cell type: {random_cell_type}")
-
-# 2. Choose a random ATSE event
-event_ids = atses['event_id'].unique()
-random_event = random.choice(event_ids)
-print(f"Selected random event: {random_event}")
-
-# 3. Get all junctions for this event
-event_junctions = atses[atses['event_id'] == random_event]['junction_id'].unique()
-print(f"Junctions in this event: {', '.join(event_junctions)}")
-
-# 4. Get cell indices for the selected cell type
-cell_indices = np.where(splice_adata.obs[cell_type_column] == random_cell_type)[0]
-print(f"Found {len(cell_indices)} cells of type {random_cell_type}")
-
-# 5. Calculate raw junction counts manually
-print("\nCalculating raw junction counts from single-cell data...")
-junction_layer = "cell_by_junction_matrix"
-
-# Create a lookup dictionary of junction_id to junction_id_index
-junction_id_to_idx = {}
-if 'junction_id_index' in splice_adata.var.columns:
-    # If we have junction_id_index column, use it directly
-    for idx, row in splice_adata.var.iterrows():
-        junction_id = row['junction_id'] if 'junction_id' in row else idx
-        junction_id_to_idx[junction_id] = row['junction_id_index']
-else:
-    # Fallback: use position in the var index
-    for idx, junction_id in enumerate(splice_adata.var.index):
-        junction_id_to_idx[junction_id] = idx
-
-# Sum up counts for each junction in this event
-raw_junction_counts = {}
-total_raw_junction_count = 0
-
-for junction in event_junctions:
-    if junction in junction_id_to_idx:
-        # Get the position directly from the lookup
-        junction_position = junction_id_to_idx[junction]
-        
-        # Extract counts for this junction across the selected cells
-        if scipy.sparse.issparse(splice_adata.layers[junction_layer]):
-            counts = splice_adata.layers[junction_layer][cell_indices, junction_position].sum()
-            if scipy.sparse.issparse(counts):
-                counts = counts.toarray()[0, 0]
-        else:
-            counts = np.sum(splice_adata.layers[junction_layer][cell_indices, junction_position])
-        
-        raw_junction_counts[junction] = counts
-        total_raw_junction_count += counts
-    else:
-        print(f"Warning: Junction {junction} not found in var dataframe")
-
-print("\nRaw junction counts from single-cell data:")
-for junction, count in sorted(raw_junction_counts.items()):
-    print(f"  {junction}: {count}")
-print(f"Total raw junction count: {total_raw_junction_count}")
-
-# 6. Get the pseudobulk counts from the long format data
-print("\nRetrieving pseudobulk counts from results...")
-
-# Filter the long format data for our cell type and event
-pseudobulk_rows = long_df[
-    (long_df['cell_type'] == random_cell_type) & 
-    (long_df['event_id'] == random_event)
-]
-
-# Sum the junction counts
-pseudobulk_junction_counts = {}
-total_pseudobulk_junction_count = 0
-
-for _, row in pseudobulk_rows.iterrows():
-    junction = row['junction_id']
-    count = row['junction_count']
-    pseudobulk_junction_counts[junction] = count
-    total_pseudobulk_junction_count += count
-
-print("\nPseudobulk junction counts from results:")
-for junction, count in sorted(pseudobulk_junction_counts.items()):
-    print(f"  {junction}: {count}")
-print(f"Total pseudobulk junction count: {total_pseudobulk_junction_count}")
-
-# 7. Compare the total counts
-print("\n=== COMPARISON ===")
-print(f"Total raw junction count: {total_raw_junction_count}")
-print(f"Total pseudobulk junction count: {total_pseudobulk_junction_count}")
-
-# Calculate percent difference
-if total_raw_junction_count > 0:
-    percent_diff = abs(total_raw_junction_count - total_pseudobulk_junction_count) / total_raw_junction_count * 100
-    print(f"Percent difference: {percent_diff:.4f}%")
-    
-    # Determine if the check passes
-    if percent_diff < 0.01:  # Less than 0.01% difference
-        print("\nSANITY CHECK PASSED! ✅")
-        print("The pseudobulk junction counts match the raw sums.")
-    else:
-        print("\nSANITY CHECK FAILED! ❌")
-        print("There's a significant difference between pseudobulk and raw counts.")
-else:
-    print("\nCannot calculate percent difference (raw count is zero).")
-
-# Print a detailed comparison for each junction to help debug any differences
-print("\n=== DETAILED COMPARISON BY JUNCTION ===")
-all_junctions = sorted(set(list(raw_junction_counts.keys()) + list(pseudobulk_junction_counts.keys())))
-for junction in all_junctions:
-    raw = raw_junction_counts.get(junction, 0)
-    pseudobulk = pseudobulk_junction_counts.get(junction, 0)
-    diff = abs(raw - pseudobulk)
-    if raw > 0:
-        percent = (diff / raw) * 100
-        print(f"{junction}: Raw={raw}, Pseudobulk={pseudobulk}, Diff={diff} ({percent:.4f}%)")
-    else:
-        print(f"{junction}: Raw={raw}, Pseudobulk={pseudobulk}, Diff={diff} (N/A%)")
-
-print("\nSanity check complete.")
-
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/052025
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
 # sbatch --mem=250G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"

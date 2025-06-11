@@ -56,7 +56,7 @@ def main():
     for metric in metrics_to_plot:
         print(f"Plotting {metric} by model parameters...")
         sorted_combos = summary_df.groupby("prior_combo")[metric].median().sort_values(ascending=False).index
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(6, 6))
         sns.boxplot(
             data=summary_df, x="prior_combo", y=metric,
             order=sorted_combos
@@ -72,7 +72,7 @@ def main():
         plt.xlabel("Model parameters used", fontsize=14)
         plt.ylabel(metric.replace('_', ' ').title(), fontsize=14)
         plt.tight_layout()
-        plt.savefig(os.path.join(OUTPUT_SUMMARY_DIR, f"{metric}_by_model_combo.png"))
+        plt.savefig(os.path.join(OUTPUT_SUMMARY_DIR, f"{metric}_by_model_combo.pdf"))
         plt.close()
 
     # --- Heatmap of Metrics by prior_combo ---
@@ -91,7 +91,7 @@ def main():
     sns.clustermap(heatmap_df_scaled, annot=False, 
         cmap="YlGnBu", yticklabels=True, xticklabels=True)
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_SUMMARY_DIR, "model_performance_heatmap_by_metric.png"))
+    plt.savefig(os.path.join(OUTPUT_SUMMARY_DIR, "model_performance_heatmap_by_metric.pdf"))
     plt.close()
 
     # save summary_df

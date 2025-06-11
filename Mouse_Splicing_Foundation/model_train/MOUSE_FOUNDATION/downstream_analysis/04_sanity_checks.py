@@ -35,14 +35,6 @@ from tqdm import tqdm
 sys.path.append('/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils/')
 from utils import *
 
-#############################
-### Configuration Section ###
-#############################
-
-# Input/Output paths
-BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829.h5ad"
-
 ######################
 ### Analysis Functions 
 ######################
@@ -141,8 +133,11 @@ def correlate_imputed_psi_with_observed_psi(splice_adata, PLOTS_DIR, DATA_DIR, n
 if len(sys.argv) > 1:
     param_id = sys.argv[1]
     MODEL_OUTPUTS_DIR = sys.argv[2]
+    ATSE_ANNDATA_PATH = sys.argv[3]
+    OUTPUT_DIR = sys.argv[4]
     print(f"Using specified param_id: {param_id}")
     print(f"Using specified MODEL_OUTPUTS_DIR: {MODEL_OUTPUTS_DIR}")
+    print(f"Using specified ATSE_ANNDATA_PATH: {ATSE_ANNDATA_PATH}")
 
 def main():
     print("\n========================================")
@@ -162,9 +157,6 @@ def main():
     
     # Create output directory
     from datetime import datetime
-    timestamp = datetime.now().strftime("%Y-%m-%d")
-    train_date = MODEL_OUTPUTS_DIR.split("/")[-1]
-    OUTPUT_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{train_date}/param_id_{param_id}"
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
     
