@@ -105,8 +105,7 @@ def plot_individual_factor_junction_analysis(final_df, results_dir, top_n=30):
         
         # Create publication-ready plot with 3 subplots
         # Calculate height based on number of junctions (min 6", max 12")
-        fig_height = max(6, min(12, 4 + top_n * 0.25))
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, fig_height), 
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 7), 
                                             gridspec_kw={'width_ratios': [3.5, 1.25, 1.25]})
         
         # Set publication-ready style
@@ -282,10 +281,6 @@ def plot_individual_factor_junction_analysis(final_df, results_dir, top_n=30):
             clustermap_data_display.index = display_row_labels
             row_colors_df.index = display_row_labels
             
-            # Create the clustermap
-            fig_height = max(8, min(16, 4 + len(top_junction_ids) * 0.4))
-            fig_width = max(10, min(20, 6 + len(clustermap_data.columns) * 0.3))
-            
             g = sns.clustermap(
                 clustermap_data_display,
                 row_colors=row_colors_df,
@@ -293,7 +288,7 @@ def plot_individual_factor_junction_analysis(final_df, results_dir, top_n=30):
                 center=0,
                 annot=False,
                 linewidths=0.3,
-                figsize=(fig_width, fig_height),
+                figsize=(6, 7),
                 cbar_kws={'label': 'Effect Size'},
                 xticklabels=True,
                 yticklabels=True
@@ -374,7 +369,7 @@ if len(sys.argv) > 1:
     print(f"Using specified OUTPUT_DIR: {OUTPUT_DIR}")
 def main():
     print("\n========================================")
-    print("LeafletFA Model Analysis - Mouse Splicing Foundation")
+    print("LeafletFA Model Analysis 03...")
     print("========================================\n")
     
     ############################
@@ -382,15 +377,51 @@ def main():
     ############################
     print("\n>> Loading data and model...")
     
+    final_cells = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/filtered_cell_ids.txt"
+    with open(final_cells, "r") as f:
+        final_cells = f.read().splitlines()
+    
     splice_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
     ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
     ge_adata_nmf = ad.read_h5ad(GE_ANNDATA_NMF_PATH)
+
+    if "cell_id" not in ge_adata.obs.columns:
+        ge_adata.obs["cell_id"] = ge_adata.obs["cell_id_clean"]
+        ge_adata_nmf.obs["cell_id"] = ge_adata_nmf.obs["cell_id_clean"]
+        splice_adata.obs["cell_id"] = splice_adata.obs["cell_id_clean"] 
+
+    assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
+
+    # Only subset by final_cells if in mouse so check if "MOUSE_" is in ATSE_ANNDATA_PATH
+    if "MOUSE_" in ATSE_ANNDATA_PATH:
+        print("   :gear: Subsetting to final cells (outlier removal)...")
+        # Subset both anndatas to only include cells in final_cells
+        splice_adata = splice_adata[splice_adata.obs["cell_id"].isin(final_cells)].copy()
+        ge_adata = ge_adata[ge_adata.obs["cell_id"].isin(final_cells)].copy()
+        ge_adata_nmf = ge_adata_nmf[ge_adata_nmf.obs["cell_id"].isin(final_cells)].copy()
+
+    assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
+
+    # Fix the sex column in the anndatas
+    sex_str = splice_adata.obs["sex"].astype(str)
+
+    # Step 2: Replace "M" → "male", "F" → "female"
+    sex_fixed = sex_str.replace({"M": "male", "F": "female"})
+
+    # Step 3: Convert back to categorical (optional)
+    splice_adata.obs["sex"] = pd.Categorical(sex_fixed)
+    print(splice_adata.obs["sex"].value_counts())
 
     # Load aging gene lists
     aging_genes_mouse, aging_genes_human = load_aging_genes(AGING_GENES_PATH)
     
     # Load RBP genes
     rbps = load_rbp_genes(RBP_FILE_PATH)
+    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
+
+    # If ge_adata.var["gene_name"] is not in ge_adata.var_names, then add it
+    if "gene_name" not in ge_adata.var.columns:
+        ge_adata.var["gene_name"] = ge_adata.var_names
 
     # if "mouse.id" is in splice_adata.obs rename it to donor_id 
     if "mouse.id" in splice_adata.obs.columns:
@@ -405,15 +436,15 @@ def main():
         rbps = rbps["mouse_gene_name"]
     
     else:
+        splice_adata.var = add_gene_symbols_to_var(splice_adata.var)
         splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["gene_name"]) # when running with Human data... 
         splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_human)
+        
         ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["gene_name"])
         ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_human)
         aging_genes = aging_genes_human
         rbps = rbps["gene_name"]
     
-    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
-
     assert np.all(ge_adata.obs_names == ge_adata_nmf.obs_names), "Cell IDs in ge_adata and ge_adata_nmf do not match or are not in the same order."
     assert np.all(ge_adata.var_names == ge_adata_nmf.var_names), "Gene names in ge_adata and ge_adata_nmf do not match or are not in the same order."
     ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
@@ -453,10 +484,16 @@ def main():
     ############################
 
     print("\n>> Extracting model parameters...")
+    # Extract factor activities and usage
     PHI = leaflet_model["assign_post"]
+    # Subset PHI based on cell_id_index in splice_adata.obs
+    PHI = PHI[splice_adata.obs.cell_id_index, :]
+    # assert shape of PHI matches shape of splice_adata.obs
+    assert PHI.shape == (len(splice_adata.obs), leaflet_model["K"]), "PHI shape does not match the number of cells and factors."
     K_factors_model = leaflet_model["K"]
     print(f"   ✓ Extracted {K_factors_model} factors from the model")
-
+    PSI_learned = leaflet_model["psi_learned"]
+    print(f" The shape of PSI_learned is {PSI_learned.shape}")
     splice_adata.obsm["X_PHI"] = PHI
     PSI_CELLS = np.dot(PHI, leaflet_model["psi_learned"])
     splice_adata.layers["PSI_CELLS"] = PSI_CELLS
@@ -519,7 +556,7 @@ def main():
         counts_df["factor_name"] = "factor_" + counts_df["factor_idx"].astype(str)
 
         # Create figure with appropriate size
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(7, 6))
 
         # Create barplot with appealing color palette
         ax = sns.barplot(x="factor_name", y="num_sig_junctions", data=counts_df, palette="viridis")
@@ -571,7 +608,7 @@ def main():
         pivot_df = pivot_df.drop(columns="total")
 
         # Plot
-        plt.figure(figsize=(14, 6))
+        plt.figure(figsize=(6, 3))
         pivot_df.plot(
             kind="bar",
             stacked=True,
@@ -600,7 +637,7 @@ def main():
         junc_counts_df = pd.DataFrame({"junction_id_index": junc_counts.index, "num_factors": junc_counts.values})
 
         # Create figure with appropriate size
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(7, 6))
 
         # Create histogram with better styling
         ax = sns.histplot(junc_counts_df["num_factors"], bins=range(1, junc_counts_df["num_factors"].max() + 2), 
@@ -638,7 +675,7 @@ def main():
 
         if heatmap_df.empty:
             print(f"No data to plot for clustermap for top {top_n} junctions. Skipping clustermap.")
-            plt.figure(figsize=(10,4))
+            plt.figure(figsize=(7,4))
             plt.text(0.5, 0.5, f"No significant junctions found for top {top_n} to display in clustermap.",
                      ha='center', va='center', fontsize=12)
             plt.axis('off')
@@ -675,11 +712,6 @@ def main():
         # Align row_colors_df index with data_matrix_for_display.index
         row_colors_df.index = display_row_labels
 
-        # Determine appropriate figure height based on number of junctions
-        # Min height 8, add 0.35 inch per junction beyond a small number
-        fig_height = max(8, 4 + top_n * 0.35)
-        fig_width = 12 # Keep width somewhat constant or adjust based on num factors
-
         # Create clustermap
         g = sns.clustermap(
             data_matrix_for_display,
@@ -689,7 +721,7 @@ def main():
             annot=False,   # Annotations can be cluttered; keep False
             fmt=".2f",
             linewidths=0.5,
-            figsize=(fig_width, fig_height),
+            figsize=(5, 7),
             cbar_kws={'label': 'Effect Size', 'orientation': 'vertical'},
             metric='correlation', # Distance metric for clustering
             method='average',     # Linkage method for clustering
@@ -741,12 +773,197 @@ def main():
         plt.close(g.fig)
 
 
+    # VISUALIZATION 4: Factor by junction correlation matrix
+    def plot_factor_psi_correlation_matrix(PSI_learned, output_path):
+        """
+        Create a clustermap of PSI factor correlations with significance annotations.
+        PSI_learned is expected to be a (n_factors, n_junctions) matrix.
+        """
+
+        n_factors = PSI_learned.shape[0]
+        factor_labels = [f"factor_{i}" for i in range(n_factors)]
+
+        # Compute correlation and p-values
+        corr_matrix = np.corrcoef(PSI_learned)
+        p_matrix = np.ones((n_factors, n_factors))
+
+        for i in range(n_factors):
+            for j in range(n_factors):
+                if i < j:
+                    r, p = spearmanr(PSI_learned[i], PSI_learned[j])
+                    corr_matrix[i, j] = r
+                    corr_matrix[j, i] = r
+                    p_matrix[i, j] = p
+                    p_matrix[j, i] = p
+
+        # FDR correction (off-diagonal only)
+        mask = ~np.eye(n_factors, dtype=bool)
+        p_values = p_matrix[mask]
+        _, p_adj_flat, _, _ = multipletests(p_values, method="fdr_bh")
+        p_adj_matrix = np.ones((n_factors, n_factors))
+        p_adj_matrix[mask] = p_adj_flat
+
+        # Significance annotations
+        annot = np.full((n_factors, n_factors), "", dtype=object)
+        for i in range(n_factors):
+            for j in range(n_factors):
+                if i != j and p_adj_matrix[i, j] < 0.05 and abs(corr_matrix[i, j]) > 0.2:
+                    annot[i, j] = "*"
+
+        # Create clustermap
+        df_corr = pd.DataFrame(corr_matrix, index=factor_labels, columns=factor_labels)
+        g = sns.clustermap(df_corr, cmap="RdBu_r", center=0, figsize=(6, 6), xticklabels=True, yticklabels=True, linewidths=0.5)
+
+        # Add asterisk annotations
+        ax = g.ax_heatmap
+        row_order = g.dendrogram_row.reordered_ind
+        col_order = g.dendrogram_col.reordered_ind
+
+        for i, orig_i in enumerate(row_order):
+            for j, orig_j in enumerate(col_order):
+                if annot[orig_i, orig_j] == "*":
+                    ax.text(j + 0.5, i + 0.5, "*", ha='center', va='center', color='black', fontsize=6, weight='bold')
+
+        # Save
+        g.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close(g.fig)
+
+    # VISUALIZATION 4: Junction-Junction Correlation Matrix between Factors
+    def plot_factor_correlation_matrix(final_df, output_path, min_junctions=10, fdr_threshold=0.01):
+        """
+        Create a correlation clustermap showing how similar factors are based on their junction effect patterns.
+        Similar to plot_correlation_matrix but for factor similarities based on junction effects.
+        
+        Args:
+            final_df: DataFrame with differential splicing results
+            output_path: Path to save the plot
+            min_junctions: Minimum number of shared junctions required for correlation
+            fdr_threshold: FDR threshold for significance marking
+        """
+        from statsmodels.stats.multitest import multipletests
+        
+        # Create pivot table: rows=junctions, columns=factors, values=effect_size
+        factor_effects = final_df.pivot_table(
+            index="junction_id_index",
+            columns="factor_idx", 
+            values="effect_size",
+            fill_value=0
+        )
+        
+        if factor_effects.shape[1] < 2:
+            print(f"Not enough factors ({factor_effects.shape[1]}) for correlation analysis. Skipping factor correlation matrix.")
+            return None
+            
+        print(f"Computing factor correlations based on {factor_effects.shape[0]} junctions and {factor_effects.shape[1]} factors")
+        
+        n_factors = factor_effects.shape[1]
+        factor_labels = [f"factor_{i}" for i in factor_effects.columns]
+        
+        # Compute correlation matrix between factors (columns)
+        corr_matrix = np.corrcoef(factor_effects.T)
+        
+        # Compute p-values for all factor pairs
+        p_matrix = np.ones((n_factors, n_factors))
+        n_shared_junctions = np.zeros((n_factors, n_factors))
+        
+        for i, factor_i in enumerate(factor_effects.columns):
+            for j, factor_j in enumerate(factor_effects.columns):
+                if i != j:
+                    # Get non-zero effects for both factors
+                    factor_i_effects = factor_effects[factor_i]
+                    factor_j_effects = factor_effects[factor_j]
+                    
+                    # Count shared junctions (both factors have non-zero effects)
+                    shared_mask = (factor_i_effects != 0) & (factor_j_effects != 0)
+                    n_shared = shared_mask.sum()
+                    n_shared_junctions[i, j] = n_shared
+                    
+                    if n_shared >= min_junctions:
+                        # Compute correlation only on shared junctions
+                        shared_i = factor_i_effects[shared_mask]
+                        shared_j = factor_j_effects[shared_mask]
+                        _, p = spearmanr(shared_i, shared_j)
+                        p_matrix[i, j] = p
+                    else:
+                        p_matrix[i, j] = 1.0  # Set to non-significant
+        
+        # FDR correction on off-diagonal elements
+        off_diag_mask = ~np.eye(n_factors, dtype=bool)
+        p_values = p_matrix[off_diag_mask]
+        _, p_adj_flat, _, _ = multipletests(p_values, method="fdr_bh")
+        
+        # Put corrected p-values back into matrix
+        p_adj_matrix = np.ones((n_factors, n_factors))
+        p_adj_matrix[off_diag_mask] = p_adj_flat
+        
+        # Create significance annotations
+        annot = np.full((n_factors, n_factors), "", dtype=object)
+        for i in range(n_factors):
+            for j in range(n_factors):
+                if i != j:  # Skip diagonal
+                    n_shared = n_shared_junctions[i, j]
+                    is_significant = (p_adj_matrix[i, j] < fdr_threshold) & (abs(corr_matrix[i, j]) > 0.2) & (n_shared >= min_junctions)
+                    if is_significant:
+                        annot[i, j] = "*"
+        
+        # Create DataFrame for clustermap
+        df_corr = pd.DataFrame(corr_matrix, index=factor_labels, columns=factor_labels)
+        
+        # Plot with clustermap
+        g = sns.clustermap(
+            df_corr,
+            cmap="PRGn",
+            center=0,
+            figsize=(6,6),
+            xticklabels=True,
+            yticklabels=True,
+            linewidths=0.5,
+            cbar_pos=(0.02, 0.83, 0.03, 0.15),
+            dendrogram_ratio=0.15,
+            cbar_kws={'label': 'Correlation (Junction Effects)'}
+        )
+        
+        # Set publication-ready font sizes
+        plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right", fontsize=10)
+        plt.setp(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize=10)
+        
+        # Add significance annotations after clustering
+        ax = g.ax_heatmap
+        # Get the reordered indices from clustering
+        row_order = g.dendrogram_row.reordered_ind
+        col_order = g.dendrogram_col.reordered_ind
+        
+        for i, orig_i in enumerate(row_order):
+            for j, orig_j in enumerate(col_order):
+                if annot[orig_i, orig_j] == "*":
+                    ax.text(j + 0.5, i + 0.5, "*", ha='center', va='center', 
+                           color='black', fontsize=14, weight='bold')
+        
+        # Add title
+        g.fig.suptitle(f'Factor Correlation Matrix (Junction Effects)\n* = FDR < {fdr_threshold}, |r| > 0.2, shared junctions ≥ {min_junctions}', 
+                      fontsize=12, fontweight='bold', y=0.98)
+        
+        # Save with high DPI for publication
+        g.savefig(output_path, bbox_inches="tight", dpi=300)
+        plt.close(g.fig)
+        
+        # Print summary statistics
+        print(f"   ✓ Factor correlation matrix saved")
+        print(f"   ✓ Mean |correlation|: {np.abs(corr_matrix[off_diag_mask]).mean():.3f}")
+        print(f"   ✓ Significant correlations (FDR < {fdr_threshold}): {(p_adj_matrix[off_diag_mask] < fdr_threshold).sum()}")
+        
+        return df_corr
+
     # Execute all visualizations
     plot_factor_junction_counts(final_df, os.path.join(PLOTS_DIR, "differential_splicing_counts_barplot.pdf"))
     plot_factor_junction_annotation_counts(final_df, os.path.join(PLOTS_DIR, "differential_splicing_annotation_counts_barplot.pdf"))
     plot_junction_factor_distribution(final_df, os.path.join(PLOTS_DIR, "differential_splicing_junc_counts_distribution.pdf"))
     plot_factor_junction_heatmap(final_df, os.path.join(PLOTS_DIR, "differential_splicing_factor_junction_heatmap.pdf"))
 
+    # Add the new visualization
+    plot_factor_correlation_matrix(final_df, os.path.join(PLOTS_DIR, "factor_correlation_matrix_junction_effects.pdf"))
+    plot_factor_psi_correlation_matrix(PSI_learned, os.path.join(PLOTS_DIR, "factor_correlation_matrix_psi_effects.pdf"))
+    
     # Assuming your data is in final_df with required columns
     ds_factors_dir = plot_individual_factor_junction_analysis(
         final_df=final_df,

@@ -128,15 +128,13 @@ def compute_factor_activity_by_group(adata, groupby="broad_cell_type", DATA_DIR=
             plot_data,
             cmap="PRGn",
             center=0,
-            figsize=(7, 7),  # Made larger for better visibility
+            figsize=(6, 6),  # Made larger for better visibility
             xticklabels=True,
             yticklabels=True,
             cbar_kws={'label': 'Mean Activity'},
             linewidths=0.2,
-            linecolor='gray',
-            method='ward',  # Specify clustering method
-            metric='euclidean'  # Specify distance metric
-        )
+            linecolor='gray'
+             )
         
         # Improve label formatting
         plt.setp(g.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
@@ -153,14 +151,12 @@ def compute_factor_activity_by_group(adata, groupby="broad_cell_type", DATA_DIR=
             median_expression,
             cmap="PRGn",
             center=0,
-            figsize=(7, 7),  # Made larger for better visibility
+            figsize=(6, 6),  # Made larger for better visibility
             xticklabels=True,
             yticklabels=True,
             cbar_kws={'label': 'Median Activity'},
             linewidths=0.2,
-            linecolor='gray',
-            method='ward',
-            metric='euclidean'
+            linecolor='gray'
         )   
         plt.setp(g2.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
         plt.setp(g2.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
@@ -177,21 +173,76 @@ def compute_factor_activity_by_group(adata, groupby="broad_cell_type", DATA_DIR=
             mean_zscore,
             cmap="PRGn",
             center=0,
-            figsize=(7, 7),  # Made larger for better visibility
+            figsize=(6, 6),  # Made larger for better visibility
             xticklabels=True,
             yticklabels=True,
             cbar_kws={'label': 'Relative Activity (Z-score)'},
             linewidths=0.2,
             linecolor='gray',
-            method='ward',
             metric='euclidean'
         )
-        plt.setp(g3.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
-        plt.setp(g3.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+        plt.setp(g3.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+        plt.setp(g3.ax_heatmap.get_yticklabels(), rotation=0, fontsize=10)
         path3 = os.path.join(PLOTS_DIR, f"zscore_factor_expression_by_{groupby}_clustermap.pdf")
         g3.savefig(path3, bbox_inches='tight', dpi=300)
         print(f"✓ Z-score normalized clustermap saved to: {path3}")
         plt.close(g3.fig)
+
+
+        # --- Delta: median_old - median_young across cell groups ---
+        print("Computing delta median factor activity (old - young)...")
+
+        # Sanity check
+        assert "age_group" in adata.obs.columns, "Missing 'age_group' column in .obs"
+        assert set(adata.obs["age_group"].unique()) == {"young", "old"}, "Expected 'young' and 'old' groups only"
+
+        df_all = pd.DataFrame(X_PHI, columns=factor_cols)
+        df_all[groupby] = adata.obs[groupby].values
+        df_all["age_group"] = adata.obs["age_group"].values
+
+        # Group by groupby + age_group
+        median_by_group_and_age = df_all.groupby([groupby, "age_group"], observed=True)[factor_cols].median()
+
+        # Pivot into two matrices: one for young, one for old
+        median_young = median_by_group_and_age.xs("young", level="age_group")
+        median_old = median_by_group_and_age.xs("old", level="age_group")
+
+        # Align index (cell types) and subtract
+        delta_median = median_old - median_young
+        delta_median = delta_median.fillna(0)
+
+        # Save delta matrix
+        if DATA_DIR:
+            delta_median.to_csv(os.path.join(DATA_DIR, f"delta_median_old_minus_young_by_{groupby}.csv"))
+
+        # Reorder delta_median based on median_expression clustermap (g2)
+        reordered_rows = median_expression.index[g2.dendrogram_row.reordered_ind]
+        reordered_cols = median_expression.columns[g2.dendrogram_col.reordered_ind]
+
+        delta_median_reordered = delta_median.loc[reordered_rows, reordered_cols]
+
+        # Plot delta clustermap (same row/col order as mean_expression)
+        g4 = sns.clustermap(
+            delta_median_reordered,
+            cmap="BrBG",
+            center=0,
+            figsize=(7, 5),
+            xticklabels=True,
+            yticklabels=True,
+            cbar_kws={'label': 'Δ (Old - Young)'},
+            linewidths=0.2,
+            linecolor='gray',
+            row_cluster=False,
+            col_cluster=False
+        )
+        # Use same tick label formatting
+        plt.setp(g4.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+        plt.setp(g4.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+
+        path4 = os.path.join(PLOTS_DIR, f"delta_median_old_minus_young_by_{groupby}_clustermap.pdf")
+        g4.savefig(path4, bbox_inches='tight', dpi=300)
+        print(f"✓ Δ median activity (old-young) clustermap saved to: {path4}")
+        plt.close(g4.fig)
 
     return mean_expression_with_meta, median_expression_with_meta
 
@@ -357,7 +408,7 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
     plt.close()
         
     # 2. Barplot of factors sorted by explained variance
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(6, 5))
         
     # Sort by explained variance (descending)
     sorted_df = anova_df.sort_values("Explained_Variance", ascending=False)
@@ -385,8 +436,8 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
     plt.xticks(
         range(len(sorted_df)),
         [f"Factor {idx}" for idx in sorted_df["Factor_Index"]],
-        rotation=30,
-        fontsize=12,
+        rotation=45,
+        fontsize=8,
         ha='right'
     )
     
@@ -400,11 +451,11 @@ def compute_variance_components(adata, groupby="broad_cell_type", pi_values=None
             ha='center', 
             va='bottom',
             rotation=90,
-            fontsize=12
+            fontsize=8
         )
     
-    plt.xlabel("Factor Index (ordered by explained variance)", fontsize=16)
-    plt.ylabel(f"Variance Explained by {groupby}", fontsize=16)
+    plt.xlabel("Factor Index (ordered by explained variance)", fontsize=10)
+    plt.ylabel(f"Variance Explained by {groupby}", fontsize=10)
     plt.axhline(0.5, color='red', linestyle='--', alpha=0.7, label="High (>0.5): Higher proportion of variance explained")
     plt.axhline(0.25, color='orange', linestyle='--', alpha=0.7, label="Medium (>0.25): Lower proportion of variance explained")
     plt.legend(loc='upper right', fontsize=10)
@@ -438,16 +489,16 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
     
     # 1. Basic histogram of perplexity (only create once)
     if color_by is None:
-        plt.figure(figsize=(4, 4))
+        plt.figure(figsize=(5, 4))
         # Add line to indicate median perplexity
         plt.axvline(adata.obs['perplexity'].median(), color='red', linestyle='--', label='Median Perplexity')
         sns.histplot(adata.obs['perplexity'], bins=n_bins, kde=True, color='lightgray')
-        plt.xlabel('Perplexity')
+        plt.xlabel('# of Effective Factors/Cell (Perplexity)')
         plt.ylabel('Count')
         plt.tight_layout()
         plt.savefig(os.path.join(perplexity_dir, "perplexity_histogram.pdf"), format='pdf', bbox_inches='tight')
         plt.close()
-        
+
         # 2. UMAP colored by perplexity if UMAP coordinates exist (only create once)
         if 'X_umap' in adata.obsm:
             plt.figure(figsize=(8, 8))
@@ -480,7 +531,7 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
             color_column = 'color_category'
         else:
             color_column = color_by
-        
+
         # Violin plot by category
         plt.figure(figsize=(6, 4))
         order = perplexity_df.groupby(color_column)['perplexity'].median().sort_values(ascending=False).index
@@ -494,6 +545,27 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
         plt.xticks(rotation=45, ha='right')
         plt.tight_layout()
         plt.savefig(os.path.join(perplexity_dir, f"perplexity_violin_by_{color_by}.pdf"), format='pdf', bbox_inches='tight')
+        plt.close()
+
+        # Create pie chart for high perplexity cells
+        # Calculate 90th percentile threshold
+        perplexity_threshold = np.percentile(perplexity_df['perplexity'], 90)
+        
+        # Get cells above threshold
+        high_perplexity_cells = perplexity_df[perplexity_df['perplexity'] >= perplexity_threshold]
+        
+        # Count categories
+        category_counts = high_perplexity_cells[color_column].value_counts()
+        
+        # Create pie chart
+        plt.figure(figsize=(4, 4))
+        plt.pie(category_counts, labels=category_counts.index, autopct='%1.1f%%',
+               colors=plt.cm.tab20(np.linspace(0, 1, len(category_counts))),
+               textprops={'fontsize': 8})
+        plt.title(f'{color_by.replace("_", " ").title()} Distribution for Top 10% Perplexity Cells\n(Threshold: {perplexity_threshold:.2f})')
+        plt.tight_layout()
+        plt.savefig(os.path.join(perplexity_dir, f"high_perplexity_{color_by}_pie.pdf"), 
+                   format='pdf', bbox_inches='tight')
         plt.close()
     
     # Plot scatter plot of perplexity vs library size
@@ -549,26 +621,55 @@ if len(sys.argv) > 1:
 
 def main():
     print("\n========================================")
-    print("LeafletFA Model Analysis - Mouse Splicing Foundation")
+    print("LeafletFA Model Evaluate 01")
     print("========================================\n")
     
     ############################
     # 1. Load Data and Model
     ############################
     print("\n>> Loading data and model...")
+
+    final_cells = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/filtered_cell_ids.txt"
+    with open(final_cells, "r") as f:
+        final_cells = f.read().splitlines()
     
     # Load splicing data
     splice_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
     ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
+
+    # If ge_adata.obs doesn't have cell_id make it from cell_id_clean
+    if "cell_id" not in ge_adata.obs.columns:
+        ge_adata.obs["cell_id"] = ge_adata.obs["cell_id_clean"]
+        splice_adata.obs["cell_id"] = splice_adata.obs["cell_id_clean"] 
+
     assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
+
+    # Only subset by final_cells if in mouse so check if "MOUSE_" is in ATSE_ANNDATA_PATH
+    if "MOUSE_" in ATSE_ANNDATA_PATH:
+        print("   :gear: Subsetting to final cells (outlier removal)...")
+        # Subset both anndatas to only include cells in final_cells
+        splice_adata = splice_adata[splice_adata.obs["cell_id"].isin(final_cells)].copy()
+        ge_adata = ge_adata[ge_adata.obs["cell_id"].isin(final_cells)].copy()
+
+    assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
+
     # Add "library_size" from ge_adata to splice_adata
     splice_adata.obs["library_size"] = ge_adata.obs["library_size"]
+    sex_str = splice_adata.obs["sex"].astype(str)
+
+    # Step 2: Replace "M" → "male", "F" → "female"
+    sex_fixed = sex_str.replace({"M": "male", "F": "female"})
+
+    # Step 3: Convert back to categorical (optional)
+    splice_adata.obs["sex"] = pd.Categorical(sex_fixed)
+    print(splice_adata.obs["sex"].value_counts())
 
     # Load aging gene lists
     aging_genes_mouse, aging_genes_human = load_aging_genes(AGING_GENES_PATH)
     
     # Load RBP genes
     rbps = load_rbp_genes(RBP_FILE_PATH)
+    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
 
     # if "mouse.id" is in splice_adata.obs rename it to donor_id 
     if "mouse.id" in splice_adata.obs.columns:
@@ -577,17 +678,24 @@ def main():
         # Update gene annotations
         splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
         splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_mouse)
-    
+        aging_genes = aging_genes_mouse
+        rbps = rbps["mouse_gene_name"]
+
     else:
+        splice_adata.var = add_gene_symbols_to_var(splice_adata.var)
         splice_adata.var["RBP_gene"] = splice_adata.var["gene_name"].isin(rbps["gene_name"]) # when running with Human data... 
         splice_adata.var["Aging_gene"] = splice_adata.var["gene_name"].isin(aging_genes_human)
-    
-    splice_adata.var["gene_id"] = splice_adata.var["gene_id"].str.split(".").str[0]
-               
+        aging_genes = aging_genes_human
+        rbps = rbps["gene_name"]
+
     # Choose model based on param_id or best performance
     model_path = f"{MODEL_OUTPUTS_DIR}/run_{param_id}/leafletfa_model.pkl.xz"
     print(f"Using specified model: run_{param_id} with model path {model_path}")
     
+    # if OUTPUT_DIR does not exist, create it
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+
     # Create output directory
     PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
     DATA_DIR = os.path.join(OUTPUT_DIR, "data")
@@ -609,6 +717,12 @@ def main():
         splice_adata.obs["age_numeric"] = pd.to_numeric(splice_adata.obs["age"])
         print(f"   ✓ Age range: {splice_adata.obs['age_numeric'].min()} - {splice_adata.obs['age_numeric'].max()} years")  # human age is in years
 
+    # Split age into two groups, young and old using the median
+    median_age = np.median(splice_adata.obs["age_numeric"].unique())
+    splice_adata.obs["age_group"] = np.where(
+        splice_adata.obs["age_numeric"] < median_age, "young", "old"
+    )
+
     print(f"   ✓ Data loaded successfully")
     
     ############################
@@ -624,11 +738,16 @@ def main():
     
     # Extract factor activities and usage
     PHI = leaflet_model["assign_post"]
+    # Subset PHI based on cell_id_index in splice_adata.obs
+    PHI = PHI[splice_adata.obs.cell_id_index, :]
+    # assert shape of PHI matches shape of splice_adata.obs
+    assert PHI.shape == (len(splice_adata.obs), leaflet_model["K"]), "PHI shape does not match the number of cells and factors."
     PI = leaflet_model["pi"]
     K = leaflet_model["K"]
             
     # Add PHI to adata
     splice_adata.obsm["X_PHI"] = PHI
+    print(f"   ✓ PHI added to adata")
     
     # Calculate cell perplexity/entropy 
     print("   :gear: Calculating cell perplexity...")

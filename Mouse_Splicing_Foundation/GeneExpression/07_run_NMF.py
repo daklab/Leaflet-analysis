@@ -29,11 +29,11 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025/aligned_gene_expression_data_20250513_035938.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250614_124502.h5ad"
 
 # Define NMF model parameters
-LINEAR_LATENT = 50
-STANDARD_LATENT = 50
+LINEAR_LATENT = 30
+STANDARD_LATENT = 30
 LINEAR_EPOCHS = 200
 STANDARD_EPOCHS = 200
 NMF_BATCH_SIZE = 1024 # Batch size for MiniBatchNMF

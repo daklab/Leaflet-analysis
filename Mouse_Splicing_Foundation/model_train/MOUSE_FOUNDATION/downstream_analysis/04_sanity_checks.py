@@ -141,7 +141,7 @@ if len(sys.argv) > 1:
 
 def main():
     print("\n========================================")
-    print("LeafletFA Model Analysis - Mouse Splicing Foundation")
+    print("LeafletFA Model 04...")
     print("========================================\n")
     
     ############################

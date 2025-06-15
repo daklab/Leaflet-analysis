@@ -78,6 +78,64 @@ def load_model(model_file):
 
     return model
 
+def add_gene_symbols_to_var(var_df, species="human"):
+    """
+    Adds gene_name column to a DataFrame using Ensembl gene_id.
+
+    Parameters
+    ----------
+    var_df : pd.DataFrame
+        DataFrame with a 'gene_id' column (e.g., splice_adata.var).
+    species : str
+        Species for gene ID mapping (default is "human").
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame with a new 'gene_name' column.
+    """
+    if "gene_id" not in var_df.columns:
+        print("WARNING: gene_id column not found. Gene symbols will not be added.")
+        return var_df
+
+    try:
+        from mygene import MyGeneInfo
+
+        print("Querying MyGeneInfo to map Ensembl gene IDs to gene symbols...")
+
+        # Clean gene_id (remove version suffix)
+        clean_ids = var_df["gene_id"].dropna().apply(lambda x: x.split('.')[0])
+        unique_gene_ids = clean_ids.unique().tolist()
+
+        if unique_gene_ids:
+            mg = MyGeneInfo()
+            query_result = mg.querymany(
+                unique_gene_ids,
+                scopes="ensembl.gene",
+                fields="symbol",
+                species=species,
+                as_dataframe=True,
+                df_index=True,
+                returnall=False
+            )
+
+            # Create mapping from clean gene_id to symbol
+            gene_symbol_map = query_result["symbol"].to_dict()
+
+            # Apply mapping
+            var_df["gene_name"] = var_df["gene_id"].apply(
+                lambda x: gene_symbol_map.get(x.split('.')[0]) if pd.notnull(x) else None
+            )
+
+            print(f"Mapped {var_df['gene_name'].notnull().sum()} gene IDs to gene symbols.")
+
+    except ImportError:
+        print("WARNING: mygene module not available. Gene symbols will not be added.")
+    except Exception as e:
+        print(f"WARNING: Error during gene symbol mapping: {e}")
+
+    return var_df
+
 def load_aging_genes(filepath):
     """Load aging-related genes list"""
     # Load global aging genes
