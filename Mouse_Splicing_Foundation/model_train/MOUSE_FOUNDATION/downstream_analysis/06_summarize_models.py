@@ -14,12 +14,66 @@ from scipy.stats import entropy
 from sklearn.preprocessing import MinMaxScaler
 
 # --- Configuration ---
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-05-13"
-BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/parameter_combinations.csv"
+#DATE_RESULTS_TO_SUMMARIZE = "2025-05-13/2025-06-14" #date model was trained/date models were summarized for plotting 
+#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-11/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-06-11/2025-06-14" #date model was trained/date models were summarized for plotting 
+BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
 os.makedirs(OUTPUT_SUMMARY_DIR, exist_ok=True)
+
+def analyze_factor_deltas_by_cell_type(summary_df, cell_type_col="cell_type_grouped"):
+    """
+    Analyze factor deltas between young and old samples within each cell type.
+    
+    Parameters:
+    - summary_df: DataFrame containing factor activities and metadata
+    - cell_type_col: Column name containing cell type information
+    
+    Returns:
+    - DataFrame with delta values and statistics
+    """
+    # Create a pivot table for delta_median and avg_factor_activity
+    delta_median_pivot = summary_df.pivot(index=cell_type_col, columns='factor', values='delta_median')
+    avg_activity_pivot = summary_df.pivot(index=cell_type_col, columns='factor', values='avg_factor_activity')
+    
+    # Create figure for two side-by-side heatmaps
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    
+    # Plot delta median heatmap
+    sns.heatmap(delta_median_pivot, cmap="seismic", ax=ax1, cbar=True, 
+                annot=False, center=0, vmin=-0.05, vmax=0.05, xticklabels=True, yticklabels=True)
+    
+    # Plot average activity heatmap
+    sns.heatmap(avg_activity_pivot, cmap="coolwarm", ax=ax2, cbar=True, 
+                annot=False, center=0, xticklabels=True, yticklabels=False)
+    
+    # Set titles and labels
+    ax1.set_title('Delta Median Factor Activity (Old - Young)', fontsize=10)
+    ax2.set_title('Average Factor Activity in Cell Type', fontsize=10)
+    
+    # Set axis labels
+    ax1.set_xticklabels(delta_median_pivot.columns, rotation=90, fontsize=10)
+    ax1.set_yticklabels(delta_median_pivot.index, rotation=0, fontsize=10)
+    ax1.set_ylabel("Cell Type")
+    ax1.set_xlabel("Factor")
+    
+    ax2.set_xticklabels(avg_activity_pivot.columns, rotation=90, fontsize=10)
+    ax2.set_ylabel("Cell Type")
+    ax2.set_xlabel("Factor")
+    
+    # Adjust layout
+    plt.tight_layout()
+    
+    # Save the figure
+    current_date = pd.Timestamp.now().strftime("%Y%m%d")
+    plt.savefig(os.path.join(OUTPUT_SUMMARY_DIR, f"factor_deltas_by_cell_type_{current_date}.pdf"))
+    plt.close()
+    
+    return delta_median_pivot, avg_activity_pivot
 
 def main():
     summary_df = pd.read_csv(os.path.join(OUTPUT_SUMMARY_DIR, "summary_metrics_across_models.csv"))
@@ -52,19 +106,15 @@ def main():
         "median_cell_perplexity"
     ]
 
-    # Generate a sorted boxplot for each metric by prior_combo
+    # Generate a sorted barplot for each metric by prior_combo
     for metric in metrics_to_plot:
         print(f"Plotting {metric} by model parameters...")
         sorted_combos = summary_df.groupby("prior_combo")[metric].median().sort_values(ascending=False).index
         plt.figure(figsize=(6, 6))
-        sns.boxplot(
-            data=summary_df, x="prior_combo", y=metric,
-            order=sorted_combos
-        )
-        sns.stripplot(
+        sns.barplot(
             data=summary_df, x="prior_combo", y=metric,
             order=sorted_combos,
-            color="black", size=5, jitter=True
+            color='grey'
         )
         plt.xticks(rotation=50, ha="right", fontsize=14)
         plt.yticks(fontsize=14)

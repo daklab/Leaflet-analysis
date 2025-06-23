@@ -13,9 +13,13 @@ import seaborn as sns
 from scipy.stats import entropy
 
 # --- Configuration ---
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-05-13"
-BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/parameter_combinations.csv"
+#DATE_RESULTS_TO_SUMMARIZE = "2025-05-13/2025-06-14" #date model was trained/date models were summarized for plotting 
+#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-11/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-06-11/2025-06-14" #date model was trained/date models were summarized for plotting 
+BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
 os.makedirs(OUTPUT_SUMMARY_DIR, exist_ok=True)

@@ -498,12 +498,64 @@ def main():
     PSI_CELLS = np.dot(PHI, leaflet_model["psi_learned"])
     splice_adata.layers["PSI_CELLS"] = PSI_CELLS
     psi_samples = leaflet_model["psi_samples"]
+    phi_samples = leaflet_model["phi_samples"]
 
     ############################
     # 3. Run analysis functions 
     ############################
 
     print("\n>> Running analysis functions...")
+
+    from joblib import Parallel, delayed
+    import multiprocessing
+
+    # Outer loop: one per cell type
+    cell_types = splice_adata.obs["broad_cell_type"].unique()
+    print(f"The cell types are: {cell_types}")
+    groupby_column = "broad_cell_type"
+    min_effect_size = 0.2
+    junction_indices = splice_adata.var["junction_id_index"].values #.values[0:500]  # subset for test
+
+    #  Self-contained function: pass all required objects
+    def safe_compute(junction_idx, group_1, splice_adata, psi_samples, phi_samples, groupby_column, min_effect_size):
+        import os
+        print(f"PID {os.getpid()} processing junction {junction_idx}")
+
+        try:
+            res = ds.compute_differential_splicing_groups(
+                splice_adata, psi_samples, phi_samples,
+                junction_idx,
+                group_1=group_1, group_2=None,
+                groupby_column=groupby_column,
+                min_effect_size=min_effect_size
+            )
+            res["junction_idx"] = junction_idx
+            return res
+        except Exception as e:
+            print(f"Error processing junction {junction_idx} for {group_1}: {e}")
+            return None
+
+    for group_1 in cell_types:
+        print(f"\n>> Running DS for cell type: {group_1}")
+
+        all_ds_results = Parallel(n_jobs=16, backend="loky")(
+            delayed(safe_compute)(j, group_1, splice_adata, psi_samples, phi_samples, groupby_column, min_effect_size)
+            for j in tqdm(junction_indices, desc=f"Computing DS for {group_1}")
+        )
+
+        all_ds_results = [r for r in all_ds_results if r is not None]
+        df_all_ds = pd.DataFrame(all_ds_results)
+
+        if df_all_ds.empty:
+            print(f"⚠ No results for {group_1}. Skipping.")
+            continue
+
+        df_all_ds_sig = ds.compute_junctions_significance_groups(df_all_ds, min_effect_size=min_effect_size)
+        df_all_ds_sig["junction_id_index"] = df_all_ds_sig["junction_idx"]
+
+        filename = f"differential_splicing_{group_1.replace(' ', '_').replace('/', '_')}.csv"
+        df_all_ds_sig.to_csv(os.path.join(DATA_DIR, filename), index=False)
+        print(f"✓ Saved results for {group_1} to {filename}")
 
     results = ds.analyze_all_factors_psi(psi_samples, top_junctions=splice_adata.var["junction_id_index"].values, min_effect_size=0.2)
     all_results = []
@@ -953,6 +1005,348 @@ def main():
         print(f"   ✓ Significant correlations (FDR < {fdr_threshold}): {(p_adj_matrix[off_diag_mask] < fdr_threshold).sum()}")
         
         return df_corr
+    
+
+    def analyze_celltype_subclustering_with_features(splice_adata, ge_adata, PLOTS_DIR=None, DATA_DIR=None, 
+                                               n_top_celltypes=10, cluster_values=[3, 5, 10], 
+                                               use_random_forest=True):
+        """
+        Analyze how well different feature types can recapture subclustering within major cell types.
+
+        For the top N most frequent cell types:
+        1. Split each cell type data in half
+        2. Apply K-means with fixed K values to first half (ground truth)
+        3. Train classifiers on first half to predict cluster labels
+        4. Test classifiers on second half using the trained K-means model
+
+        Args:
+            splice_adata: AnnData with splicing data and X_PHI in obsm
+            ge_adata: AnnData with gene expression data and NMF components
+            PLOTS_DIR: Directory to save plots
+            DATA_DIR: Directory to save data
+            n_top_celltypes: Number of top cell types to analyze
+            cluster_values: List of K values to test [3, 5, 10]
+            use_random_forest: If True, use RandomForest; if False, use LogisticRegression
+
+        Returns:
+            Dictionary with results for each cell type and feature combination
+        """
+        print(f"Analyzing subclustering within top {n_top_celltypes} cell types...")
+
+        from sklearn.cluster import KMeans
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.metrics import adjusted_rand_score, silhouette_score
+        from sklearn.preprocessing import StandardScaler
+        import seaborn as sns
+
+        # Get top cell types by frequency
+        cell_type_counts = splice_adata.obs["broad_cell_type"].value_counts()
+        top_cell_types = cell_type_counts.head(n_top_celltypes).index.tolist()
+
+        print(f"Analyzing cell types: {top_cell_types}")
+        print(f"Testing K values: {cluster_values}")
+
+        # Prepare feature sets
+        feature_sets = {
+            'Splicing_Factors': splice_adata.obsm["X_PHI"],
+            'GE_NMF': ge_adata.obsm["X_nmf_standard_mb"],
+            'Combined': np.hstack([splice_adata.obsm["X_PHI"], ge_adata.obsm["X_nmf_standard_mb"]])
+        }
+
+        all_results = []
+        subclustering_results = {}
+
+        for cell_type in top_cell_types:
+            print(f"\n  Analyzing {cell_type}...")
+
+            # Get cells of this type
+            cell_mask = splice_adata.obs["broad_cell_type"] == cell_type
+            n_cells = cell_mask.sum()
+
+            min_cells_needed = max(cluster_values) * 40  # Need at least 40 cells per max cluster
+            if n_cells < min_cells_needed:
+                print(f"    Skipping {cell_type}: only {n_cells} cells (need at least {min_cells_needed})")
+                continue
+
+            # Get combined features for this cell type and split in half
+            combined_features = feature_sets['Combined'][cell_mask]
+
+            # Split data in half randomly
+            indices = np.arange(len(combined_features))
+            np.random.seed(42)  # For reproducibility
+            np.random.shuffle(indices)
+
+            split_point = len(indices) // 2
+            train_indices = indices[:split_point]
+            test_indices = indices[split_point:]
+
+            # Scale the combined features
+            scaler_combined = StandardScaler()
+            combined_scaled = scaler_combined.fit_transform(combined_features)
+
+            train_combined = combined_scaled[train_indices]
+            test_combined = combined_scaled[test_indices]
+
+            print(f"    Split into train: {len(train_indices)}, test: {len(test_indices)} cells")
+
+            # Test different K values
+            for k_clusters in cluster_values:
+                if len(train_indices) < k_clusters * 10:  # Need at least 10 cells per cluster in training
+                    print(f"      Skipping K={k_clusters}: insufficient training data")
+                    continue
+
+                print(f"    Testing K={k_clusters} clusters...")
+
+                # Step 1: Generate ground truth subclusters on training data using combined features
+                kmeans_model = KMeans(n_clusters=k_clusters, random_state=42, n_init=10)
+                train_labels = kmeans_model.fit_predict(train_combined)
+
+                # Apply the same clustering model to test data
+                test_labels = kmeans_model.predict(test_combined)
+
+                print(f"      Train cluster distribution: {np.bincount(train_labels)}")
+                print(f"      Test cluster distribution: {np.bincount(test_labels)}")
+
+                # Store subclustering info
+                subcluster_key = f"{cell_type}_K{k_clusters}"
+                subclustering_results[subcluster_key] = {
+                    'train_labels': train_labels,
+                    'test_labels': test_labels,
+                    'n_clusters': k_clusters,
+                    'n_train_cells': len(train_indices),
+                    'n_test_cells': len(test_indices),
+                    'kmeans_model': kmeans_model
+                }
+
+                # Step 2: Train classifiers using different feature sets to predict subclusters
+                for feature_name, full_features in feature_sets.items():
+                    print(f"        Testing {feature_name}...")
+
+                    # Get features for this cell type and split the same way
+                    cell_features = full_features[cell_mask]
+
+                    # Scale features
+                    scaler_feat = StandardScaler()
+                    cell_features_scaled = scaler_feat.fit_transform(cell_features)
+
+                    # Split features using the same indices as for K-means
+                    X_train = cell_features_scaled[train_indices]  # Features for first half
+                    X_test = cell_features_scaled[test_indices]    # Features for second half
+
+                    # Use K-means labels as targets
+                    y_train = train_labels  # Cluster labels from K-means on first half
+                    y_test = test_labels    # Cluster labels from K-means applied to second half
+
+                    # Train classifier on first half: features → cluster labels
+                    if use_random_forest:
+                        classifier = RandomForestClassifier(
+                            n_estimators=100, max_depth=10, random_state=42, n_jobs=-1
+                        )
+                    else:
+                        classifier = LogisticRegression(
+                            max_iter=1000, multi_class='ovr', random_state=42
+                        )
+
+                    classifier.fit(X_train, y_train)
+
+                    # Test classifier on second half: can it predict the K-means labels?
+                    y_pred = classifier.predict(X_test)
+
+                    # Calculate metrics: how well does classifier predict K-means labels?
+                    accuracy = accuracy_score(y_test, y_pred)
+                    ari_score = adjusted_rand_score(y_test, y_pred)
+
+                    # Store results
+                    all_results.append({
+                        'cell_type': cell_type,
+                        'feature_set': feature_name,
+                        'k_clusters': k_clusters,
+                        'n_train_cells': len(train_indices),
+                        'n_test_cells': len(test_indices),
+                        'accuracy': accuracy,
+                        'ari_score': ari_score,
+                        'classifier': 'RandomForest' if use_random_forest else 'LogisticRegression'
+                    })
+
+                    print(f"          {feature_name}: Accuracy={accuracy:.3f}, ARI={ari_score:.3f}")
+
+        # Convert results to DataFrame
+        results_df = pd.DataFrame(all_results)
+
+        # Save results
+        if DATA_DIR:
+            results_df.to_csv(os.path.join(DATA_DIR, "celltype_subclustering_results.csv"), index=False)
+
+            # Save subclustering details
+            import pickle
+            with open(os.path.join(DATA_DIR, "subclustering_details.pkl"), 'wb') as f:
+                pickle.dump(subclustering_results, f)
+
+        # Create visualizations
+        if PLOTS_DIR and not results_df.empty:
+            # Plot 1: Heatmap of performance across cell types, features, and K values
+            for k_val in cluster_values:
+                k_data = results_df[results_df['k_clusters'] == k_val]
+                if k_data.empty:
+                    continue
+
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+                # Accuracy heatmap
+                acc_pivot = k_data.pivot(index='cell_type', columns='feature_set', values='accuracy')
+                sns.heatmap(acc_pivot, annot=True, fmt='.3f', cmap='YlOrRd', ax=ax1, cbar_kws={'label': 'Accuracy'})
+                ax1.set_title(f'Subcluster Prediction Accuracy (K={k_val})')
+                ax1.set_xlabel('Feature Set')
+                ax1.set_ylabel('Cell Type')
+
+                # ARI heatmap
+                ari_pivot = k_data.pivot(index='cell_type', columns='feature_set', values='ari_score')
+                sns.heatmap(ari_pivot, annot=True, fmt='.3f', cmap='YlOrRd', ax=ax2, cbar_kws={'label': 'ARI Score'})
+                ax2.set_title(f'Adjusted Rand Index (K={k_val})')
+                ax2.set_xlabel('Feature Set')
+                ax2.set_ylabel('Cell Type')
+
+                plt.tight_layout()
+                plt.savefig(os.path.join(PLOTS_DIR, f"celltype_subclustering_heatmaps_K{k_val}.pdf"), 
+                           format='pdf', bbox_inches='tight', dpi=300)
+                plt.close()
+
+            # Plot 2: Bar plot comparing average performance across all K values
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+            # Average accuracy by feature set
+            avg_acc = results_df.groupby('feature_set')['accuracy'].agg(['mean', 'std']).reset_index()
+            bars1 = ax1.bar(avg_acc['feature_set'], avg_acc['mean'], 
+                           yerr=avg_acc['std'], capsize=5, alpha=0.7)
+            ax1.set_title('Average Subcluster Prediction Accuracy (All K)')
+            ax1.set_ylabel('Accuracy')
+            ax1.set_ylim(0, 1)
+            ax1.tick_params(axis='x', rotation=45)
+
+            # Average ARI by feature set
+            avg_ari = results_df.groupby('feature_set')['ari_score'].agg(['mean', 'std']).reset_index()
+            bars2 = ax2.bar(avg_ari['feature_set'], avg_ari['mean'], 
+                           yerr=avg_ari['std'], capsize=5, alpha=0.7)
+            ax2.set_title('Average Adjusted Rand Index (All K)')
+            ax2.set_ylabel('ARI Score')
+            ax2.tick_params(axis='x', rotation=45)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(PLOTS_DIR, "celltype_subclustering_average_performance.pdf"), 
+                       format='pdf', bbox_inches='tight', dpi=300)
+            plt.close()
+
+            # Plot 3: Performance by K value
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+            for feature_set in results_df['feature_set'].unique():
+                subset = results_df[results_df['feature_set'] == feature_set]
+                k_avg_acc = subset.groupby('k_clusters')['accuracy'].mean()
+                k_avg_ari = subset.groupby('k_clusters')['ari_score'].mean()
+
+                ax1.plot(k_avg_acc.index, k_avg_acc.values, marker='o', label=feature_set)
+                ax2.plot(k_avg_ari.index, k_avg_ari.values, marker='o', label=feature_set)
+
+            ax1.set_xlabel('Number of Clusters (K)')
+            ax1.set_ylabel('Average Accuracy')
+            ax1.set_title('Accuracy vs K Value')
+            ax1.legend()
+            ax1.set_xticks(cluster_values)
+
+            ax2.set_xlabel('Number of Clusters (K)')
+            ax2.set_ylabel('Average ARI Score')
+            ax2.set_title('ARI Score vs K Value')
+            ax2.legend()
+            ax2.set_xticks(cluster_values)
+
+            plt.tight_layout()
+            plt.savefig(os.path.join(PLOTS_DIR, "celltype_subclustering_vs_k.pdf"), 
+                       format='pdf', bbox_inches='tight', dpi=300)
+            plt.close()
+
+        return results_df, subclustering_results
+
+    def analyze_subcluster_feature_importance(splice_adata, ge_adata, subclustering_results,
+                                        DATA_DIR=None, top_features=10):
+        """
+        Analyze which features (splicing factors or NMF components) are most important 
+        for distinguishing subclusters within each cell type.
+
+        Args:
+            splice_adata: AnnData with splicing data
+            ge_adata: AnnData with gene expression data
+            subclustering_results: Results from subclustering analysis
+            DATA_DIR: Directory to save results
+            top_features: Number of top features to report per cell type
+
+        Returns:
+            Dictionary with feature importance results
+        """
+        print("Analyzing feature importance for subclustering...")
+
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.preprocessing import StandardScaler
+
+        # Prepare features
+        splicing_features = splice_adata.obsm["X_PHI"]
+        nmf_features = ge_adata.obsm["X_nmf_standard_mb"]
+        combined_features = np.hstack([splicing_features, nmf_features])
+
+        # Feature names
+        n_splice = splicing_features.shape[1]
+        n_nmf = nmf_features.shape[1]
+        feature_names = ([f"Splice_Factor_{i}" for i in range(n_splice)] + 
+                        [f"NMF_Component_{i}" for i in range(n_nmf)])
+
+        feature_importance_results = {}
+
+        for cell_type, results in subclustering_results.items():
+            print(f"  Analyzing feature importance for {cell_type}...")
+
+            # Get cells and labels for this cell type
+            cell_mask = splice_adata.obs["broad_cell_type"] == cell_type
+            cell_features = combined_features[cell_mask]
+            subcluster_labels = results['true_labels']
+
+            if len(np.unique(subcluster_labels)) < 2:
+                print(f"    Skipping {cell_type}: insufficient subclusters")
+                continue
+
+            # Scale features
+            scaler = StandardScaler()
+            cell_features_scaled = scaler.fit_transform(cell_features)
+
+            # Train Random Forest for feature importance
+            rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+            rf.fit(cell_features_scaled, subcluster_labels)
+
+            # Get feature importances
+            importances = rf.feature_importances_
+
+            # Create results dataframe for this cell type
+            importance_df = pd.DataFrame({
+                'feature_name': feature_names,
+                'importance': importances,
+                'feature_type': (['Splicing'] * n_splice + ['Gene_Expression_NMF'] * n_nmf)
+            }).sort_values('importance', ascending=False)
+
+            feature_importance_results[cell_type] = importance_df.head(top_features)
+
+            print(f"    Top 5 features for {cell_type}:")
+            for idx, row in importance_df.head(5).iterrows():
+                print(f"      {row['feature_name']} ({row['feature_type']}): {row['importance']:.4f}")
+
+        # Save results
+        if DATA_DIR:
+            for cell_type, df in feature_importance_results.items():
+                filename = f"feature_importance_{cell_type.replace(' ', '_').replace('/', '_')}.csv"
+                df.to_csv(os.path.join(DATA_DIR, filename), index=False)
+
+            print(f"Saved feature importance results to {DATA_DIR}")
+
+        return feature_importance_results
+
 
     # Execute all visualizations
     plot_factor_junction_counts(final_df, os.path.join(PLOTS_DIR, "differential_splicing_counts_barplot.pdf"))
