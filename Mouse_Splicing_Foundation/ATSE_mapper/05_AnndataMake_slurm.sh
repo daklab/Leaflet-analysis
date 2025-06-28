@@ -5,12 +5,12 @@
 #SBATCH --mem=64G
 #SBATCH --partition=cpu
 #SBATCH --cpus-per-task=4
-#SBATCH --array=0-998%16
+#SBATCH --array=0-100%16
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/ATSE_mapper/05_AnndataMake.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415
-OUTPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415/anndatas
-CHUNK_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250415/chunks
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622
+OUTPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622/anndatas
+CHUNK_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622/chunks
 
 # Create base directory with today's date
 cd $WD

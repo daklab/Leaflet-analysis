@@ -2,7 +2,7 @@
 #SBATCH -J RH_pseudobulk
 #SBATCH --mem=64G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-23497%50 # Number of unique clusters
+#SBATCH --array=1-23498
 
 #conda activate python3ENV 
 module load samtools
@@ -13,7 +13,8 @@ ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024
 OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells" 
 
 # make subdir for RH with date 
-RH_DIR="$OUTPUT_DIR/RH_$(date +%Y%m%d)"
+RH_DIR="$OUTPUT_DIR/RH"
+
 mkdir -p "$RH_DIR"
 echo "Output directory: $RH_DIR"
 

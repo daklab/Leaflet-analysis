@@ -499,21 +499,6 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
         plt.savefig(os.path.join(perplexity_dir, "perplexity_histogram.pdf"), format='pdf', bbox_inches='tight')
         plt.close()
 
-        # 2. UMAP colored by perplexity if UMAP coordinates exist (only create once)
-        if 'X_umap' in adata.obsm:
-            plt.figure(figsize=(8, 8))
-            sc.pl.umap(
-                adata, 
-                color='perplexity', 
-                cmap='viridis',
-                show=False, 
-                frameon=True
-            )
-            plt.title('UMAP Colored by Cell Perplexity')
-            plt.tight_layout()
-            plt.savefig(os.path.join(perplexity_dir, "umap_perplexity.pdf"), format='pdf', bbox_inches='tight')
-            plt.close()
-    
     # 3. Perplexity distribution colored by metadata (if specified)
     if color_by and color_by in adata.obs.columns:
         # Create a DataFrame with perplexity and the color variable
@@ -580,22 +565,6 @@ def visualize_cell_perplexity(adata, color_by=None, n_bins=50, DATA_DIR=None, PL
         s=20  # smaller point size
     )
     
-    # Add colorbar label
-    plt.colorbar(scatter.collections[0]).set_label('Age')
-    
-    plt.title('Perplexity vs Library Size', fontsize=14)
-    plt.xlabel('Library Size', fontsize=12)
-    plt.ylabel('Perplexity', fontsize=12)
-    
-    # Add grid for better readability
-    plt.grid(True, linestyle='--', alpha=0.3)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(PLOTS_DIR, "perplexity_vs_library_size.pdf"), 
-                format='pdf', 
-                bbox_inches='tight',
-                dpi=300)
-    plt.close()    
     print(f"✓ Cell perplexity visualizations saved to {perplexity_dir}")
 
 ###########################
@@ -766,7 +735,7 @@ def main():
     print(f"  Preparing to save cell-level metadata with perplexity...")
 
     # Define the columns you want from splice_adata.obs
-    cols_to_select = ['broad_cell_type', 'tissue', 'age_numeric', 'dataset', 'perplexity', 'library_size']
+    cols_to_select = ['broad_cell_type', 'tissue', 'age_numeric', 'dataset', 'perplexity']
 
     # Create a DataFrame with these columns
     # First, check which of the desired columns actually exist in splice_adata.obs

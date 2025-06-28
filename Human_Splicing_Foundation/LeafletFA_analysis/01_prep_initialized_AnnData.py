@@ -40,17 +40,17 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file paths
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/splice_adata_matched_2025-06-11.h5ad"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250625_130447.h5ad"
 ATSE_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
 
 # Model configuration
 N_WAYPOINTS = 30
-N_PCA_COMPONENTS = 50
+N_PCA_COMPONENTS = 30
 N_DIM_COMPONENTS = 30
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.75  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.2  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,10 +100,11 @@ def compute_atse_scores(splice_adata):
         # Calculate component scores
         print("   Computing component quality scores...")
         splice_adata.var["annotation_status_score"] = splice_adata.var["annotation_status"].map(
-            {"both": 1, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0}
+            {"both": 0.25, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0.25}
         ) * 2  # Weight more heavily
-        
-        splice_adata.var["non_zero_cell_prop_score"] = (splice_adata.var["non_zero_cell_prop"] > 0.01).astype(int) * 1.5
+
+        # Score for non-zero proportion when compared to 5% threshold, higher score for more cells with expression        
+        splice_adata.var["non_zero_cell_prop_score"] = (splice_adata.var["non_zero_cell_prop"] > 0.05).astype(int) * 1.75
         
         # Group by event_id and calculate scores
         print("   Aggregating scores by ATSE...")
@@ -146,23 +147,13 @@ def filter_and_process_junctions(splice_adata, atses, atse_scores_filtered):
         splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filtered.index)]
         print(f"   ✓ Filtered to {splice_adata.shape[1]} junctions in {len(atse_scores_filtered)} ATSEs")
         
-        # Merge ATSE metadata
-        print("   Merging ATSE metadata...")
-        splice_adata.var = splice_adata.var.merge(
-            atses[["gene_id", "gene_name", "junction_id", "annotation_status", 
-                  "position_off_5_prime", "position_off_3_prime"]], 
-            on=["junction_id", "gene_id", "annotation_status", "gene_name", 
-               "position_off_5_prime", "position_off_3_prime"]
-        )
-        
         # Reset indices and update junction index
         splice_adata.var.reset_index(drop=True, inplace=True)
         if 'junction_id_index' in splice_adata.var.columns:
             splice_adata.var.rename(columns={'junction_id_index': 'old_junction_id_index'}, inplace=True)
         splice_adata.var['junction_id_index'] = splice_adata.var.index
-        
+        print(splice_adata.var.head())
         print(f"   ✓ Junction information processed for model input")
-        
         return splice_adata
         
     except Exception as e:

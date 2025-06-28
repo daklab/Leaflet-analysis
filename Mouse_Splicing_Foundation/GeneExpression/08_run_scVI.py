@@ -31,13 +31,13 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250614_124502.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250625_182138.h5ad"
 
 # Model configuration
 LINEAR_LATENT = 30
 STANDARD_LATENT = 30
-LINEAR_EPOCHS = 200
-STANDARD_EPOCHS = 200
+LINEAR_EPOCHS = 100
+STANDARD_EPOCHS = 100
 
 def load_data():
     """Load aligned gene expression data"""
@@ -323,3 +323,4 @@ print("========================================\n")
 # conda activate scvi-env
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/scVI
 # sbatch --mem=250G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"
+# sbatch --mem=300G -p cpu,bigmem -J "scVI_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"

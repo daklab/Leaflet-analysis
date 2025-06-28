@@ -8,9 +8,15 @@ from typing import List, Dict
 from tqdm import tqdm
 import sys 
 
-# Add path to where find_intron_clusters_v3.py is located 
-sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/clustering')
-from find_intron_clusters_v3 import JunctionReader
+# Add LeafletFA-utils to path
+module_path = "/gpfs/commons/home/kisaev/LeafletFA-utils"
+if module_path not in sys.path:
+    sys.path.append(module_path)
+    print(f"Added {module_path} to sys.path")
+
+# Import functions
+from leafletfa_utils.atsemapper.main import JunctionReader  
+
 
 def split_file_list(input_file: str, chunks: int, output_dir: str):
     """Split input file list into chunks for Slurm array processing"""
@@ -52,7 +58,9 @@ def process_chunk(chunk_file: str, output_dir: str):
         min_intron=50,
         max_intron=500000,
         batch_size=10,
-        num_workers=4
+        num_workers=4, 
+        min_cells=2, 
+        min_reads=10
     )
     
     junctions = reader.process_files(file_list)

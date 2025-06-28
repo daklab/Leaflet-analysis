@@ -30,8 +30,8 @@ def load_datasets():
     print("\n>> Loading processed datasets...")
     
     try:
-        ge_path = f"{WD}/tms_ab_exons_combo_ge_adata_2025-05-12.h5ad"
-        intron_path = f"{WD}/ab_adata_introns_2025-05-12.h5ad"
+        ge_path = f"{WD}/tms_ab_exons_combo_ge_adata_2025-06-24.h5ad"
+        intron_path = f"{WD}/ab_adata_introns_2025-06-24.h5ad"
         
         print(f"   ⚙️ Loading combined gene expression data from: {ge_path}")
         ge_adata = ad.read_h5ad(ge_path)

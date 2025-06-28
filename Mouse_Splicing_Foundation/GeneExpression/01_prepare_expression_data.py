@@ -45,6 +45,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 GTF_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
 DB_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/GENCODE_vM19"
 AB_METADATA = "/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/metadata.csv"
+
+# These are raw data files:
 AB_INTRONS = "/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/GeneExpression/expression_matrix_introns.csv"
 AB_EXONS = "/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/GeneExpression/expression_matrix_exons.csv"
 TMS_EXPRESSION = "/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data/AWS/processed_for_scanpy/tabulamurissenisfacsofficialrawobj.h5ad"
@@ -57,19 +59,19 @@ gene_info_df = extract_gene_transcript_info(GTF_FILE, DB_FILE)
 print("\n>> Loading Allen Brain Atlas data...")
 try:
     metadata_ab = pd.read_csv(AB_METADATA, low_memory=False)
-    print(f"   ✓ Loaded metadata for {len(metadata_ab)} cells")
+    print(f"   Loaded metadata for {len(metadata_ab)} cells")
     
-    print("   ⚙️ Loading intron expression data...")
+    print("   Loading intron expression data...")
     ab_adata_introns = sc.read_csv(AB_INTRONS)
     ab_adata_introns.obs["sample_name"] = ab_adata_introns.obs.index
-    print(f"   ✓ Loaded intron expression data: {ab_adata_introns.shape}")
+    print(f"   Loaded intron expression data: {ab_adata_introns.shape}")
     
-    print("   ⚙️ Loading exon expression data...")
+    print("   Loading exon expression data...")
     ab_adata_exons = sc.read_csv(AB_EXONS)
     ab_adata_exons.obs["sample_name"] = ab_adata_exons.obs.index
-    print(f"   ✓ Loaded exon expression data: {ab_adata_exons.shape}")
+    print(f"   Loaded exon expression data: {ab_adata_exons.shape}")
 except Exception as e:
-    print(f"   ❌ Error loading Allen Brain data: {str(e)}")
+    print(f"   Error loading Allen Brain data: {str(e)}")
     sys.exit(1)
     
 # Step 3: Process Allen Brain data - make explicit copies
@@ -97,13 +99,14 @@ try:
     tms_adata = sc.read_h5ad(TMS_EXPRESSION)
     tms_adata = tms_adata.copy()  # Explicit copy
     tms_adata = preprocess_anndata(tms_adata, dataset_label="tabula_muris_senis")
-    print(f"   ✓ Loaded TMS expression data: {tms_adata.shape}")
+    print(f"   Loaded TMS expression data: {tms_adata.shape}")
 except Exception as e:
-    print(f"   ❌ Error loading TMS data: {str(e)}")
+    print(f"   Error loading TMS data: {str(e)}")
     sys.exit(1)
     
 # Step 5: Clean TMS cell IDs
 print("\n>> Cleaning Tabula Muris Senis cell IDs...")
+
 # Apply basic cleaning to all cell IDs
 tms_adata.obs_names = pd.Index([
     cell_id.split(".mm10-plus-0-0")[0].split(".mus-2-1")[0] 
@@ -123,15 +126,35 @@ print(f"   ✓ Cleaned cell IDs for {tms_adata.shape[0]} cells")
 # Step 6: Harmonize gene information across datasets
 print("\n>> Harmonizing genes across datasets...")
 
+# Dictionary to store lost gene information
+lost_genes_info = {}
+
 # Add gene info to all datasets
 for adata, name in zip([tms_adata, ab_adata_introns, ab_adata_exons], 
                        ["TMS", "AB introns", "AB exons"]):
-    print(f"   ⚙️ Adding gene length info to {name} dataset...")
+    print(f"   Adding gene length info to {name} dataset...")
     adata.var["gene_name"] = adata.var["gene_symbol"] if "gene_symbol" in adata.var.columns else adata.var.index
     adata.var["orig_index"] = adata.var.index  # store original index
+
+    # Track original genes
+    original_genes = set(adata.var["gene_name"])
+    
+    # Perform merge
     merged = adata.var.reset_index().merge(gene_info_df, on="gene_name", how="inner")
+
+    # Calculate lost genes
     if len(merged) < adata.shape[1]:
-        print(f"   ⚠️ Lost {adata.shape[1] - len(merged)} genes during gene info merge")
+        merged_genes = set(merged["gene_name"])
+        lost_genes = original_genes - merged_genes
+        lost_genes_info[name] = {
+            "total_before": len(original_genes),
+            "total_after": len(merged_genes),
+            "lost_genes": sorted(lost_genes),
+            "lost_count": len(lost_genes)
+        }
+        print(f" Lost {adata.shape[1] - len(merged)} genes during gene info merge")
+        print(f" Lost genes: {lost_genes_info[name]}")
+
     if "orig_index" in merged.columns:
         merged = merged.set_index("orig_index")
     adata._inplace_subset_var(merged.index)  # ensure dimensions match
@@ -208,7 +231,7 @@ tms_adata = tms_adata.copy()  # Make a copy to avoid view issues
 keep_cols = ['cell_id', 'age', 'cell_ontology_class', 'mouse.id', 'sex', 'subtissue', 'tissue', 'dataset']
 for col in keep_cols:
     if col not in tms_adata.obs.columns:
-        print(f"   ⚠️ Column '{col}' not found in TMS data, adding empty column")
+        print(f"   Column '{col}' not found in TMS data, adding empty column")
         tms_adata.obs[col] = "unknown"
         
 tms_adata.obs = tms_adata.obs[keep_cols].copy()
@@ -271,18 +294,18 @@ try:
     print(f"   ✓ Combined dataset contains {combined_adata.shape[0]} cells and {combined_adata.shape[1]} genes")
     print(f"   ✓ Batch distribution: {dict(combined_adata.obs['batch'].value_counts())}")
 except Exception as e:
-    print(f"   ❌ Error creating combined dataset: {str(e)}")
+    print(f"   Error creating combined dataset: {str(e)}")
     sys.exit(1)
 
 # Make sure introns data is in CSR format for saving
 if hasattr(ab_adata_introns.X, "format") and ab_adata_introns.X.format == "coo":
-    print("   ⚙️ Converting COO matrix to CSR format for saving...")
+    print("   Converting COO matrix to CSR format for saving...")
     ab_adata_introns.X = ab_adata_introns.X.tocsr()
     
 # Also check any layers
 for layer_name in ab_adata_introns.layers:
     if hasattr(ab_adata_introns.layers[layer_name], "format") and ab_adata_introns.layers[layer_name].format == "coo":
-        print(f"   ⚙️ Converting layer '{layer_name}' from COO to CSR format...")
+        print(f"   Converting layer '{layer_name}' from COO to CSR format...")
         ab_adata_introns.layers[layer_name] = ab_adata_introns.layers[layer_name].tocsr()
 
 # Step 13: Save results
@@ -311,10 +334,10 @@ def save_anndata(adata, filename, compress=True, overwrite=False):
     try:
         compression = "lzf" if compress else None
         adata.write_h5ad(full_path, compression=compression)
-        print(f"   ✓ Successfully saved to {full_path}")
+        print(f"   Successfully saved to {full_path}")
         return True
     except Exception as e:
-        print(f"   ❌ Error saving {filename}: {str(e)}")
+        print(f"   Error saving {filename}: {str(e)}")
         return False
 
 # Define filenames

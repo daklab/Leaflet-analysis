@@ -62,28 +62,28 @@ def load_datasets():
         
         # Fall back to hardcoded date if today's files don't exist
         if not os.path.exists(ge_adata_path):
-            print(f"   ⚠️ Could not find file with current date: {ge_adata_path}")
+            print(f"   Could not find file with current date: {ge_adata_path}")
             ge_adata_path = f"{WD}/tms_ab_exons_combo_ge_adata_2025-05-12.h5ad"
-            print(f"   ⚙️ Trying alternative path: {ge_adata_path}")
+            print(f"   Trying alternative path: {ge_adata_path}")
             
         if not os.path.exists(intron_adata_path):
-            print(f"   ⚠️ Could not find file with current date: {intron_adata_path}")
+            print(f"   Could not find file with current date: {intron_adata_path}")
             intron_adata_path = f"{WD}/ab_adata_introns_2025-05-12.h5ad"
-            print(f"   ⚙️ Trying alternative path: {intron_adata_path}")
+            print(f"   Trying alternative path: {intron_adata_path}")
         
-        print(f"   ⚙️ Loading combined gene expression data from: {ge_adata_path}")
+        print(f"   Loading combined gene expression data from: {ge_adata_path}")
         ge_adata = ad.read_h5ad(ge_adata_path)
         
-        print(f"   ⚙️ Loading intron data from: {intron_adata_path}")
+        print(f"   Loading intron data from: {intron_adata_path}")
         intron_adata = ad.read_h5ad(intron_adata_path)
         
-        print(f"   ✓ Loaded gene expression data: {ge_adata.shape[0]} cells, {ge_adata.shape[1]} genes")
-        print(f"   ✓ Loaded intron data: {intron_adata.shape[0]} cells, {intron_adata.shape[1]} genes")
+        print(f"   Loaded gene expression data: {ge_adata.shape[0]} cells, {ge_adata.shape[1]} genes")
+        print(f"   Loaded intron data: {intron_adata.shape[0]} cells, {intron_adata.shape[1]} genes")
         
         return ge_adata, intron_adata
         
     except Exception as e:
-        print(f"   ❌ Error loading datasets: {str(e)}")
+        print(f"   Error loading datasets: {str(e)}")
         sys.exit(1)
 
 def load_linear_model(model_path):
@@ -94,13 +94,13 @@ def load_linear_model(model_path):
         with open(model_path, 'rb') as f:
             model = pickle.load(f)
             
-        print("   ✓ Model loaded successfully")
-        print("   ✓ Model summary:")
+        print("   Model loaded successfully")
+        print("   Model summary:")
         print(model.summary())
         
         return model
     except Exception as e:
-        print(f"   ❌ Error loading model: {str(e)}")
+        print(f"   Error loading model: {str(e)}")
         sys.exit(1)
 
 def create_cell_type_mappings():
@@ -418,7 +418,7 @@ def prepare_annotations(ge_adata, intron_adata):
         ge_adata.obs.drop(columns=['subtissue'], inplace=True)
     
     # Apply cell type mapping to both datasets
-    print("   ⚙️ Mapping cell types to standardized categories...")
+    print("   Mapping cell types to standardized categories...")
     ge_adata.obs['broad_cell_type'] = ge_adata.obs['cell_ontology_class'].apply(
         lambda x: map_cell_type(x, cell_type_mappings)
     )
@@ -427,7 +427,7 @@ def prepare_annotations(ge_adata, intron_adata):
     )
     
     # Set tissue labels for Allen Brain data
-    print("   ⚙️ Setting tissue labels for Allen Brain data...")
+    print("   Setting tissue labels for Allen Brain data...")
     ab_mask = ge_adata.obs["dataset"] == "allen_brain_exons"
     ge_adata.obs.loc[ab_mask, "tissue"] = "Brain_Non-Myeloid"
     
@@ -435,7 +435,7 @@ def prepare_annotations(ge_adata, intron_adata):
     ab_microglia_mask = ab_mask & (ge_adata.obs["broad_cell_type"] == "MICROGLIA")
     ge_adata.obs.loc[ab_microglia_mask, "tissue"] = "Brain_Myeloid"
     
-    print(f"   ✓ Standardized annotations for {ge_adata.shape[0]} cells")
+    print(f"   Standardized annotations for {ge_adata.shape[0]} cells")
     
     return ge_adata, intron_adata
 
@@ -458,7 +458,7 @@ def apply_linear_model(ge_adata, intron_adata, model):
     coef_exons = model.params["exons"]
     coef_introns = model.params["introns"]
     
-    print(f"   ✓ Model coefficients: intercept={intercept:.4f}, exons={coef_exons:.4f}, introns={coef_introns:.4f}")
+    print(f"   Model coefficients: intercept={intercept:.4f}, exons={coef_exons:.4f}, introns={coef_introns:.4f}")
     
     # Create a copy of the gene expression data
     combined_adata = ge_adata.copy()
@@ -467,7 +467,7 @@ def apply_linear_model(ge_adata, intron_adata, model):
     ab_mask = combined_adata.obs["dataset"] == "allen_brain_exons"
     ab_cells = combined_adata[ab_mask]
     
-    print(f"   ⚙️ Applying model to {sum(ab_mask)} Allen Brain cells...")
+    print(f"   Applying model to {sum(ab_mask)} Allen Brain cells...")
     
     # Extract normalized expression matrices
     log_exons = ab_cells.layers["log_norm"]
@@ -507,7 +507,7 @@ def save_dataset(adata, filename, compression_method="lzf"):
         bool: Success status
     """
     try:
-        print(f"   ⚙️ Saving dataset with '{compression_method}' compression...")
+        print(f"   Saving dataset with '{compression_method}' compression...")
         start_time = datetime.datetime.now()
         
         # Save the AnnData object with specified compression
@@ -532,7 +532,7 @@ def save_dataset(adata, filename, compression_method="lzf"):
         
         return True
     except Exception as e:
-        print(f"   ❌ Error saving {filename}: {str(e)}")
+        print(f"   Error saving {filename}: {str(e)}")
         return False
     
 # Main execution flow

@@ -28,9 +28,9 @@ param_grid = {
     "num_samples": [100],
     'gamma': [0.01],
     'min_delta': [100],
-    "lr": [0.5],
-    "num_epochs": [80],
-    "patience": [5],
+    "lr": [0.1],
+    "num_epochs": [3, 80],
+    "patience": [3],
 }
 
 # Generate all parameter combinations

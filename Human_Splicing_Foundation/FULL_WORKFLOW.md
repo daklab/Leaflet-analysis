@@ -84,14 +84,17 @@ ${ROOT_PATH}/GeneExpression/05_combine_TS_AB.py
 # Also clean up cell type labels 
 ${ROOT_PATH}/GeneExpression/06_align_splice_ge_anndatas.py
 
-# Step 9: Run scVI on length-normalized counts
-${ROOT_PATH}/GeneExpression/06_run_scVI.py
+# Remove outliers 
+${ROOT_PATH}/GeneExpression/07_check_outliers.ipynb
 
 # Step 10: Run NMF on regression-adjusted values
-${ROOT_PATH}/GeneExpression/07_run_NMF.py  
+${ROOT_PATH}/GeneExpression/08_run_NMF.py  
+
+# Step 9: Run scVI on length-normalized counts
+${ROOT_PATH}/GeneExpression/09_run_scVI.py
 
 # Step 11: Visualize latent spaces from scVI and NMF 
-${ROOT_PATH}/GeneExpression/08_visualize_scVI_NMF.py  
+${ROOT_PATH}/GeneExpression/10_visualize_scVI_NMF.py  
 ```
 
 ### 2.2 10X Data Processing

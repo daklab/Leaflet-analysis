@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 
 # Gene expression data
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-05-13.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_models_2025-05-16.h5ad"
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-06-27.h5ad"
+GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_model_30_1024_2025-06-26.h5ad"
 PLOTS_DIR = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/gene_expression/plots"
 # if doesn't exist, create it
 if not os.path.exists(PLOTS_DIR):
@@ -83,24 +83,24 @@ def plot_umap(ge_adata, rep_input, variable_name, PLOTS_DIR, num_groups=None):
 print("Generating UMAP from NMF standard...")
 sc.pp.neighbors(ge_adata, use_rep="X_nmf_standard_mb", n_neighbors=8)
 sc.tl.umap(ge_adata)
-plot_umap(ge_adata, "X_nmf_standard_mb", "broad_cell_type", PLOTS_DIR, num_groups=10)
+plot_umap(ge_adata, "X_nmf_standard_mb", "broad_cell_type", PLOTS_DIR, num_groups=15)
 plot_umap(ge_adata, "X_nmf_standard_mb", "dataset", PLOTS_DIR)
 
 # scVI
 print("Generating UMAP from scVI linear...")
 sc.pp.neighbors(ge_adata, use_rep="X_scVI_linear", n_neighbors=8)
 sc.tl.umap(ge_adata)
-plot_umap(ge_adata, "X_scVI_linear", "broad_cell_type", PLOTS_DIR, num_groups=10)
+plot_umap(ge_adata, "X_scVI_linear", "broad_cell_type", PLOTS_DIR, num_groups=15)
 plot_umap(ge_adata, "X_scVI_linear", "dataset", PLOTS_DIR)
 
 # scVI standard
 print("Generating UMAP from scVI standard...")
 sc.pp.neighbors(ge_adata, use_rep="X_scVI_standard", n_neighbors=8)
 sc.tl.umap(ge_adata)
-plot_umap(ge_adata, "X_scVI_standard", "broad_cell_type", PLOTS_DIR, num_groups=10)
+plot_umap(ge_adata, "X_scVI_standard", "broad_cell_type", PLOTS_DIR, num_groups=15)
 plot_umap(ge_adata, "X_scVI_standard", "dataset", PLOTS_DIR)
 
 # to submit 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
-# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_visualize_scVI_NMF.py
-# sbatch --mem=350G -p dev,cpu,bigmem -J "MF_GE_UMAPs" --wrap="python $script"
+# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/09_visualize_scVI_NMF.py
+# sbatch --mem=350G -p cpu,bigmem -J "MUS_GE_UMAPs" --wrap="python $script"

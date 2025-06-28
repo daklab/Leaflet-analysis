@@ -41,7 +41,7 @@ mkdir -p chunks
 python $SCRIPT_PATH \
     --mode split \
     --input-file $INPUT_FILE \
-    --chunks 1000 \
+    --chunks 100 \
     --output-dir chunks
 
 # Verify chunks were created

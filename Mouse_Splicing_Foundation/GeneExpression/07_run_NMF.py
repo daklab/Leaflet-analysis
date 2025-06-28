@@ -29,7 +29,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250614_124502.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250625_182138.h5ad"
 
 # Define NMF model parameters
 LINEAR_LATENT = 30
@@ -83,7 +83,7 @@ def train_mini_batch_NMF(ge_adata):
     """Train mini batch NMF model for gene expression data using sklearn's MiniBatchNMF"""
     print("\n>> Training MiniBatchNMF model...")
     
-    layer_name = "predicted_log_norm_tms"
+    layer_name = "log_norm"
     if layer_name not in ge_adata.layers:
         print(f"  Error: Layer '{layer_name}' not found. Cannot proceed with NMF.")
         sys.exit(1)
@@ -201,7 +201,7 @@ print("========================================\n")
 
 # Load data
 ge_adata = load_data()
-check_data_quality(ge_adata, "predicted_log_norm_tms") # Using layer with predicted values for Allen Brain nuclei using TMS regression model
+check_data_quality(ge_adata, "log_norm") # Using layer with log_norm values
 
 # Train mini batch NMF model
 ge_adata = train_mini_batch_NMF(ge_adata)

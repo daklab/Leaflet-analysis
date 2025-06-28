@@ -35,22 +35,22 @@ import BetaDirichletFactor.waypoints as wayp
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025"
+OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file paths
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025/aligned_splicing_data_20250513_035938.h5ad"
-ATSE_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250625_182138.h5ad"
+print(f"The input file is: {SPLICE_INPUT}")
 
 # Model configuration
-N_WAYPOINTS = 50
-N_PCA_COMPONENTS = 50
+N_WAYPOINTS = 30
+N_PCA_COMPONENTS = 30
 N_DIM_COMPONENTS = 30
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.45  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.2  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -69,17 +69,12 @@ def load_data():
         splice_adata.obs.reset_index(drop=True, inplace=True)
         splice_adata.obs["cell_id_index"] = splice_adata.obs.index 
         print(f"   ✓ Loaded splicing data with {splice_adata.shape[0]} cells and {splice_adata.shape[1]} junctions")
-        
-        # Load ATSE file
-        print(f"   ⚙️ Loading ATSE information from {ATSE_FILE}")
-        atses = pd.read_csv(ATSE_FILE, sep="\t")
-        print(f"   ✓ Loaded ATSE info with {len(atses['event_id'].unique())} unique events")
-        
+                
         # Print summary of cell types (already standardized in step 05)
         print(f"   ✓ Data contains {splice_adata.obs['broad_cell_type'].nunique()} standardized cell types")
         print(f"   ✓ Top 5 cell types: {dict(splice_adata.obs['broad_cell_type'].value_counts().head(5))}")
         
-        return splice_adata, atses
+        return splice_adata
         
     except Exception as e:
         print(f"   ❌ Error loading datasets: {str(e)}")
@@ -99,7 +94,7 @@ def compute_atse_scores(splice_adata):
         # Calculate component scores
         print("   ⚙️ Computing component quality scores...")
         splice_adata.var["annotation_status_score"] = splice_adata.var["annotation_status"].map(
-            {"both": 1, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0}
+            {"both": 0.25, "five_prime": 0.5, "three_prime": 0.5, "unannotated": 0.25}
         ) * 2  # Weight more heavily
         
         splice_adata.var["non_zero_cell_prop_score"] = (splice_adata.var["non_zero_cell_prop"] > 0.01).astype(int) * 1.5
@@ -135,7 +130,7 @@ def compute_atse_scores(splice_adata):
         traceback.print_exc()
         sys.exit(1)
 
-def filter_and_process_junctions(splice_adata, atses, atse_scores_filtered):
+def filter_and_process_junctions(splice_adata, atse_scores_filtered):
     """Filter junctions by ATSE scores and process for model input"""
     print("\n>> Filtering and processing junctions...")
     
@@ -144,16 +139,7 @@ def filter_and_process_junctions(splice_adata, atses, atse_scores_filtered):
         print("   ⚙️ Filtering junctions by ATSE scores...")
         splice_adata = splice_adata[:, splice_adata.var["event_id"].isin(atse_scores_filtered.index)]
         print(f"   ✓ Filtered to {splice_adata.shape[1]} junctions in {len(atse_scores_filtered)} ATSEs")
-        
-        # Merge ATSE metadata
-        print("   ⚙️ Merging ATSE metadata...")
-        splice_adata.var = splice_adata.var.merge(
-            atses[["gene_id", "gene_name", "junction_id", "annotation_status", 
-                  "position_off_5_prime", "position_off_3_prime"]], 
-            on=["junction_id", "gene_id", "annotation_status", "gene_name", 
-               "position_off_5_prime", "position_off_3_prime"]
-        )
-        
+                
         # Reset indices and update junction index
         splice_adata.var.reset_index(drop=True, inplace=True)
         if 'junction_id_index' in splice_adata.var.columns:
@@ -328,13 +314,13 @@ print("LeafletFA Input Preparation - Mouse Splicing Foundation")
 print("========================================\n")
 
 # Load data
-splice_adata, atses = load_data()
+splice_adata = load_data()
 
 # Compute ATSE scores and filter
 atse_scores_filtered = compute_atse_scores(splice_adata)
 
 # Filter junctions and process
-splice_adata = filter_and_process_junctions(splice_adata, atses, atse_scores_filtered)
+splice_adata = filter_and_process_junctions(splice_adata, atse_scores_filtered)
 
 # Compute dimensionality reduction
 splice_adata = compute_dimensionality_reduction(splice_adata)
@@ -353,10 +339,5 @@ print("LeafletFA input preparation complete!")
 print(f"Results saved to: {OUTPUT_DIR}")
 print("========================================\n")
 
-# Submission command for reference
-print("# To submit this job:")
-print("cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025")
-print("sbatch --mem=200G --wrap=\"python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py\"")
-
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/052025
-# sbatch --mem=250G -p cpu,dev,bigmem -J "prep_initialized_AnnData" --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025
+# sbatch --mem=400G -p cpu,bigmem -J "prep_initialized_AnnData" --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

@@ -40,7 +40,9 @@ TabulaSenis/LeafletFA_analysis/archive
 tabula_sapien/snakemake/snakemake/sample_ids.txt
 Human_Splicing_Foundation/processed_data/tabsap_adata_2025-04-15.h5ad
 Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/*
-
+Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/* 
+Mouse_Splicing_Foundation/model_train/CELL_TYPE_SPECIFIC/gene_expression/* 
+Mouse_Splicing_Foundation/model_train/CELL_TYPE_SPECIFIC/results*
 *.h5ad
 
 # Add all /.snakemake folders

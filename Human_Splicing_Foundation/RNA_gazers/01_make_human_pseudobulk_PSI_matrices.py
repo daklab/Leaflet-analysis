@@ -57,7 +57,7 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # Splicing input file
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/splice_adata_matched_2025-06-11.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250623_170756.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
 # Define which column to use for cell type grouping
@@ -68,45 +68,6 @@ cell_type_column = "broad_cell_type"
 # Read splicing AnnData
 print("Loading splicing AnnData file...", flush=True)
 splice_adata = ad.read_h5ad(input_file)
-
-# Add parameter for testing with subset of cells
-MAX_CELLS = None  # Set to None to use all cells
-if MAX_CELLS is not None and MAX_CELLS < splice_adata.shape[0]:
-    print(f"\nSubsampling to {MAX_CELLS} cells while maintaining cell type proportions...")
-    
-    # Get cell type proportions
-    cell_type_props = splice_adata.obs[cell_type_column].value_counts(normalize=True)
-    print(cell_type_props)
-    
-    # Calculate number of cells to sample per cell type
-    cells_per_type = (cell_type_props * MAX_CELLS).round().astype(int)
-    
-    # Ensure we don't exceed MAX_CELLS
-    while cells_per_type.sum() > MAX_CELLS:
-        # Find the largest cell type and reduce by 1
-        largest_type = cells_per_type.idxmax()
-        cells_per_type[largest_type] -= 1
-    
-    # Sample cells for each cell type
-    sampled_indices = []
-    for cell_type, n_cells in cells_per_type.items():
-        print(f"Sampling {n_cells} cells for cell type {cell_type}")
-        type_indices = np.where(splice_adata.obs[cell_type_column] == cell_type)[0]
-        if len(type_indices) > n_cells:
-            sampled_indices.extend(np.random.choice(type_indices, n_cells, replace=False))
-        else:
-            sampled_indices.extend(type_indices)
-    
-    # Create subset of AnnData
-    splice_adata = splice_adata[sampled_indices].copy()
-    print(f"Created subset with {splice_adata.shape[0]} cells")
-    print("\nCell type distribution in subset:")
-    print(splice_adata.obs[cell_type_column].value_counts())
-
-    # Verify layer data is properly reindexed
-    print("\nVerifying layer data reindexing:")
-    for layer in splice_adata.layers:
-        print(f"Layer '{layer}' shape: {splice_adata.layers[layer].shape}")
 
 # Reset index and store original index
 splice_adata.obs.reset_index(drop=True, inplace=True)
@@ -148,7 +109,7 @@ cell_type_dataset_counts.to_csv(distribution_file)
 print(f"Saved cell type distribution to: {distribution_file}")
 
 # Function to create pseudobulk samples
-def create_pseudobulk(adata, group_by, layer=None):
+def create_pseudobulk(adata, group_by, min_cells=50, layer=None):
     """
     Create pseudobulk samples by aggregating cells in the same group.
     
@@ -158,6 +119,8 @@ def create_pseudobulk(adata, group_by, layer=None):
         The input AnnData object
     group_by : str
         Column name in adata.obs to group cells by (e.g., 'cell_type')
+    min_cells: int, optional
+        Minimum number of cells per group to include in the pseudobulk sample
     layer : str, optional
         Layer to use for aggregation (if None, uses X)
         
@@ -209,6 +172,10 @@ def create_pseudobulk(adata, group_by, layer=None):
         
         if n_cells == 0:
             print(f"Warning: No cells found for group {group}")
+            continue
+
+        if n_cells < min_cells:
+            print(f"Warning: Only {n_cells} cells found for group {group}, skipping")
             continue
         
         # Update cell count
@@ -536,4 +503,4 @@ print("\nPseudobulk creation and PSI calculation complete!")
 
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
-# sbatch --mem=250G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"
+# sbatch --mem=64G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"

@@ -21,16 +21,16 @@ param_grid = {
     "input_conc": [None, 'inf'],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
     "delta_fixed": [0.5, 1, None],
-    "K": [50],
+    "K": [30],
     "waypoints_use": [True],
     "num_inits": [1],
     "ELBO_num_particles": [3],
     "num_samples": [100],
     'gamma': [0.01],
     'min_delta': [100],
-    "lr": [0.7],
-    "num_epochs": [120],
-    "patience": [5],
+    "lr": [0.1],
+    "num_epochs": [3,85],
+    "patience": [3],
 }
 
 # Generate all parameter combinations
