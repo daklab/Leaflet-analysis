@@ -6,7 +6,18 @@ __pycache__/
 # C extensions
 *.so
 
+# Ignore all files with the following extensions in all directories
+*.pdf
+*.png
+*.txt
+*.csv
+*.tsv
+*.h5ad
+
 **/Archive/
+Multi_Species_Splicing_Foundation/compare_ATSEs.ipynb
+Multi_Species_Splicing_Foundation/cross_species_conservation_analysis_2025-06-24/data/human_atse_filtered_orthologs.csv
+Multi_Species_Splicing_Foundation/cross_species_conservation_analysis_2025-06-24/data/ortholog_mappings.csv
 
 # Distribution / packaging
 .Python
