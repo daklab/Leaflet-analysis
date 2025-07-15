@@ -29,12 +29,10 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250625_182138.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250707_181219.h5ad"
 
 # Define NMF model parameters
-LINEAR_LATENT = 30
-STANDARD_LATENT = 30
-LINEAR_EPOCHS = 200
+STANDARD_LATENT = 50
 STANDARD_EPOCHS = 200
 NMF_BATCH_SIZE = 1024 # Batch size for MiniBatchNMF
 
@@ -47,7 +45,6 @@ def load_data():
     
     return ge_adata
     
-
 def check_data_quality(adata, layer_name):
     """Check for NaN or Inf values in the specified layer of AnnData object."""
     print(f"\n>> Checking data quality for layer: {layer_name}...")
@@ -80,79 +77,65 @@ def check_data_quality(adata, layer_name):
 
 
 def train_mini_batch_NMF(ge_adata):
-    """Train mini batch NMF model for gene expression data using sklearn's MiniBatchNMF"""
-    print("\n>> Training MiniBatchNMF model...")
-    
-    layer_name = "log_norm"
+
+    """Train standard MiniBatchNMF model on HVGs using sklearn's MiniBatchNMF"""
+    print("\n>> Training Standard MiniBatchNMF model...")
+
+    layer_name = "predicted_log_norm_tms"
     if layer_name not in ge_adata.layers:
         print(f"  Error: Layer '{layer_name}' not found. Cannot proceed with NMF.")
         sys.exit(1)
 
-    print(f"  Using layer '{layer_name}' for MiniBatchNMF.")
-    _data_matrix_original = ge_adata.layers[layer_name]
-    processed_data_matrix = None
-    negative_values_found = False
+    if "highly_variable" not in ge_adata.var.columns:
+        print("  Error: 'highly_variable' column not found in .var. Run HVG selection first.")
+        sys.exit(1)
 
+    # Subset to HVGs
+    hvg_mask = ge_adata.var["highly_variable"].values
+    adata_hvg = ge_adata[:, hvg_mask]
+    _data_matrix_original = adata_hvg.layers[layer_name]
+    ge_adata.uns["hvg_mask_used_for_nmf"] = hvg_mask
+    ge_adata.uns["nmf_standard_mb_params"] = {
+        "n_components": STANDARD_LATENT,
+        "max_iter": STANDARD_EPOCHS,
+        "batch_size": NMF_BATCH_SIZE,
+        "init": "nndsvda",
+        "random_state": 0
+    }
+    
+    print(f"  Using {hvg_mask.sum()} HVGs from layer '{layer_name}' for MiniBatchNMF.")
+
+    # Handle negative values
+    negative_values_found = False
     if issparse(_data_matrix_original):
         if _data_matrix_original.min() < 0:
             negative_values_found = True
-            print("  Found negative values in the sparse input data layer. Using a zero-clipped version for NMF.")
+            print("  Found negative values in sparse input. Clipping to zero.")
             processed_data_matrix = _data_matrix_original.maximum(0)
         else:
-            processed_data_matrix = _data_matrix_original 
+            processed_data_matrix = _data_matrix_original
     elif isinstance(_data_matrix_original, np.ndarray):
         if np.any(_data_matrix_original < 0):
             negative_values_found = True
-            print("  Found negative values in the dense input data layer. Using a zero-clipped version for NMF.")
+            print("  Found negative values in dense input. Clipping to zero.")
             processed_data_matrix = np.clip(_data_matrix_original, 0, None)
         else:
             processed_data_matrix = _data_matrix_original
     else:
-        print(f"  Data matrix in layer '{layer_name}' is of an unexpected type: {type(_data_matrix_original)}. NMF might fail if it contains negative values or is incompatible.")
+        print(f"  Unexpected data type for matrix: {type(_data_matrix_original)}")
         processed_data_matrix = _data_matrix_original
 
+    # Check for all-zero input
     if negative_values_found:
-        is_all_zero = False
-        if issparse(processed_data_matrix):
-            if processed_data_matrix.nnz == 0:
-                is_all_zero = True
-        elif isinstance(processed_data_matrix, np.ndarray):
-            if np.all(processed_data_matrix == 0):
-                is_all_zero = True
-        
+        is_all_zero = (processed_data_matrix.nnz == 0) if issparse(processed_data_matrix) else np.all(processed_data_matrix == 0)
         if is_all_zero:
-            print(f"   Error: Data matrix for layer '{layer_name}' became all zeros after clipping negative values. Cannot proceed with NMF.")
+            print("  Error: All-zero matrix after clipping. Cannot run NMF.")
             sys.exit(1)
-    
-    data_matrix = processed_data_matrix # Use this variable for NMF
 
-    # Linear MiniBatchNMF
-    print(f"   Training Linear MiniBatchNMF with {LINEAR_LATENT} components, {LINEAR_EPOCHS} max_iter, batch_size {NMF_BATCH_SIZE}...")
-    model_linear = MiniBatchNMF(
-        n_components=LINEAR_LATENT,
-        max_iter=LINEAR_EPOCHS,
-        batch_size=NMF_BATCH_SIZE,
-        random_state=0,
-        init='nndsvda' # A good initialization for NMF
-    )
-    # Fit and transform
-    # For MiniBatchNMF, fit_transform is done in batches.
-    # We will iterate manually to show progress, though fit() can also be used.
-    # However, for simplicity and directness with AnnData, let's use fit_transform directly on the whole data
-    # if memory allows, or adapt to partial_fit if truly out-of-core for very large data is needed.
-    # Assuming ge_adata.layers[layer_name] fits in memory for this step with sklearn.
-    
-    W_linear = model_linear.fit_transform(data_matrix)
-    H_linear = model_linear.components_
-    
-    ge_adata.obsm['X_nmf_linear_mb'] = W_linear
-    ge_adata.varm['nmf_linear_mb_components'] = H_linear.T # Store as n_genes x n_components
+    data_matrix = processed_data_matrix
 
-    print(f"   Linear MiniBatchNMF training complete.")
-    print(f"   Results stored in ge_adata.obsm['X_nmf_linear_mb'] ({W_linear.shape}) and ge_adata.varm['nmf_linear_mb_components'] ({H_linear.T.shape})")
-
-    # Standard MiniBatchNMF
-    print(f"   Training Standard MiniBatchNMF with {STANDARD_LATENT} components, {STANDARD_EPOCHS} max_iter, batch_size {NMF_BATCH_SIZE}...")
+    # Train Standard MiniBatchNMF
+    print(f"   Training with {STANDARD_LATENT} components, {STANDARD_EPOCHS} max_iter, batch size {NMF_BATCH_SIZE}...")
     model_standard = MiniBatchNMF(
         n_components=STANDARD_LATENT,
         max_iter=STANDARD_EPOCHS,
@@ -160,16 +143,23 @@ def train_mini_batch_NMF(ge_adata):
         random_state=0,
         init='nndsvda'
     )
+
     W_standard = model_standard.fit_transform(data_matrix)
     H_standard = model_standard.components_
 
+    # Store results
     ge_adata.obsm['X_nmf_standard_mb'] = W_standard
-    ge_adata.varm['nmf_standard_mb_components'] = H_standard.T # Store as n_genes x n_components
 
-    print(f"   Standard MiniBatchNMF training complete.")
-    print(f"   Results stored in ge_adata.obsm['X_nmf_standard_mb'] ({W_standard.shape}) and ge_adata.varm['nmf_standard_mb_components'] ({H_standard.T.shape})")
+    H_standard_full = np.full((ge_adata.n_vars, STANDARD_LATENT), np.nan)
+    H_standard_full[hvg_mask, :] = H_standard.T
+    ge_adata.varm["nmf_standard_mb_components"] = H_standard_full
+
+    print(f"   MiniBatchNMF training complete.")
+    print(f"   Stored W → ge_adata.obsm['X_nmf_standard_mb']: {W_standard.shape}")
+    print(f"   Stored H → ge_adata.varm['nmf_standard_mb_components']: {H_standard_full.shape}")
 
     return ge_adata
+
 
 def save_results(ge_adata):
     """Save updated AnnData with NMF results"""
@@ -177,8 +167,11 @@ def save_results(ge_adata):
     
     try:
         # Define output filename
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_NMF_model_{LINEAR_LATENT}_{NMF_BATCH_SIZE}_{today}.h5ad")
+        today = datetime.datetime.now().strftime("%Y-%m-%d")        
+        output_file = os.path.join(
+            OUTPUT_DIR,
+            f"ge_adata_with_NMF_standard_{STANDARD_LATENT}_{NMF_BATCH_SIZE}_{today}.h5ad"
+            )
         
         # Save file
         print(f" Saving updated AnnData to {output_file}...")
@@ -201,7 +194,7 @@ print("========================================\n")
 
 # Load data
 ge_adata = load_data()
-check_data_quality(ge_adata, "log_norm") # Using layer with log_norm values
+check_data_quality(ge_adata, "predicted_log_norm_tms") 
 
 # Train mini batch NMF model
 ge_adata = train_mini_batch_NMF(ge_adata)

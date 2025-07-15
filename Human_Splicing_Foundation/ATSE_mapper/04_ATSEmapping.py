@@ -27,8 +27,8 @@ output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_
 
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 10
-min_num_cells_wjunc = 2
+min_junc_reads = 100 
+min_num_cells_wjunc = 10
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
@@ -83,7 +83,6 @@ output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_groups, filtered_junctions, output_file)
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/04_ATSEmapping.py

@@ -105,8 +105,8 @@ if __name__ == '__main__':
 # INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622/anndatas
 # OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622/anndatas/merged_anndata.h5ad
 
-#sbatch --mem=300G \
-#  -p cpu,bigmem \
+# sbatch --mem=300G \
+#   -p cpu,bigmem \
 #  --output=merge_anndata.out \
 #  --error=merge_anndata.err \
 #  --wrap "python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE"

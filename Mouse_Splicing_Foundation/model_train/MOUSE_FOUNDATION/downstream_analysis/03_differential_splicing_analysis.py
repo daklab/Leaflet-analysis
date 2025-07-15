@@ -492,11 +492,15 @@ def main():
     assert PHI.shape == (len(splice_adata.obs), leaflet_model["K"]), "PHI shape does not match the number of cells and factors."
     K_factors_model = leaflet_model["K"]
     print(f"   ✓ Extracted {K_factors_model} factors from the model")
+
     PSI_learned = leaflet_model["psi_learned"]
     print(f" The shape of PSI_learned is {PSI_learned.shape}")
+
     splice_adata.obsm["X_PHI"] = PHI
+    
     PSI_CELLS = np.dot(PHI, leaflet_model["psi_learned"])
     splice_adata.layers["PSI_CELLS"] = PSI_CELLS
+
     psi_samples = leaflet_model["psi_samples"]
     phi_samples = leaflet_model["phi_samples"]
 
@@ -504,65 +508,17 @@ def main():
     # 3. Run analysis functions 
     ############################
 
+    # Reset junction_id_index column 
+    splice_adata.var["junction_id_index"] = np.arange(splice_adata.n_vars)
+
     print("\n>> Running analysis functions...")
-
-    from joblib import Parallel, delayed
-    import multiprocessing
-
-    # Outer loop: one per cell type
-    cell_types = splice_adata.obs["broad_cell_type"].unique()
-    print(f"The cell types are: {cell_types}")
-    groupby_column = "broad_cell_type"
-    min_effect_size = 0.2
-    junction_indices = splice_adata.var["junction_id_index"].values #.values[0:500]  # subset for test
-
-    #  Self-contained function: pass all required objects
-    def safe_compute(junction_idx, group_1, splice_adata, psi_samples, phi_samples, groupby_column, min_effect_size):
-        import os
-        print(f"PID {os.getpid()} processing junction {junction_idx}")
-
-        try:
-            res = ds.compute_differential_splicing_groups(
-                splice_adata, psi_samples, phi_samples,
-                junction_idx,
-                group_1=group_1, group_2=None,
-                groupby_column=groupby_column,
-                min_effect_size=min_effect_size
-            )
-            res["junction_idx"] = junction_idx
-            return res
-        except Exception as e:
-            print(f"Error processing junction {junction_idx} for {group_1}: {e}")
-            return None
-
-    for group_1 in cell_types:
-        print(f"\n>> Running DS for cell type: {group_1}")
-
-        all_ds_results = Parallel(n_jobs=16, backend="loky")(
-            delayed(safe_compute)(j, group_1, splice_adata, psi_samples, phi_samples, groupby_column, min_effect_size)
-            for j in tqdm(junction_indices, desc=f"Computing DS for {group_1}")
-        )
-
-        all_ds_results = [r for r in all_ds_results if r is not None]
-        df_all_ds = pd.DataFrame(all_ds_results)
-
-        if df_all_ds.empty:
-            print(f"⚠ No results for {group_1}. Skipping.")
-            continue
-
-        df_all_ds_sig = ds.compute_junctions_significance_groups(df_all_ds, min_effect_size=min_effect_size)
-        df_all_ds_sig["junction_id_index"] = df_all_ds_sig["junction_idx"]
-
-        filename = f"differential_splicing_{group_1.replace(' ', '_').replace('/', '_')}.csv"
-        df_all_ds_sig.to_csv(os.path.join(DATA_DIR, filename), index=False)
-        print(f"✓ Saved results for {group_1} to {filename}")
-
     results = ds.analyze_all_factors_psi(psi_samples, top_junctions=splice_adata.var["junction_id_index"].values, min_effect_size=0.2)
     all_results = []
 
     for factor_idx, (effect_size_list, significance_df) in results.items():
         # Append to list
         all_results.append(significance_df)
+        print("\n>> Running analysis functions...")
 
     # Concatenate all results into a single DataFrame
     final_df = pd.concat(all_results, ignore_index=True)
@@ -572,6 +528,7 @@ def main():
     splice_adata.var["junction_id_index"] = splice_adata.var["junction_id_index"].astype("int64")
     # Merge with adata.var using junction_id_index
     final_df = final_df.merge(splice_adata.var, on="junction_id_index")
+    
     # filter just significant junctions
     final_df = final_df[final_df["significant"]]
 
@@ -1347,7 +1304,6 @@ def main():
 
         return feature_importance_results
 
-
     # Execute all visualizations
     plot_factor_junction_counts(final_df, os.path.join(PLOTS_DIR, "differential_splicing_counts_barplot.pdf"))
     plot_factor_junction_annotation_counts(final_df, os.path.join(PLOTS_DIR, "differential_splicing_annotation_counts_barplot.pdf"))
@@ -1362,7 +1318,7 @@ def main():
     ds_factors_dir = plot_individual_factor_junction_analysis(
         final_df=final_df,
         results_dir=PLOTS_DIR,
-        top_n=50  # or however many top junctions you want
+        top_n=100  # or however many top junctions you want
     )
 
     print("\n========================================")

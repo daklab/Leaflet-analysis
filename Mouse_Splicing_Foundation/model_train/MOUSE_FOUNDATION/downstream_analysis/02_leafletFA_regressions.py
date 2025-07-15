@@ -1162,10 +1162,6 @@ def main():
     ############################
     print("\n>> Loading data and model...")
     
-    final_cells = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/filtered_cell_ids.txt"
-    with open(final_cells, "r") as f:
-        final_cells = f.read().splitlines()
-    
     # Load splicing data
     splice_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
     ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
@@ -1176,16 +1172,6 @@ def main():
         ge_adata.obs["cell_id"] = ge_adata.obs["cell_id_clean"]
         ge_adata_nmf.obs["cell_id"] = ge_adata_nmf.obs["cell_id_clean"]
         splice_adata.obs["cell_id"] = splice_adata.obs["cell_id_clean"] 
-
-    assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
-
-    # Only subset by final_cells if in mouse so check if "MOUSE_" is in ATSE_ANNDATA_PATH
-    if "MOUSE_" in ATSE_ANNDATA_PATH:
-        print("   :gear: Subsetting to final cells (outlier removal)...")
-        # Subset both anndatas to only include cells in final_cells
-        splice_adata = splice_adata[splice_adata.obs["cell_id"].isin(final_cells)].copy()
-        ge_adata = ge_adata[ge_adata.obs["cell_id"].isin(final_cells)].copy()
-        ge_adata_nmf = ge_adata_nmf[ge_adata_nmf.obs["cell_id"].isin(final_cells)].copy()
 
     assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values), "Cell IDs in ge_adata and splice_adata do not match or are not in the same order."
 
@@ -1210,6 +1196,9 @@ def main():
     if "gene_name" not in ge_adata.var.columns:
         ge_adata.var["gene_name"] = ge_adata.var_names
 
+    rbps["mouse_gene_name"] = rbps["mouse_gene_name"].str.upper()
+    aging_genes_mouse = [g.upper() for g in aging_genes_mouse]
+
     # if "mouse.id" is in splice_adata.obs rename it to donor_id 
     if "mouse.id" in splice_adata.obs.columns:
         print(f"Renaming mouse.id to donor_id in splice_adata.obs")
@@ -1220,8 +1209,6 @@ def main():
         ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
         ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_mouse)
         rbps = rbps["mouse_gene_name"]
-        print(ge_adata.var["RBP_gene"])
-        print(ge_adata.var["Aging_gene"])
     
     else:
         splice_adata.var = add_gene_symbols_to_var(splice_adata.var)
@@ -1231,19 +1218,16 @@ def main():
         ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["gene_name"])
         ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_human)
         rbps = rbps["gene_name"]
-        print(ge_adata.var["RBP_gene"])
-        print(ge_adata.var["Aging_gene"])
     
+    print(ge_adata.var.RBP_gene.value_counts())
+
     assert np.all(ge_adata.obs_names == ge_adata_nmf.obs_names), "Cell IDs in ge_adata and ge_adata_nmf do not match or are not in the same order."
     assert np.all(ge_adata.var_names == ge_adata_nmf.var_names), "Gene names in ge_adata and ge_adata_nmf do not match or are not in the same order."
     ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
     ge_adata.varm["nmf_standard_mb_components"] = ge_adata_nmf.varm["nmf_standard_mb_components"]
     
     # Check if predicted_log_norm_tms not in ge_adata.layers then ge_layer_name="log_norm"
-    if "predicted_log_norm_tms" not in ge_adata.layers:
-        ge_layer_name = "log_norm"
-    else:
-        ge_layer_name = "predicted_log_norm_tms"
+    ge_layer_name = "log_norm"
     
     model_path = os.path.join(MODEL_OUTPUTS_DIR, f"run_{param_id}", "leafletfa_model.pkl.xz")
     print(f"Using specified model: run_{param_id} with model path {model_path}")

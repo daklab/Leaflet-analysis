@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-scVI Model Training - Mouse Splicing Foundation
+scVI Model Training - Human Splicing Foundation
 
 This script:
 1. Loads gene expression data aligned with splicing data
@@ -31,7 +31,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250625_130447.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250707_121747.h5ad"
 
 # Model configuration
 LINEAR_LATENT = 30
@@ -163,12 +163,12 @@ def train_linear_scvi(ge_adata):
     try:
         # Setup for model
         print("   ⚙️ Setting up AnnData for LinearSCVI...")
-        scvi.model.LinearSCVI.setup_anndata(ge_adata, layer="length_norm", batch_key="dataset")
-        
-        # Initialize and train model
-        print(f"   ⚙️ Initializing LinearSCVI with {LINEAR_LATENT} latent dimensions...")
-        model = scvi.model.LinearSCVI(ge_adata, n_latent=LINEAR_LATENT)
-        
+        hvg_mask = ge_adata.var["highly_variable"].values
+        adata_hvg = ge_adata[:, hvg_mask].copy()
+
+        scvi.model.LinearSCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
+        model = scvi.model.LinearSCVI(adata_hvg, n_latent=LINEAR_LATENT)
+
         print(f"   ⚙️ Training model for {LINEAR_EPOCHS} epochs...")
         model.train(max_epochs=LINEAR_EPOCHS, check_val_every_n_epoch=10)
         
@@ -205,11 +205,11 @@ def train_standard_scvi(ge_adata):
     try:
         # Setup for model
         print("   ⚙️ Setting up AnnData for standard SCVI...")
-        scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm", batch_key="dataset")
-        
-        # Initialize and train model
-        print(f"   ⚙️ Initializing SCVI with {STANDARD_LATENT} latent dimensions...")
-        model = scvi.model.SCVI(ge_adata, n_latent=STANDARD_LATENT)
+        hvg_mask = ge_adata.var["highly_variable"].values
+        adata_hvg = ge_adata[:, hvg_mask].copy()
+
+        scvi.model.SCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
+        model = scvi.model.SCVI(adata_hvg, n_latent=STANDARD_LATENT)
         
         print(f"   ⚙️ Training model for {STANDARD_EPOCHS} epochs...")
         model.train(max_epochs=STANDARD_EPOCHS, check_val_every_n_epoch=10)
@@ -289,7 +289,7 @@ def save_results(ge_adata):
 
 # Main execution
 print("\n========================================")
-print("scVI Model Training - Mouse Splicing Foundation")
+print("scVI Model Training - Human Splicing Foundation")
 print("Running both LinearSCVI and standard SCVI models")
 print("========================================\n")
 

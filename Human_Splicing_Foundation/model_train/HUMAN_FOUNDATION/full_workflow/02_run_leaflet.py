@@ -76,13 +76,14 @@ print(f"All outputs will be saved in {output_dir}")
 # Get today's date and time 
 today = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 print(f"Starting run at: {today}")
+today_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
 # Initialize wandb
 wandb.init(
-    project="LeafletFA-HumanFoundation",  # Your project name
+    project=f"LeafletFA-HumanFoundation-GPU-{today_date}",  # Your project name
     config=params,  # Config parameters for this run
     # add time to run name 
-    name=f"run_{param_id}_{today}",  # Name of this run
+    name=f"run_{param_id}",  # Name of this run
     dir=output_dir,  # Directory to store wandb files
     # Optional: Add a group for easier organization
     group="HumanFoundation",
@@ -101,7 +102,7 @@ print(f"Loading Anndata file: {ATSE_anndata_file}")
 adata = ad.read_h5ad(ATSE_anndata_file)
 print(f"Anndata file loaded successfully.")
 print(adata.obs.head()) 
-print(f"Anndata object contains {adata.n_obs} cells and {adata.n_vars} genes.")
+print(f"Anndata object contains {adata.n_obs} cells and {adata.n_vars} junctions.")
 
 # Log basic dataset info
 wandb.log({

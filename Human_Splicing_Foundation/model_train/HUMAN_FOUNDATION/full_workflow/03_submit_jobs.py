@@ -4,9 +4,9 @@ import datetime
 
 # Define where to save outputs 
 # Should be directory in which model params are saved
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-26"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06"
 leafletfa_script = "/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/full_workflow/02_run_leaflet.py"
-anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_77212_junctions_30_waypoints_20250625_131216.h5ad"
+anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_19391_junctions_30_waypoints_20250706_193817.h5ad"
 
 # Load parameter list from JSON file
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -25,9 +25,9 @@ job_script_template = """#!/bin/bash
 #SBATCH --job-name=H_leaflet_{job_id}
 #SBATCH --output={log_dir}/leaflet_{job_id}.out
 #SBATCH --error={log_dir}/leaflet_{job_id}.err
-#SBATCH --mem=750G
-#SBATCH --partition=bigmem
-#SBATCH --time=2-06:00:00
+#SBATCH --mem=300G
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
 
 # Set Python to run in unbuffered mode to ensure real-time output
 export PYTHONUNBUFFERED=1
@@ -58,5 +58,5 @@ for i, params in enumerate(param_list):
 
 print(f"\nSubmitted {len(param_list)} jobs to Slurm.")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-26
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/full_workflow/03_submit_jobs.py

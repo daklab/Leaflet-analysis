@@ -238,7 +238,7 @@ def plot_correlation_matrix(PHI, PLOTS_DIR, fdr_threshold=0.01):
     """Plot simple correlation matrix with significance stars"""
     
     n_factors = PHI.shape[1]
-    factor_labels = [f"factor{i}" for i in range(n_factors)]
+    factor_labels = [f"Factor {i+1}" for i in range(n_factors)]
     
     # Compute correlation matrix
     corr_matrix = np.corrcoef(PHI.T)
@@ -456,5 +456,197 @@ def plot_factor_distribution_by_variable(adata, factor_idx, variable_col, contin
     
     return plt.gcf()
 
-if __name__ == "__main__":
-    print("This module contains utility functions for LeafletFA analysis.")
+import statsmodels.formula.api as smf
+from statsmodels.stats.anova import anova_lm
+
+def run_variance_explained_analysis(
+    splice_adata, 
+    sample_id,
+    PLOTS_DIR=None, 
+    DATA_DIR=None
+):
+    """
+    Run variance explained analysis for splicing factors using OLS regression and ANOVA.
+    Uses pre-computed RBP NMF features and derives NMF features for aging genes.
+    """
+    print("Running variance explained analysis...")
+        
+    # 1. Prepare analysis DataFrame
+    X_phi = splice_adata.obsm["X_PHI"]
+    factor_names = [f"Factor_{i+1}" for i in range(X_phi.shape[1])]
+    analysis_df = pd.DataFrame(X_phi, index=splice_adata.obs_names, columns=factor_names)
+
+    # --- Basic Covariates from splice_adata.obs ---
+    obs_cols_to_copy = {
+        "broad_cell_type": "cell_type", 
+        "tissue": "tissue",
+        "sex": "sex",
+        sample_id: "dataset",
+        "age_numeric": "age"
+    }
+    
+    for obs_col, df_col in obs_cols_to_copy.items():
+        analysis_df[df_col] = splice_adata.obs[obs_col].values
+
+    # 2. Define Covariate List for Formula (using the approach that worked before)
+    base_formula_covariates = [
+        'C(cell_type)', 
+        'C(tissue)', 
+        'C(sex)', 
+        'C(dataset)', 
+        'age'
+    ]
+    
+    # Add NMF components as regular column names (no backticks)
+    all_covariates = base_formula_covariates
+    
+    # Define interaction term
+    interaction_terms = ['C(cell_type):age', 'C(tissue):age', 'C(sex):age']
+
+    # 3. Run ANOVA for each factor (simplified based on working approach)
+    r2_scores_list = []
+    anova_results_list = []
+    
+    for factor_col in tqdm(factor_names, desc="Analyzing factors for variance explained"):
+        # Build the formula string - without backticks for any variables
+        formula = f"{factor_col} ~ " + " + ".join(all_covariates)
+        if interaction_terms:
+            formula += " + " + " + ".join(interaction_terms)
+            
+        # Print formula
+        print(f"  Formula: {formula}")
+
+        # Fit the model
+        model = smf.ols(formula, data=analysis_df, missing='drop').fit()
+        
+        if model.nobs < (model.df_model + 2) or model.df_resid <= 0:
+            print(f"    Skipping factor {factor_col} due to insufficient observations")
+            continue
+            
+        r2_scores_list.append({'factor': factor_col, 'r2_overall': model.rsquared, 'n_obs': model.nobs})
+        
+        anova_res = anova_lm(model, typ=2)
+        anova_res['factor'] = factor_col
+        anova_results_list.append(anova_res.reset_index())
+
+    r2_df = pd.DataFrame(r2_scores_list)
+    anova_df_combined = pd.concat(anova_results_list)
+    
+    # 4. Process ANOVA results for plotting (proportion of variance)
+    anova_df_combined = anova_df_combined.rename(columns={'index': 'covariate_term'}) # 'index' is the default name from reset_index
+    anova_df_filtered = anova_df_combined[anova_df_combined['covariate_term'] != 'Residual'].copy()
+    anova_df_filtered['sum_sq'] = pd.to_numeric(anova_df_filtered['sum_sq'], errors='coerce')
+    anova_df_filtered.dropna(subset=['sum_sq'], inplace=True)
+
+    anova_pivot = anova_df_filtered.pivot_table(
+            index='factor', columns='covariate_term', values='sum_sq', aggfunc='sum' )
+    anova_pivot = anova_pivot.loc[:, (anova_pivot.sum(axis=0).abs() > 1e-9)] 
+        
+    total_explained_ss_per_factor = anova_pivot.sum(axis=1)
+    anova_prop = anova_pivot.div(total_explained_ss_per_factor.replace(0, np.nan), axis=0) # Replace 0 with NaN to make resulting divisions NaN
+
+    # Map: factor name → label with R²
+    factor_r2_map = {
+        row['factor']: f"{row['factor']} (R²={row['r2_overall']:.2f})"
+        for _, row in r2_df.set_index("factor").loc[anova_prop.index].reset_index().iterrows()
+    }
+    
+    # Ensure plot_data has finite values for masking operations
+    plot_data = anova_prop
+        
+    height = 5
+    width = 4
+
+    # Ensure all data is float for clustermap
+    plot_data = plot_data.astype(float)
+    # Rename index of plot_data (rows of the clustermap)
+    plot_data_annotated = plot_data.rename(index=factor_r2_map)
+    
+    # Round the values for annotation and convert to string
+    annot_data = plot_data_annotated.round(2).astype(str)
+
+    # Compute clustermap
+    cg = sns.clustermap(
+        plot_data_annotated, 
+        cmap="PRGn", 
+        center=0,             # ← center diverging colormap at zero (white)
+        linewidths=0.2,
+        linecolor='black',
+        annot=annot_data,
+        fmt='',  # Values already formatted as strings
+        annot_kws={"size": 4, "color": "grey"},  # Smaller font size with grey color for annotations
+        figsize=(width, height),
+        xticklabels=True,
+        yticklabels=True,
+        vmin=0,
+        vmax=max(1.0, plot_data.max().max()) if plot_data.size > 0 else 1.0
+    )
+
+    # Adjust tick labels
+    plt.setp(cg.ax_heatmap.get_xticklabels(), rotation=45, ha='right', fontsize=8)
+    plt.setp(cg.ax_heatmap.get_yticklabels(), rotation=0, fontsize=8)
+    cg.ax_heatmap.tick_params(axis='x', which='major', labelsize=8, length=3)
+    cg.ax_heatmap.tick_params(axis='y', which='major', labelsize=8, length=3)
+    
+    # Axis labels
+    cg.ax_heatmap.set_xlabel('Covariate Terms', fontsize=11, fontweight='bold')
+    cg.ax_heatmap.set_ylabel('LeafletFA Factors', fontsize=11, fontweight='bold')
+    
+    # Colorbar formatting
+    cbar = cg.ax_heatmap.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=8)
+    cbar.set_label('')
+    
+    # Save
+    plot_path = os.path.join(PLOTS_DIR, "variance_explained_heatmap.pdf")
+    cg.savefig(plot_path, format="pdf", bbox_inches="tight")
+    print(f"  Saved variance explained heatmap to {plot_path}")
+    plt.close(cg.fig)
+
+    # Annotate each factor 
+    # Convert string annotations to float
+    annot_data_float = annot_data.astype(float)
+
+    # Step 2: Get top covariates (1 or 2 depending on max contribution)
+    factor_labels = []
+
+    for factor, row in annot_data_float.iterrows():
+        sorted_covs = row.sort_values(ascending=False)
+        top1_val = sorted_covs.iloc[0]
+
+        if top1_val < 0.75:
+            top_covs = sorted_covs.head(2)
+        else:
+            top_covs = sorted_covs.head(1)
+
+        label = ", ".join([f"{term} ({val:.2f})" for term, val in top_covs.items()])
+
+        factor_labels.append({
+            "factor": factor,
+            "top_covariates": label,
+            "top_covariate_name": top_covs.index[0],
+            "top_covariate_value": float(top_covs.iloc[0])
+        })
+
+    # Step 3: Create DataFrame and extract R²
+    factor_label_df = pd.DataFrame(factor_labels)
+    factor_label_df[["factor_id", "r2_str"]] = factor_label_df["factor"].str.extract(r"(Factor_\d+)\s+\(R²=(.*)\)")
+    factor_label_df["r2"] = factor_label_df["r2_str"].astype(float)
+
+    # Step 4: Compute explained variance
+    factor_label_df["explained_variance_score"] = (
+        factor_label_df["r2"] * factor_label_df["top_covariate_value"]
+    )
+
+    # Step 5: Sort and assign ranked labels directly by top_covariate_name
+    factor_label_df = factor_label_df.sort_values(
+        by=["top_covariate_name", "explained_variance_score"], ascending=[True, False]
+    )
+
+    factor_label_df["category_ranked_label"] = (
+        factor_label_df["top_covariate_name"] + " #" + 
+        (factor_label_df.groupby("top_covariate_name").cumcount() + 1).astype(str)
+    )
+
+    # Save factor_label_df to DATA_DIR
+    return factor_label_df 

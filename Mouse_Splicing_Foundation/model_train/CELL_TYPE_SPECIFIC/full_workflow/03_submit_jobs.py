@@ -3,7 +3,7 @@ import os
 import json
 
 # Define where to save outputs
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel_celltype/2025-06-28"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel_celltype/2025-07-05"
 leafletfa_script = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/CELL_TYPE_SPECIFIC/full_workflow/02_run_leaflet.py"
 
 # Load parameter list from JSON file
@@ -68,5 +68,5 @@ print(f"Submitted {submitted_jobs} jobs to Slurm.")
 print(f"Log files will be saved in: {log_dir}")
 print(f"Results will be saved in: {os.path.join(base_output_dir, 'results')}")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel_celltype/2025-06-28
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel_celltype/2025-07-05
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/CELL_TYPE_SPECIFIC/full_workflow/03_submit_jobs.py

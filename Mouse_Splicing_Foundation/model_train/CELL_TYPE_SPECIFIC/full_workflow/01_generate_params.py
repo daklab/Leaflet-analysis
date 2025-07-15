@@ -20,7 +20,7 @@ print(f"All outputs will be saved in {base_output_dir}")
 input_data_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025"
 
 # Find all cell type directories (look for the most recent per_celltype folder)
-celltype_dirs = glob.glob(os.path.join(input_data_dir, "per_celltype_*"))
+celltype_dirs = glob.glob(os.path.join(input_data_dir, "per_celltype_20250705_002648"))
 if not celltype_dirs:
     raise FileNotFoundError(f"No per_celltype directories found in {input_data_dir}")
 
@@ -44,18 +44,18 @@ for cell_type, file_path in cell_type_files.items():
 
 # Define parameter grid
 param_grid = {
-    "input_conc": [None, 'inf'],  # 'inf' will be converted to torch.tensor(np.inf)
+    "input_conc": [None],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
-    "delta_fixed": [1, None],
-    "K": [30],  # This might need to be adjusted per cell type based on waypoints
+    "delta_fixed": [None, 1],
+    "K": [30],
     "waypoints_use": [True],
     "num_inits": [1],
     "ELBO_num_particles": [5],
     "num_samples": [100],
-    'gamma': [0.0001],
+    'gamma': [0.01, 0.05],
     'min_delta': [100],
-    "lr": [0.9],
-    "num_epochs": [1000],
+    "lr": [0.1, 0.5, 0.8],
+    "num_epochs": [300],
     "patience": [5],
 }
 

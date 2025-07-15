@@ -12,10 +12,13 @@ import seaborn as sns
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
 import re
+import numpy as np
+import pandas as pd
+from scipy.stats import zscore
 
 # Input file path (make sure using most recent aligned anndatas)
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250624_210347.h5ad"
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250624_210347.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250703_224309.h5ad"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250703_224309.h5ad"
 OUTPUT_DIR_PLOTS = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/gene_expression/plots"
 
 # Create output directory if it doesn't exist
@@ -41,12 +44,6 @@ print(f"Gene expression - Number of cells: {ge_adata.n_obs}")
 print(f"Gene expression - Number of genes: {ge_adata.n_vars}")
 print(f"Splicing - Number of cells: {splice_adata.n_obs}")
 print(f"Splicing - Number of junctions: {splice_adata.n_vars}")
-
-# %% [markdown]
-# ### Types of QC to do before saving final splicing and GE anndatas....
-# - Gene expression based QC
-# - Splicing based QC, ensure reasonable number of junctions detected in cells... 
-# - Calculate nuclear vs cytoplasmic score...
 
 # %%
 print("=== ALIGNING CELL IDS ===")
@@ -83,43 +80,33 @@ print("=== CLEANING CELL IDS ===")
 # Confirm that the cell ids are the same
 # Assert that obs_names are the same
 assert np.all(ge_adata.obs_names == splice_adata.obs_names)
-# Assert that the cells are in the same order
 assert np.all(ge_adata.obs["cell_id"].values == splice_adata.obs["cell_id"].values)
 print("✓ Cell order confirmed consistent between datasets")
 
-# %% [markdown]
-# ### Quality-control pipeline  (overview)
-# 
-# 1. **Flag rRNA genes**  
-#    * Parse the comma-separated `transcript_biotypes` column.  
-#    * Mark any entry that contains `rRNA` or `rRNA_pseudogene` → `is_rRNA = True`.
-# 
-# 2. **Per-cell QC metrics** (`scanpy.pp.calculate_qc_metrics`)  
-#    * Input layer: raw counts  
-#    * Extra QC var: `is_rRNA` → adds `total_counts_is_rRNA` and `pct_counts_is_rRNA`.
-# 
-# 3. **Batch-aware outlier detection**  
-#    For each `batch` separately:  
-#    * Compute the **median** and **MAD** (median-absolute-deviation) of  
-#      * library size (`total_counts`)  
-#      * number of detected genes (`n_genes_by_counts`) using raw counts.
-#    * Convert both features to robust z-scores  
-#      \[
-#        z = \frac{x-\text{median}}{\text{MAD}\times1.4826}
-#      \]
-#      (1.4826 rescales MAD to σ for a normal distribution).
-# 
-# 4. **Cell filtering rules**  
-#    * │z│ > 3 for *either* library size *or* genes detected → drop  
-#    * `pct_counts_is_rRNA` ≥ 10 % → drop  
-#    * missing `broad_cell_type` annotation → drop  
-# 
-# 5. **Result**  
-#    After filtering **80,904** cells remain (from initial set of 88,518).
-# 
-# 6. **Feature selection for integration**  
-#    From the `predicted_log_norm_tms` layer, keep the **10 000** most highly variable genes for all downstream analyses.
-# 
+print("=== FILTERING CELL TYPES WITH <50 CELLS ===")
+# Count cells per broad_cell_type
+cell_type_counts = ge_adata.obs['broad_cell_type'].value_counts()
+print(f"Cell type counts before filtering:")
+print(cell_type_counts.sort_values(ascending=False))
+
+# Keep only cell types with at least 50 cells
+valid_cell_types = cell_type_counts[cell_type_counts >= 50].index
+print(f"\nCell types with ≥50 cells: {len(valid_cell_types)}")
+print(f"Cell types being removed: {len(cell_type_counts) - len(valid_cell_types)}")
+
+# Filter both datasets
+cells_before = ge_adata.n_obs
+cell_mask = ge_adata.obs['broad_cell_type'].isin(valid_cell_types)
+ge_adata = ge_adata[cell_mask].copy()
+splice_adata = splice_adata[cell_mask].copy()
+
+print(f"Filtered from {cells_before} to {ge_adata.n_obs} cells")
+print(f"Final cell type counts:")
+print(ge_adata.obs['broad_cell_type'].value_counts().sort_values(ascending=False))
+
+# Verify alignment
+assert np.all(ge_adata.obs_names == splice_adata.obs_names)
+print("✓ Datasets remain aligned after cell type filtering")
 
 # %%
 print("=== STARTING QC METRICS CALCULATION ===")
@@ -185,14 +172,6 @@ print(f"Retained {final_cells} cells (filtered out {initial_cells - final_cells}
 
 # %%
 print(f"Current data dimensions: {ge_adata.shape}")
-
-# %% [markdown]
-# ### Calculate nuclear score using nuclear and cytoplasmic marker genes + ribosomal RNA expression
-
-# %%
-import numpy as np
-import pandas as pd
-from scipy.stats import zscore
 
 NUCLEAR_GENES = ['Malat1','Neat1','Xist','Meg3','Kcnq1ot1',
                  'Pvt1','Gas5','Snhg1','Snhg6']
@@ -306,7 +285,6 @@ plt.savefig(plot_path, dpi=300, bbox_inches='tight')
 print(f"✓ Saved nuclear score plot (predicted_log_norm_tms): {plot_path}")
 plt.close()
 
-
 # %%
 # Second nuclear score plot
 score_col = 'nuclear_ratio_log_norm'   # or nuclear_score_length_norm
@@ -348,10 +326,6 @@ plt.savefig(plot_path, dpi=300, bbox_inches='tight')
 print(f"✓ Saved nuclear score plot (log_norm): {plot_path}")
 plt.close()
 
-
-# %% [markdown]
-# #### Do marker gene analysis as sanity check that regression based adjustment worked...  
-
 # %%
 print("=== LOADING AGING GENES ===")
 # read the aging-gene table you pasted
@@ -360,7 +334,6 @@ df = pd.read_csv("/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOU
 age_pos = df.loc[df.gag_score_coef > 0, "global_aging_genes"].str.upper().tolist()
 # negative genes = coefficient < 0 (down-regulated with age)
 age_neg = df.loc[df.gag_score_coef < 0, "global_aging_genes"].str.upper().tolist()
-
 print(f"Loaded {len(age_pos)} age-positive genes and {len(age_neg)} age-negative genes")
 
 # %%
@@ -450,43 +423,59 @@ plt.savefig(plot_path, dpi=300, bbox_inches='tight')
 print(f"✓ Saved aging score by cell type plot: {plot_path}")
 plt.close()
 
+print("=== STEP 1: Remove lncRNAs from ge_adata ===")
 
-# %%
-print("=== SELECTING HIGHLY VARIABLE GENES ===")
-# ---------- 4   Select 15,000 HVGs (log_norm layer) ----
-initial_genes = ge_adata.n_vars
+# Define lncRNA biotype keywords
+lncrna_keywords = ["lncRNA", "lincRNA"]
+
+# Identify lncRNA genes
+lncrna_mask = ge_adata.var["transcript_biotypes"].str.contains(
+    "|".join(lncrna_keywords), case=False, na=False
+)
+print(f"Removing {lncrna_mask.sum():,} lncRNA genes.")
+ge_adata = ge_adata[:, ~lncrna_mask].copy()
+
+# ----------------------------------------------------------------
+
+print("=== STEP 2: Subset to genes shared with splice_adata ===")
+
+# Compute gene overlap
+splice_genes = set(splice_adata.var["gene_name"])
+ge_genes = set(ge_adata.var["gene_name"])
+common_genes = splice_genes & ge_genes
+
+print(f"Keeping {len(common_genes):,} genes shared between GE and Splicing data.")
+
+# Subset ge_adata to shared genes
+ge_adata = ge_adata[:, ge_adata.var["gene_name"].isin(common_genes)].copy()
+
+# Also subset splice_adata to shared genes 
+splice_adata = splice_adata[:, splice_adata.var["gene_name"].isin(common_genes)].copy()
+
+# ----------------------------------------------------------------
+
+print("=== STEP 3: HVG selection on filtered ge_adata ===")
+
+# Run HVG selection on length-normalized layer
 sc.pp.highly_variable_genes(
     ge_adata,
-    layer='log_norm',
-    n_top_genes=15_000,
+    layer="length_norm",
+    n_top_genes=15000,
+    batch_key="dataset",  # or whatever your batch column is called
+    flavor="seurat_v3",  # or "cell_ranger", depending on your use case
     inplace=True
 )
 
-ge_adata = ge_adata[:, ge_adata.var['highly_variable']].copy()
-final_genes = ge_adata.n_vars
-print(f"Selected {final_genes} highly variable genes from {initial_genes} total genes")
-print(f"Final gene expression data shape: {ge_adata.shape}")
+print(f"✓ Selected {ge_adata.var['highly_variable'].sum():,} HVGs.")
 
-# %%
-print("=== ALIGNING SPLICE DATA TO FILTERED CELLS ===")
-# ensure splice_adata has only the same cells as remain in ge_adata 
-initial_splice_cells = splice_adata.n_obs
+# ----------------------------------------------------------------
+
+print("=== STEP 4: Align cells between ge_adata and splice_adata ===")
+# Realign splice_adata to match filtered ge_adata cells
 splice_adata = splice_adata[ge_adata.obs_names].copy()
-assert np.all(ge_adata.obs_names == splice_adata.obs_names)
-print(f"✓ Splice data aligned to {splice_adata.n_obs} cells (from {initial_splice_cells})")
 
-# %%
-print("=== FILTERING SPLICE DATA TO MATCHING GENES ===")
-# restrict splice_adata to the same genes in ge_adata
-initial_splice_vars = splice_adata.n_vars
-splice_adata = splice_adata[:, splice_adata.var["gene_name"].isin(ge_adata.var["gene_name"])].copy()
+# Now safe to compare
 assert np.all(ge_adata.obs_names == splice_adata.obs_names)
-
-# lastly ensure that ge_adata now contains the same genes as splice_adata
-ge_adata = ge_adata[:, ge_adata.var["gene_name"].isin(splice_adata.var["gene_name"])].copy()
-assert np.all(ge_adata.obs_names == splice_adata.obs_names)
-
-print(f"✓ Splice data filtered to {splice_adata.n_vars} junctions (from {initial_splice_vars})")
 print(f"✓ Gene expression data filtered to {ge_adata.n_vars} genes")
 
 # %%
@@ -518,7 +507,7 @@ from datetime import datetime
 print("=== SAVING FINAL DATASETS ===")
 
 # Set new model date and shared output directory
-new_model_date = "062025"
+new_model_date = "072025"
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 GE_OUTPUT_DIR = f"/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/{new_model_date}"
 os.makedirs(GE_OUTPUT_DIR, exist_ok=True)

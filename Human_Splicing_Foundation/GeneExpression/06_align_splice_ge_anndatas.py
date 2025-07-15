@@ -55,7 +55,7 @@ splice_adata.obs["cell_id_index"] = splice_adata.obs.index
 print(f"The number of cells in the splice dataset is {splice_adata.shape[0]}", flush=True)
 
 # --- ATSEs ---
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
+ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-07-01_03-02-03.txt.gz"
 assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
 
 atses = pd.read_csv(ATSE_file, sep="\t")
@@ -478,4 +478,4 @@ print(f"Saved ge_adata to {ge_adata_file}")
 
 # Submit script like this:
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
-# sbatch --mem=75G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/06_align_splice_ge_anndatas.py"
+# sbatch --mem=100G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/06_align_splice_ge_anndatas.py"

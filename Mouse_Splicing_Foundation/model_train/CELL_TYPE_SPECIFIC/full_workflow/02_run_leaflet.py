@@ -212,6 +212,7 @@ results_df = pd.DataFrame([{
     "median_corr": median_corr,
     "min_corr": min_corr,
     "lr": params["lr"],
+    "gamma": params["gamma"],
     "num_samples": params["num_samples"],
     "ELBO_num_particles": params["ELBO_num_particles"],
     "pruned_K": len(leaflet_model.pi)  # Number of factors retained after pruning

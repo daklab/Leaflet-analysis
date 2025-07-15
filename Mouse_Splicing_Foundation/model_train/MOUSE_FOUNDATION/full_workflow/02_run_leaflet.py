@@ -76,13 +76,14 @@ print(f"All outputs will be saved in {output_dir}")
 # Get today's date and time 
 today = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 print(f"Starting run at: {today}")
+today_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
 # Initialize wandb
 wandb.init(
-    project="LeafletFA-MouseFoundation",  # Your project name
+    project=f"LeafletFA-MouseFoundation_{today_date}",  # Your project name
     config=params,  # Config parameters for this run
     # add time to run name 
-    name=f"run_{param_id}_{today}",  # Name of this run
+    name=f"run_{param_id}",  # Name of this run
     dir=output_dir,  # Directory to store wandb files
     # Optional: Add a group for easier organization
     group="MouseFoundation",

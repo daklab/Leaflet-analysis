@@ -25,7 +25,7 @@ output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_
 min_intron = 50
 max_intron = 500000
 min_junc_reads = 100 
-min_num_cells_wjunc = 5
+min_num_cells_wjunc = 10
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
@@ -86,5 +86,4 @@ atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/ATSE_mapper/04_ATSEmapping.py
-# sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J mouse_foundation_ATSE -p bigmem
 # sbatch --wrap="python $script_path" --mem=300G --time=2-00:00:00 -J mouse_foundation_ATSE -p cpu,bigmem

@@ -13,12 +13,12 @@ import seaborn as sns
 from scipy.stats import entropy
 
 # --- Configuration ---
-#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-05-13/parameter_combinations.csv"
-#DATE_RESULTS_TO_SUMMARIZE = "2025-05-13/2025-06-14" #date model was trained/date models were summarized for plotting 
+#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
+#DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
 #BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-06-11/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-06-11/2025-06-14" #date model was trained/date models were summarized for plotting 
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
 BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
@@ -46,9 +46,11 @@ def main():
         learned_params_path = os.path.join(data_dir, "model_parameters.csv")
         learned_params_df = pd.read_csv(learned_params_path)
 
+        pi = np.load(os.path.join(data_dir, "PI_values.npy"))
+        
         perplexity_df = pd.read_csv(os.path.join(data_dir, "median_cell_perplexity.csv"))
 
-        global_var_r2_df = pd.read_csv(os.path.join(data_dir, "variance_explained_r_squared.csv"))
+        #global_var_r2_df = pd.read_csv(os.path.join(data_dir, "variance_explained_r_squared.csv"))
         aging_r2 = pd.read_csv(os.path.join(data_dir, "age_prediction_results.csv")).iloc[1:].T
         aging_r2.columns = ["r2", "mse"]
         aging_r2["features"] = aging_r2.index
@@ -95,8 +97,8 @@ def main():
         diversity_min = vc_df["variance_diversity"].min()
         diversity_max = vc_df["variance_diversity"].max()
 
-        global_r2_median = global_var_r2_df["r2_overall"].median()
-        global_r2_max = global_var_r2_df["r2_overall"].max()
+        #global_r2_median = global_var_r2_df["r2_overall"].median()
+        #global_r2_max = global_var_r2_df["r2_overall"].max()
 
         sanity_check_df = pd.read_csv(os.path.join(data_dir, "PSI_imputed_vs_observed_correlations_summary.txt"))
         sanity_check_dict = {row.iloc[0].split(":")[0].strip(): float(row.iloc[0].split(":")[1].strip()) for _, row in sanity_check_df.iterrows()}
@@ -110,7 +112,10 @@ def main():
 
         summary_row = {
             "param_id": param_id,
+            "lr": model_params.get("lr", np.nan), 
             "K": model_params.get("K", np.nan),
+            "new_K":len(pi), 
+            "gamma": model_params.get("gamma", np.nan), 
             "range_pi": range_pi,
             "median_pi": median_pi,
             "delta_fixed": model_params.get("delta_fixed", np.nan),  # now this is used as input dir_conc
@@ -121,8 +126,8 @@ def main():
             "likelihood_type": model_params.get("likelihood_type", "unknown"),
             "median_cell_perplexity": perplexity_df["median_cell_perplexity"].values[0],
             "celltype_classification_accuracy": float(cell_type_classification_df["accuracy"].values[0]),
-            "global_r2_median": global_r2_median,
-            "global_r2_max": global_r2_max,
+      #      "global_r2_median": global_r2_median,
+      #      "global_r2_max": global_r2_max,
             "mean_dataset_var": mean_dataset_var,
             "max_dataset_var": max_dataset_var,
             "top3_dataset_var": top3_dataset_var,

@@ -91,7 +91,9 @@ def create_parameter_label(summary_row):
     """Create parameter label from summary data"""
     junc_prior = summary_row.get('junc_specific_prior', 'NA')
     dir_conc = summary_row.get('dir_conc', 'NA')
-    return f"jp_{junc_prior}_dc_{dir_conc}"
+    lr = summary_row.get("lr", "NA")
+    gamma = summary_row.get("gamma", "NA")
+    return f"jp_{junc_prior}_dc_{dir_conc}_lr_{lr}_gamma_{gamma}"
 
 def analyze_single_celltype(results_dir, cell_type):
     """Analyze all runs for a single cell type"""
@@ -229,7 +231,7 @@ def create_umap_for_run(cell_type, run, param_label, results_dir, anndata_path, 
         
         # Add PHI and compute UMAP
         adata.obsm['X_phi'] = phi
-        sc.pp.neighbors(adata, use_rep='X_phi', n_neighbors=15)
+        sc.pp.neighbors(adata, use_rep='X_phi', n_neighbors=8)
         sc.tl.umap(adata, min_dist=0.5, spread=1.0)
         
         # Clustering
@@ -243,10 +245,10 @@ def create_umap_for_run(cell_type, run, param_label, results_dir, anndata_path, 
         
         # Calculate plot grid
         n_plots = len(metadata_cols)
-        n_cols = min(3, n_plots)
+        n_cols = 2
         n_rows = (n_plots + n_cols - 1) // n_cols
         
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 6*n_rows))
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 15))
         if n_plots == 1:
             axes = [axes]
         elif n_rows == 1 and n_cols > 1:
@@ -313,11 +315,11 @@ def main():
     
     print("LeafletFA Analysis Script")
     print("=" * 50)
-    model_date = "2025-06-28"
+    model_date = "2025-07-05"
     
     # Paths
     results_dir = f"/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel_celltype/{model_date}/results"
-    anndatas_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/per_celltype_20250625_215409"
+    anndatas_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/per_celltype_20250705_002648"
     output_dir = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/CELL_TYPE_SPECIFIC/results/{model_date}_simplified_{cell_type}"
     
     os.makedirs(output_dir, exist_ok=True)
