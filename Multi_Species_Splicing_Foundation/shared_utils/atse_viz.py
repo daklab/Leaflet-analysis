@@ -18,9 +18,10 @@ if module_path not in sys.path:
 
 # Import visualization functions
 try:
-    from leafletfa_utils.atsemapper.main import run_atsemapper
-    from leafletfa_utils.atseviz.main import *
+    from leafletfa_utils.atsemapper.main import run_atsemapper # type: ignore
+    from leafletfa_utils.atseviz.main import * # type: ignore
     print("Visualization imports successful!")
+    
 except ImportError as e:
     print(f"Warning: Could not import visualization functions: {e}")
     print("Visualization functions will not be available")

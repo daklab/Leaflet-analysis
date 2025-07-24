@@ -17,8 +17,8 @@ import pandas as pd
 from scipy.stats import zscore
 
 # Input file path (make sure using most recent aligned anndatas)
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_gene_expression_data_20250703_224309.h5ad"
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250703_224309.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250722_235313.h5ad"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250722_235313.h5ad"
 OUTPUT_DIR_PLOTS = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/gene_expression/plots"
 
 # Create output directory if it doesn't exist
@@ -57,16 +57,6 @@ print("✓ Cell IDs successfully aligned between datasets")
 # %%
 # Add the directory containing the shared utils to the Python path
 sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
-
-# Import utility functions
-from gene_processing import (
-    extract_gene_transcript_info, 
-    normalize_by_gene_length,
-    safe_stringify_obs,
-    preprocess_anndata,
-    normalize_and_log_transform
-)
-
 # Input file paths
 GTF_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
 DB_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/GENCODE_vM19"
@@ -461,8 +451,8 @@ sc.pp.highly_variable_genes(
     ge_adata,
     layer="length_norm",
     n_top_genes=15000,
-    batch_key="dataset",  # or whatever your batch column is called
-    flavor="seurat_v3",  # or "cell_ranger", depending on your use case
+    batch_key="dataset", 
+    flavor="seurat_v3", 
     inplace=True
 )
 
@@ -477,6 +467,106 @@ splice_adata = splice_adata[ge_adata.obs_names].copy()
 # Now safe to compare
 assert np.all(ge_adata.obs_names == splice_adata.obs_names)
 print(f"✓ Gene expression data filtered to {ge_adata.n_vars} genes")
+
+
+# ----------------------------------------------------------------
+
+print("=== STEP 5: Summarize number of junction reads per cell ===")
+
+print("=== CALCULATING JUNCTION QC METRICS ===")
+
+# Confirm required column exists
+assert "annotation_status" in splice_adata.var.columns, "Missing 'annotation_status' column in splice_adata.var"
+assert "both" in splice_adata.var["annotation_status"].unique(), "'both' not found in annotation_status"
+
+# Define annotation mask
+is_annotated = splice_adata.var["annotation_status"] == "both"
+is_unannotated = ~is_annotated
+
+# Read count matrix
+X_counts = splice_adata.layers["cell_by_junction_matrix"]
+
+# Total read counts
+splice_adata.obs["total_junction_reads"] = np.asarray(X_counts.sum(axis=1)).flatten()
+splice_adata.obs["annotated_junction_reads"] = np.asarray(X_counts[:, is_annotated].sum(axis=1)).flatten()
+splice_adata.obs["unannotated_junction_reads"] = np.asarray(X_counts[:, is_unannotated].sum(axis=1)).flatten()
+
+# Detected junctions (binary matrix)
+X_detected = X_counts > 0
+splice_adata.obs["n_detected_annotated_junctions"] = np.asarray(X_detected[:, is_annotated].sum(axis=1)).flatten()
+splice_adata.obs["n_detected_unannotated_junctions"] = np.asarray(X_detected[:, is_unannotated].sum(axis=1)).flatten()
+
+# Apply filters based on 1st and 99th percentiles
+def quantile_filter(series, lower=0.01, upper=0.99):
+    q_low, q_high = series.quantile([lower, upper])
+    return (series >= q_low) & (series <= q_high)
+
+read_filter = quantile_filter(splice_adata.obs["total_junction_reads"])
+junctions_filter = quantile_filter(splice_adata.obs["n_detected_annotated_junctions"])
+
+# Additional filter: cell must have at least 100 total junction reads
+min_reads_filter = splice_adata.obs["total_junction_reads"] > 10
+min_junctions_filter = splice_adata.obs["n_detected_annotated_junctions"] >= 2
+
+# Final per-cell QC: within percentile range AND above minimum count
+splice_qc_filter = read_filter & junctions_filter & min_reads_filter & min_junctions_filter
+
+# Filter both datasets
+cells_before_filter = splice_adata.shape[0]
+ge_adata = ge_adata[splice_qc_filter].copy()
+splice_adata = splice_adata[splice_qc_filter].copy()
+cells_after_filter = splice_adata.shape[0]  
+print(f"Cells lost due to junction-based per-cell QC filters: {cells_before_filter - cells_after_filter}")
+
+print("✓ Applied junction-based per-cell QC filters")
+
+# ----------------------------------------------------------------
+
+print("=== APPLYING JUNCTION-LEVEL QC FILTERS ===")
+
+# Recompute total read counts per junction
+junction_counts = np.asarray(splice_adata.layers["cell_by_junction_matrix"].sum(axis=0)).flatten()
+junction_detected = np.asarray((splice_adata.layers["cell_by_junction_matrix"] > 0).sum(axis=0)).flatten()
+
+# Annotate junctions based on detection across cells
+detected_in_cells = np.asarray((X_counts > 0).sum(axis=0)).flatten()
+splice_adata.var["n_cells_detected"] = detected_in_cells
+splice_adata.var["confidence"] = np.where(
+    splice_adata.var["n_cells_detected"] <= 100, "low", "high"
+)
+print(f"✓ Annotated {np.sum(splice_adata.var['confidence'] == 'low')} junctions as 'low confidence'")
+
+
+# ----------------------------------------------------------------
+print("=== RE-SUBSETTING AND VALIDATING FINAL ALIGNMENT ===")
+
+# Step 1: Realign cells — ensure identical cell set in both
+common_cells = ge_adata.obs_names.intersection(splice_adata.obs_names)
+print(f"Re-aligning to {len(common_cells)} common cells")
+ge_adata = ge_adata[common_cells].copy()
+splice_adata = splice_adata[common_cells].copy()
+assert np.all(ge_adata.obs_names == splice_adata.obs_names)
+
+# Step 2: Filter again for cell types with ≥50 cells
+cell_type_counts = ge_adata.obs['broad_cell_type'].value_counts()
+valid_cell_types = cell_type_counts[cell_type_counts >= 50].index
+print(f"Cell types retained after final filtering: {len(valid_cell_types)}")
+
+cell_mask = ge_adata.obs['broad_cell_type'].isin(valid_cell_types)
+ge_adata = ge_adata[cell_mask].copy()
+splice_adata = splice_adata[cell_mask].copy()
+print(f"✓ Retained {ge_adata.n_obs} cells after final broad cell type filtering")
+
+# Step 3: Recheck shared genes
+shared_genes = set(ge_adata.var["gene_name"]).intersection(set(splice_adata.var["gene_name"]))
+print(f"✓ {len(shared_genes)} genes shared between gene expression and splicing data")
+
+ge_adata = ge_adata[:, ge_adata.var["gene_name"].isin(shared_genes)].copy()
+splice_adata = splice_adata[:, splice_adata.var["gene_name"].isin(shared_genes)].copy()
+
+# Final sanity checks
+assert np.all(ge_adata.obs_names == splice_adata.obs_names)
+print("✓ Final alignment confirmed between gene expression and splicing datasets")
 
 # %%
 print("=== FINAL DATA SUMMARY ===")
@@ -548,4 +638,4 @@ print("✓ All tasks completed successfully!")
 
 # to submit
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/processed_data
-# sbatch --job-name=prep_ge_data --mem=500G --partition cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/06_check_outliers.py"
+# sbatch --job-name=outlier_check --mem=600G --partition cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/06_check_outliers.py"

@@ -5,7 +5,7 @@ Align Splicing and Gene Expression Data - Mouse Splicing Foundation
 This script:
 1. Loads splicing data from ATSEmapper and gene expression data
 2. Aligns cells between the two datasets
-3. Standardizes cell type annotations
+3. Standardizes cell type annotations using two-level mapping system
 4. Ensures both datasets have cells in the same order
 5. Adds derived information like library size and centered PSI values (via raw data)
 6. Saves aligned datasets for downstream analysis
@@ -31,7 +31,7 @@ import BetaDirichletFactor.waypoints as wayp  # for getting centered sparse junc
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/062025"
+OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
@@ -42,238 +42,648 @@ ATSE_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SP
 
 METADATA_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/metadata_mouse_metadata_combined.csv"
 
-# Cell type mapping functions
+# Cell type mapping functions with two levels of granularity
 def create_cell_type_mappings():
     """Create dictionaries for mapping cell types to standardized categories"""
     
-    # Cell type mappings organized by category
-    cell_type_mappings = {
-        # Broad cell type map (previously separate)
-        "Micro-PVM": "MICROGLIA",
-        "Astro": "GLIAL CELL",
-        "Oligo": "GLIAL CELL",
-        "VLMC": "VLMCs",
-        "Endo": "ENDOTHELIAL CELL",
-        "SMC-Peri": "PERICYTE",
+    # LEVEL 1: SPECIFIC MAPPINGS (for detailed analysis)
+    specific_cell_type_mappings = {
+        # Brain-specific cell types (keep detailed for neuroscience)
+        "Micro-PVM": "Microglia",
+        "Astro": "Astrocyte",
+        "Oligo": "Oligodendrocyte", 
+        "VLMC": "Vascular stromal cell",
+        "Endo": "Endothelial cell",
+        "SMC-Peri": "Pericyte",
         
         # Car3+ special case
-        "Car3": "Other non-neuronal (Car3+)",
+        "Car3": "Car3+ cell",
         
-        # Inhibitory neuron markers
-        "Sst": "Inhibitory Neurons",
-        "Pvalb": "Inhibitory Neurons",
-        "Vip": "Inhibitory Neurons",
-        "Lamp5": "Inhibitory Neurons",
-        "Sncg": "Inhibitory Neurons",
-        "Meis2": "Inhibitory Neurons",
-        "Ntng1": "Inhibitory Neurons",
-        "Pax6": "Inhibitory Neurons",
-        "CR": "Inhibitory Neurons",
+        # Inhibitory neuron subtypes (detailed)
+        "Sst": "Sst+ inhibitory neuron",
+        "Pvalb": "Pvalb+ inhibitory neuron", 
+        "Vip": "Vip+ inhibitory neuron",
+        "Lamp5": "Lamp5+ inhibitory neuron",
+        "Sncg": "Sncg+ inhibitory neuron",
+        "Meis2": "Meis2+ inhibitory neuron",
+        "Ntng1": "Ntng1+ inhibitory neuron",
+        "Pax6": "Pax6+ inhibitory neuron",
+        "CR": "Cr+ inhibitory neuron",
         
-        # Excitatory neuron layer markers
-        "L2": "Excitatory Neurons",
-        "L3": "Excitatory Neurons",
-        "L4": "Excitatory Neurons",
-        "L5": "Excitatory Neurons",
-        "L6": "Excitatory Neurons",
+        # Excitatory neuron layer subtypes (detailed)
+        "L2": "Layer 2 excitatory neuron",
+        "L3": "Layer 3 excitatory neuron", 
+        "L4": "Layer 4 excitatory neuron",
+        "L5": "Layer 5 excitatory neuron",
+        "L6": "Layer 6 excitatory neuron",
         
-        # Excitatory subregions (hippocampal/entorhinal)
-        "CA1": "Excitatory Neurons",
-        "CA2": "Excitatory Neurons",
-        "CA3": "Excitatory Neurons",
-        "DG": "Excitatory Neurons",
-        "SUB": "Excitatory Neurons",
-        "ProS": "Excitatory Neurons",
-        "HATA": "Excitatory Neurons",
-        "Mossy": "Excitatory Neurons",
-        "PPP": "Excitatory Neurons",
-        "RHP": "Excitatory Neurons",
+        # Excitatory subregions (hippocampal/entorhinal) - detailed
+        "CA1": "Ca1 pyramidal neuron",
+        "CA2": "Ca2 pyramidal neuron",
+        "CA3": "Ca3 pyramidal neuron", 
+        "DG": "Dentate gyrus neuron",
+        "SUB": "Subicular neuron",
+        "ProS": "Prosubicular neuron",
+        "HATA": "Hata neuron",
+        "Mossy": "Mossy cell",
+        "PPP": "Ppp neuron",
+        "RHP": "Rhp neuron",
         
-        # Excitatory region markers
-        "IT": "Excitatory Neurons",
-        "CT": "Excitatory Neurons",
-        "PT": "Excitatory Neurons",
-        "NP": "Excitatory Neurons",
-        "CTX": "Excitatory Neurons",
-        "ENT": "Excitatory Neurons",
-        "PAR": "Excitatory Neurons",
-        "POST": "Excitatory Neurons",
-        "RSP": "Excitatory Neurons",
-        "HPF": "Excitatory Neurons",
+        # Excitatory projection types (detailed)
+        "IT": "Intratelencephalic neuron",
+        "CT": "Corticothalamic neuron", 
+        "PT": "Pyramidal tract neuron",
+        "NP": "Near-projecting neuron",
+        "CTX": "Cortical excitatory neuron",
+        "ENT": "Entorhinal neuron",
+        "PAR": "Parietal neuron", 
+        "POST": "Posterior neuron",
+        "RSP": "Retrosplenial neuron",
+        "HPF": "Hippocampal formation neuron",
+
+        # Immune cells (specific subtypes)
+        'T cell': 'T cell',
+        'CD4-positive, alpha-beta T cell': 'Cd4+ T cell',
+        'CD8-positive, alpha-beta T cell': 'Cd8+ T cell', 
+        'regulatory T cell': 'Regulatory T cell',
+        'mature NK T cell': 'Nk T cell',
+        'mature alpha-beta T cell': 'Mature T cell',
         
-        # Basal cells
-        'basal cell of epidermis': 'BASAL CELL',
-        'basal cell': 'BASAL CELL',
+        'B cell': 'B cell',
+        'immature B cell': 'Immature B cell',
+        'naive B cell': 'Naive B cell', 
+        'precursor B cell': 'Precursor B cell',
+        'early pro-B cell': 'Early pro-B cell',
+        'late pro-B cell': 'Late pro-B cell',
+        'plasma cell': 'Plasma cell',
 
-        # Endothelial cells
-        'endothelial cell': 'ENDOTHELIAL CELL',
-        'endothelial cell of coronary artery': 'ENDOTHELIAL CELL',
-        'endothelial cell of hepatic sinusoid': 'ENDOTHELIAL CELL',
-        'aortic endothelial cell': 'ENDOTHELIAL CELL',
-        'vein endothelial cell': 'ENDOTHELIAL CELL',
-        'endothelial cell of lymphatic vessel': 'ENDOTHELIAL CELL',
+        'macrophage': 'Macrophage',
+        'Kupffer cell': 'Kupffer cell',
+        'lung macrophage': 'Lung macrophage', 
 
-        # T cells
-        'T cell': 'T CELL',
-        'CD4-positive, alpha-beta T cell': 'T CELL',
-        'CD8-positive, alpha-beta T cell': 'T CELL',
-        'regulatory T cell': 'T CELL',
-        'mature NK T cell': 'T CELL',
-        'mature alpha-beta T cell': 'T CELL',
+        'monocyte': 'Monocyte',
+        'classical monocyte': 'Classical monocyte',
+        'non-classical monocyte': 'Non-classical monocyte',
+        'intermediate monocyte': 'Intermediate monocyte',
+
+        'dendritic cell': 'Dendritic cell',
+        'plasmacytoid dendritic cell': 'Plasmacytoid dendritic cell',
+        'myeloid dendritic cell': 'Myeloid dendritic cell',
+
+        'neutrophil': 'Neutrophil',
+        'granulocyte': 'Granulocyte',
+        'basophil': 'Basophil',
+        'granulocyte monocyte progenitor cell': 'Granulocyte progenitor',
+
+        'NK cell': 'Nk cell',
+        'thymocyte': 'Thymocyte',
+        'DN4 thymocyte': 'Dn4 thymocyte',
+
+        'microglial cell': 'Microglia',
+
+        # Muscle cell subtypes
+        'smooth muscle cell': 'Smooth muscle cell',
+        'bronchial smooth muscle cell': 'Bronchial smooth muscle cell',
+        'smooth muscle cell of the pulmonary artery': 'Pulmonary artery smooth muscle',
+        'smooth muscle cell of trachea': 'Tracheal smooth muscle',
+        'ventricular myocyte': 'Ventricular cardiomyocyte',
+        'atrial myocyte': 'Atrial cardiomyocyte', 
+        'skeletal muscle satellite cell': 'Skeletal muscle satellite cell',
+
+        # Epithelial cell subtypes
+        'basal cell of epidermis': 'Epidermal basal cell',
+        'basal cell': 'Basal cell',
+        'keratinocyte': 'Keratinocyte',
+        'bulge keratinocyte': 'Bulge keratinocyte',
         
-        # B cells
-        'B cell': 'B CELL',
-        'immature B cell': 'B CELL',
-        'naive B cell': 'B CELL',
-        'precursor B cell': 'B CELL',
-        'early pro-B cell': 'B CELL',
-        'late pro-B cell': 'B CELL',
-        'plasma cell': 'B CELL',
+        'epithelial cell': 'Epithelial cell',
+        'epidermal cell': 'Epidermal cell',
+        'epithelial cell of large intestine': 'Large intestine epithelial cell',
+        'enterocyte of epithelium of large intestine': 'Large intestine enterocyte',
+        'epithelial cell of proximal tubule': 'Proximal tubule epithelial cell',
+        'epithelial cell of thymus': 'Thymic epithelial cell',
+        'bladder urothelial cell': 'Bladder urothelial cell',
+        'basal epithelial cell of tracheobronchial tree': 'Tracheobronchial basal epithelial cell',
+        'luminal epithelial cell of mammary gland': 'Mammary luminal epithelial cell',
 
-        # Fibroblasts
-        'fibroblast': 'FIBROBLAST',
-        'fibroblast of cardiac tissue': 'FIBROBLAST',
-        'fibroblast of lung': 'FIBROBLAST',
-        'pulmonary interstitial fibroblast': 'FIBROBLAST',
-        'kidney interstitial fibroblast': 'FIBROBLAST',
-        'fibrocyte': 'FIBROBLAST',
+        # Vascular cells
+        'endothelial cell': 'Endothelial cell',
+        'endothelial cell of coronary artery': 'Coronary endothelial cell',
+        'endothelial cell of hepatic sinusoid': 'Hepatic sinusoid endothelial cell',
+        'aortic endothelial cell': 'Aortic endothelial cell',
+        'vein endothelial cell': 'Venous endothelial cell',
+        'endothelial cell of lymphatic vessel': 'Lymphatic endothelial cell',
+        'pericyte cell': 'Pericyte',
+        'brain pericyte': 'Brain pericyte',
 
-        # Macrophages 
-        'macrophage': 'MACROPHAGE',
-        'Kupffer cell': 'MACROPHAGE',  # macrophages in the liver
-        'lung macrophage': 'MACROPHAGE',
+        # Fibroblasts and stromal cells
+        'fibroblast': 'Fibroblast',
+        'fibroblast of cardiac tissue': 'Cardiac fibroblast',
+        'fibroblast of lung': 'Lung fibroblast',
+        'pulmonary interstitial fibroblast': 'Pulmonary interstitial fibroblast',
+        'kidney interstitial fibroblast': 'Kidney interstitial fibroblast',
+        'fibrocyte': 'Fibrocyte',
+        'stromal cell': 'Stromal cell',
+        'adventitial cell': 'Adventitial cell',
 
-        # Monocytes
-        'monocyte': 'MONOCYTE',
-        'classical monocyte': 'MONOCYTE',
-        'non-classical monocyte': 'MONOCYTE',
-        'intermediate monocyte': 'MONOCYTE',
+        # Specialized organ cells
+        'pancreatic A cell': 'Pancreatic alpha cell',
+        'pancreatic B cell': 'Pancreatic beta cell', 
+        'pancreatic D cell': 'Pancreatic delta cell',
+        'pancreatic acinar cell': 'Pancreatic acinar cell',
+        'pancreatic PP cell': 'Pancreatic pp cell',
+        'pancreatic ductal cell': 'Pancreatic ductal cell',
+        'pancreatic stellate cell': 'Pancreatic stellate cell',
 
-        # General Immune Cells
-        'granulocyte': 'GRANULOCYTE',
-        'basophil': 'GRANULOCYTE', 
-        'granulocyte monocyte progenitor cell': 'GRANULOCYTE',
-
-        'leukocyte': 'GENERAL IMMUNE CELL',
-        'professional antigen presenting cell': 'ANTIGEN PRESENTING CELL',
-
-        'lymphocyte': 'LYMPHOID IMMUNE CELL',
-        'NK cell': 'LYMPHOID IMMUNE CELL',
-
-        'myeloid cell': 'MYELOID IMMUNE CELL',
-        'myeloid leukocyte': 'MYELOID IMMUNE CELL',
-        'granulocytopoietic cell': 'MYELOID IMMUNE CELL',
-        'promonocyte': 'MYELOID IMMUNE CELL',
-
-        'thymocyte': 'THYMOCYTE',
-        'DN4 thymocyte': 'THYMOCYTE',
-
-        # Neutrophils
-        'neutrophil': 'NEUTROPHIL',
-
-        # Dendritic Cells
-        'dendritic cell': 'DENDRITIC CELL',
-        'plasmacytoid dendritic cell': 'DENDRITIC CELL',
-        'myeloid dendritic cell': 'DENDRITIC CELL',
-
-        # Microglia (Brain Immune Cells)
-        'microglial cell': 'MICROGLIA',
+        'hepatocyte': 'Hepatocyte',
         
-        # Pancreatic cells
-        'pancreatic A cell': 'PANCREATIC CELL',
-        'pancreatic B cell': 'PANCREATIC CELL',
-        'pancreatic D cell': 'PANCREATIC CELL',
-        'pancreatic acinar cell': 'PANCREATIC CELL',
-        'pancreatic PP cell': 'PANCREATIC CELL',
-        'pancreatic ductal cell': 'PANCREATIC CELL',
-        'pancreatic stellate cell': 'PANCREATIC CELL',
-        
-        # Smooth muscle cells
-        'smooth muscle cell': 'SMOOTH MUSCLE CELL',
-        'bronchial smooth muscle cell': 'SMOOTH MUSCLE CELL',
-        'smooth muscle cell of the pulmonary artery': 'SMOOTH MUSCLE CELL',
-        'smooth muscle cell of trachea': 'SMOOTH MUSCLE CELL',
-        
-        # Epithelial cells
-        'epithelial cell': 'EPITHELIAL CELL',
-        'epidermal cell': 'EPITHELIAL CELL',
-        'epithelial cell of large intestine': 'EPITHELIAL CELL',
-        'enterocyte of epithelium of large intestine': 'EPITHELIAL CELL',
-        'epithelial cell of proximal tubule': 'EPITHELIAL CELL',
-        'epithelial cell of thymus': 'EPITHELIAL CELL',
-        'bladder urothelial cell': 'EPITHELIAL CELL',
-        'basal epithelial cell of tracheobronchial tree': 'EPITHELIAL CELL',
-        'luminal epithelial cell of mammary gland': 'EPITHELIAL CELL',
+        'kidney collecting duct principal cell': 'Kidney collecting duct principal cell',
+        'kidney collecting duct epithelial cell': 'Kidney collecting duct epithelial cell',
+        'mesangial cell': 'Mesangial cell',
+        'kidney loop of Henle ascending limb epithelial cell': 'Kidney loop of henle epithelial cell',
 
-        # Neurons
-        'neuron': 'NEURON',
-        'medium spiny neuron': 'NEURON',
-        'interneuron': 'NEURON',
-        'neuronal stem cell': 'NEURON',
+        'type I pneumocyte': 'Type I pneumocyte',
+        'type II pneumocyte': 'Type II pneumocyte',
+        'club cell of bronchiole': 'Club cell',
+        'lung neuroendocrine cell': 'Lung neuroendocrine cell',
+        'ciliated columnar cell of tracheobronchial tree': 'Ciliated tracheobronchial cell',
+        'respiratory basal cell': 'Respiratory basal cell',
 
-        # Glial Cells (excluding microglia)
-        'oligodendrocyte': 'GLIAL CELL',
-        'oligodendrocyte precursor cell': 'GLIAL CELL',
-        'astrocyte': 'GLIAL CELL',
-        'Bergmann glial cell': 'GLIAL CELL',
-        'ependymal cell': 'GLIAL CELL',
+        'Brush cell of epithelium proper of large intestine': 'Large intestine brush cell',
+        'large intestine goblet cell': 'Large intestine goblet cell',
+        'enteroendocrine cell': 'Enteroendocrine cell',
 
         # Stem cells
-        'mesenchymal stem cell': 'STEM CELL',
-        'mesenchymal stem cell of adipose': 'STEM CELL',
-        'hematopoietic stem cell': 'STEM CELL',
-        'neuronal stem cell': 'STEM CELL',
-        'intestinal crypt stem cell': 'STEM CELL',
-        'keratinocyte stem cell': 'STEM CELL',
-        'lymphoid progenitor cell': 'STEM CELL',
-        'proerythroblast': 'STEM CELL',
-        'megakaryocyte-erythroid progenitor cell': 'STEM CELL',
+        'mesenchymal stem cell': 'Mesenchymal stem cell',
+        'mesenchymal stem cell of adipose': 'Adipose mesenchymal stem cell',
+        'hematopoietic stem cell': 'Hematopoietic stem cell',
+        'neuronal stem cell': 'Neuronal stem cell',
+        'intestinal crypt stem cell': 'Intestinal crypt stem cell',
+        'keratinocyte stem cell': 'Keratinocyte stem cell',
+        'lymphoid progenitor cell': 'Lymphoid progenitor cell',
+        'proerythroblast': 'Proerythroblast',
+        'megakaryocyte-erythroid progenitor cell': 'Megakaryocyte-erythroid progenitor',
 
-        # Other specialized cells
-        'ventricular myocyte': 'CARDIAC MUSCLE CELL',
-        'atrial myocyte': 'CARDIAC MUSCLE CELL',
-        'skeletal muscle satellite cell': 'SKELETAL MUSCLE CELL',
-        'kidney collecting duct principal cell': 'KIDNEY CELL',
-        'kidney collecting duct epithelial cell': 'KIDNEY CELL',
-        'kidney interstitial fibroblast': 'FIBROBLAST',
-        'mesangial cell': 'KIDNEY CELL',
-        'type I pneumocyte': 'LUNG CELL',
-        'type II pneumocyte': 'LUNG CELL',
-        'club cell of bronchiole': 'LUNG CELL',
-        'lung neuroendocrine cell': 'LUNG CELL',
-        'ciliated columnar cell of tracheobronchial tree': 'LUNG CELL',
-        'respiratory basal cell': 'LUNG CELL',
-        'Brush cell of epithelium proper of large intestine': 'INTESTINAL CELL',
-        'large intestine goblet cell': 'INTESTINAL CELL',
-        'enteroendocrine cell': 'INTESTINAL CELL',
-        'stromal cell': 'STROMAL CELL',
-        'pericyte cell': 'PERICYTE',
-        'brain pericyte': 'PERICYTE',
-        'adventitial cell': 'STROMAL CELL',
-        'keratinocyte': 'KERATINOCYTE',
-        'bulge keratinocyte': 'KERATINOCYTE',
-        'hepatocyte': 'HEPATOCYTE',
-        'bladder cell': 'BLADDER CELL',
-        'secretory cell': 'SECRETORY CELL',
-        'endocardial cell': 'ENDOCARDIAL CELL',
-        'valve cell': 'VALVE CELL',
-        'chondrocyte': 'STROMAL CELL',
-        'fenestrated cell': 'FENESTRATED CELL',
-        'neuroepithelial cell': 'NEUROEPITHELIAL CELL',
-        'kidney loop of Henle ascending limb epithelial cell': 'KIDNEY CELL',
-        'mucus secreting cell': 'SECRETORY CELL'
+        # Other glial cells
+        'oligodendrocyte': 'Oligodendrocyte',
+        'oligodendrocyte precursor cell': 'Oligodendrocyte precursor cell',
+        'astrocyte': 'Astrocyte',
+        'Bergmann glial cell': 'Bergmann glial cell',
+        'ependymal cell': 'Ependymal cell',
+
+        # General neurons
+        'neuron': 'Neuron',
+        'medium spiny neuron': 'Medium spiny neuron',
+        'interneuron': 'Interneuron',
+
+        # Other specialized cells  
+        'bladder cell': 'Bladder cell',
+        'secretory cell': 'Secretory cell',
+        'mucus secreting cell': 'Mucus secreting cell',
+        'endocardial cell': 'Endocardial cell',
+        'valve cell': 'Valve cell',
+        'chondrocyte': 'Chondrocyte',
+        'fenestrated cell': 'Fenestrated cell',
+        'neuroepithelial cell': 'Neuroepithelial cell',
+
+        # Catch-all categories
+        'leukocyte': 'Leukocyte',
+        'professional antigen presenting cell': 'Antigen presenting cell',
+        'lymphocyte': 'Lymphocyte',
+        'myeloid cell': 'Myeloid cell',
+        'myeloid leukocyte': 'Myeloid leukocyte',
+        'granulocytopoietic cell': 'Granulocytopoietic cell',
+        'promonocyte': 'Promonocyte',
+    }
+    
+    # LEVEL 2: BROAD MAPPINGS (for high-level analysis)
+    broad_cell_type_mappings = {
+        # All neurons -> Neuron
+        "Sst+ inhibitory neuron": "Neuron",
+        "Pvalb+ inhibitory neuron": "Neuron", 
+        "Vip+ inhibitory neuron": "Neuron",
+        "Lamp5+ inhibitory neuron": "Neuron",
+        "Sncg+ inhibitory neuron": "Neuron",
+        "Meis2+ inhibitory neuron": "Neuron",
+        "Ntng1+ inhibitory neuron": "Neuron",
+        "Pax6+ inhibitory neuron": "Neuron",
+        "Cr+ inhibitory neuron": "Neuron",
+        
+        "Layer 2 excitatory neuron": "Neuron",
+        "Layer 3 excitatory neuron": "Neuron",
+        "Layer 4 excitatory neuron": "Neuron", 
+        "Layer 5 excitatory neuron": "Neuron",
+        "Layer 6 excitatory neuron": "Neuron",
+        
+        "Ca1 pyramidal neuron": "Neuron",
+        "Ca2 pyramidal neuron": "Neuron",
+        "Ca3 pyramidal neuron": "Neuron",
+        "Dentate gyrus neuron": "Neuron",
+        "Subicular neuron": "Neuron",
+        "Prosubicular neuron": "Neuron",
+        "Hata neuron": "Neuron",
+        "Mossy cell": "Neuron",
+        "Ppp neuron": "Neuron",
+        "Rhp neuron": "Neuron",
+        
+        "Intratelencephalic neuron": "Neuron",
+        "Corticothalamic neuron": "Neuron",
+        "Pyramidal tract neuron": "Neuron", 
+        "Near-projecting neuron": "Neuron",
+        "Cortical excitatory neuron": "Neuron",
+        "Entorhinal neuron": "Neuron",
+        "Parietal neuron": "Neuron",
+        "Posterior neuron": "Neuron",
+        "Retrosplenial neuron": "Neuron",
+        "Hippocampal formation neuron": "Neuron",
+        
+        "Neuron": "Neuron",
+        "Medium spiny neuron": "Neuron",
+        "Interneuron": "Neuron",
+
+        # All glial cells -> Glial cell  
+        "Microglia": "Glial cell",
+        "Astrocyte": "Glial cell",
+        "Oligodendrocyte": "Glial cell",
+        "Oligodendrocyte precursor cell": "Glial cell",
+        "Bergmann glial cell": "Glial cell",
+        "Ependymal cell": "Glial cell",
+
+        # All immune cells -> Immune cell
+        "T cell": "Immune cell",
+        "Cd4+ T cell": "Immune cell", 
+        "Cd8+ T cell": "Immune cell",
+        "Regulatory T cell": "Immune cell",
+        "Nk T cell": "Immune cell",
+        "Mature T cell": "Immune cell",
+        
+        "B cell": "Immune cell",
+        "Immature B cell": "Immune cell",
+        "Naive B cell": "Immune cell",
+        "Precursor B cell": "Immune cell", 
+        "Early pro-B cell": "Immune cell",
+        "Late pro-B cell": "Immune cell",
+        "Plasma cell": "Immune cell",
+
+        "Macrophage": "Immune cell",
+        "Kupffer cell": "Immune cell",
+        "Lung macrophage": "Immune cell",
+
+        "Monocyte": "Immune cell",
+        "Classical monocyte": "Immune cell", 
+        "Non-classical monocyte": "Immune cell",
+        "Intermediate monocyte": "Immune cell",
+
+        "Dendritic cell": "Immune cell",
+        "Plasmacytoid dendritic cell": "Immune cell",
+        "Myeloid dendritic cell": "Immune cell",
+
+        "Neutrophil": "Immune cell",
+        "Granulocyte": "Immune cell",
+        "Basophil": "Immune cell",
+        "Granulocyte progenitor": "Immune cell",
+
+        "Nk cell": "Immune cell",
+        "Thymocyte": "Immune cell",
+        "Dn4 thymocyte": "Immune cell",
+        
+        "Leukocyte": "Immune cell",
+        "Antigen presenting cell": "Immune cell",
+        "Lymphocyte": "Immune cell",
+        "Myeloid cell": "Immune cell",
+        "Myeloid leukocyte": "Immune cell", 
+        "Granulocytopoietic cell": "Immune cell",
+        "Promonocyte": "Immune cell",
+
+        # All muscle cells -> Muscle cell
+        "Smooth muscle cell": "Muscle cell",
+        "Bronchial smooth muscle cell": "Muscle cell",
+        "Pulmonary artery smooth muscle": "Muscle cell",
+        "Tracheal smooth muscle": "Muscle cell", 
+        "Ventricular cardiomyocyte": "Muscle cell",
+        "Atrial cardiomyocyte": "Muscle cell",
+        "Skeletal muscle satellite cell": "Muscle cell",
+
+        # All epithelial -> Epithelial cell
+        "Epidermal basal cell": "Epithelial cell",
+        "Basal cell": "Epithelial cell",
+        "Keratinocyte": "Epithelial cell",
+        "Bulge keratinocyte": "Epithelial cell",
+        
+        "Epithelial cell": "Epithelial cell",
+        "Epidermal cell": "Epithelial cell",
+        "Large intestine epithelial cell": "Epithelial cell",
+        "Large intestine enterocyte": "Epithelial cell",
+        "Proximal tubule epithelial cell": "Epithelial cell",
+        "Thymic epithelial cell": "Epithelial cell",
+        "Bladder urothelial cell": "Epithelial cell",
+        "Tracheobronchial basal epithelial cell": "Epithelial cell",
+        "Mammary luminal epithelial cell": "Epithelial cell",
+        "Kidney collecting duct epithelial cell": "Epithelial cell",
+        "Kidney loop of henle epithelial cell": "Epithelial cell",
+
+        # All vascular -> Vascular cell
+        "Endothelial cell": "Vascular cell",
+        "Coronary endothelial cell": "Vascular cell",
+        "Hepatic sinusoid endothelial cell": "Vascular cell",
+        "Aortic endothelial cell": "Vascular cell",
+        "Venous endothelial cell": "Vascular cell", 
+        "Lymphatic endothelial cell": "Vascular cell",
+        "Pericyte": "Vascular cell",
+        "Brain pericyte": "Vascular cell",
+
+        # All stromal -> Stromal cell
+        "Vascular stromal cell": "Stromal cell",
+        "Fibroblast": "Stromal cell",
+        "Cardiac fibroblast": "Stromal cell", 
+        "Lung fibroblast": "Stromal cell",
+        "Pulmonary interstitial fibroblast": "Stromal cell",
+        "Kidney interstitial fibroblast": "Stromal cell",
+        "Fibrocyte": "Stromal cell",
+        "Stromal cell": "Stromal cell",
+        "Adventitial cell": "Stromal cell",
+        "Chondrocyte": "Stromal cell",
+
+        # All stem cells -> Stem cell
+        "Mesenchymal stem cell": "Stem cell",
+        "Adipose mesenchymal stem cell": "Stem cell",
+        "Hematopoietic stem cell": "Stem cell",
+        "Neuronal stem cell": "Stem cell",
+        "Intestinal crypt stem cell": "Stem cell",
+        "Keratinocyte stem cell": "Stem cell",
+        "Lymphoid progenitor cell": "Stem cell",
+        "Proerythroblast": "Stem cell",
+        "Megakaryocyte-erythroid progenitor": "Stem cell",
+
+        # Organ-specific cells (keep some specialization)
+        "Pancreatic alpha cell": "Pancreatic cell",
+        "Pancreatic beta cell": "Pancreatic cell",
+        "Pancreatic delta cell": "Pancreatic cell",
+        "Pancreatic acinar cell": "Pancreatic cell",
+        "Pancreatic pp cell": "Pancreatic cell",
+        "Pancreatic ductal cell": "Pancreatic cell",
+        "Pancreatic stellate cell": "Pancreatic cell",
+
+        "Hepatocyte": "Liver cell",
+        
+        "Kidney collecting duct principal cell": "Kidney cell",
+        "Mesangial cell": "Kidney cell",
+
+        "Type I pneumocyte": "Lung cell",
+        "Type II pneumocyte": "Lung cell",
+        "Club cell": "Lung cell",
+        "Lung neuroendocrine cell": "Lung cell", 
+        "Ciliated tracheobronchial cell": "Lung cell",
+        "Respiratory basal cell": "Lung cell",
+
+        "Large intestine brush cell": "Intestinal cell",
+        "Large intestine goblet cell": "Intestinal cell",
+        "Enteroendocrine cell": "Intestinal cell",
+
+        # Special/other cells
+        "Car3+ cell": "Other cell",
+        "Bladder cell": "Bladder cell",
+        "Secretory cell": "Secretory cell",
+        "Mucus secreting cell": "Secretory cell",
+        "Endocardial cell": "Cardiac cell",
+        "Valve cell": "Cardiac cell", 
+        "Fenestrated cell": "Fenestrated cell",
+        "Neuroepithelial cell": "Neuroepithelial cell",
+    }
+
+    # LEVEL 2.5: MEDIUM MAPPINGS (intermediate granularity)
+    medium_cell_type_mappings = {
+        # Neurons - keep major functional distinctions
+        "Sst+ inhibitory neuron": "Inhibitory neuron",
+        "Pvalb+ inhibitory neuron": "Inhibitory neuron", 
+        "Vip+ inhibitory neuron": "Inhibitory neuron",
+        "Lamp5+ inhibitory neuron": "Inhibitory neuron",
+        "Sncg+ inhibitory neuron": "Inhibitory neuron",
+        "Meis2+ inhibitory neuron": "Inhibitory neuron",
+        "Ntng1+ inhibitory neuron": "Inhibitory neuron",
+        "Pax6+ inhibitory neuron": "Inhibitory neuron",
+        "Cr+ inhibitory neuron": "Inhibitory neuron",
+
+        "Layer 2 excitatory neuron": "Cortical excitatory neuron",
+        "Layer 3 excitatory neuron": "Cortical excitatory neuron",
+        "Layer 4 excitatory neuron": "Cortical excitatory neuron", 
+        "Layer 5 excitatory neuron": "Cortical excitatory neuron",
+        "Layer 6 excitatory neuron": "Cortical excitatory neuron",
+
+        "Ca1 pyramidal neuron": "Hippocampal neuron",
+        "Ca2 pyramidal neuron": "Hippocampal neuron",
+        "Ca3 pyramidal neuron": "Hippocampal neuron",
+        "Dentate gyrus neuron": "Hippocampal neuron",
+        "Subicular neuron": "Hippocampal neuron",
+        "Prosubicular neuron": "Hippocampal neuron",
+        "Hata neuron": "Hippocampal neuron",
+        "Mossy cell": "Hippocampal neuron",
+        "Ppp neuron": "Hippocampal neuron",
+        "Rhp neuron": "Hippocampal neuron",
+
+        "Intratelencephalic neuron": "Projection neuron",
+        "Corticothalamic neuron": "Projection neuron",
+        "Pyramidal tract neuron": "Projection neuron", 
+        "Near-projecting neuron": "Projection neuron",
+        "Cortical excitatory neuron": "Cortical excitatory neuron",
+        "Entorhinal neuron": "Cortical excitatory neuron",
+        "Parietal neuron": "Cortical excitatory neuron",
+        "Posterior neuron": "Cortical excitatory neuron",
+        "Retrosplenial neuron": "Cortical excitatory neuron",
+        "Hippocampal formation neuron": "Hippocampal neuron",
+
+        "Neuron": "Other neuron",
+        "Medium spiny neuron": "Other neuron",
+        "Interneuron": "Other neuron",
+
+        # Glial cells - keep major subtypes
+        "Microglia": "Microglia",
+        "Astrocyte": "Astrocyte",
+        "Oligodendrocyte": "Oligodendrocyte",
+        "Oligodendrocyte precursor cell": "Oligodendrocyte precursor",
+        "Bergmann glial cell": "Other glial cell",
+        "Ependymal cell": "Other glial cell",
+
+        # Immune cells - group by major lineages
+        "T cell": "T cell",
+        "Cd4+ T cell": "T cell", 
+        "Cd8+ T cell": "T cell",
+        "Regulatory T cell": "T cell",
+        "Nk T cell": "T cell",
+        "Mature T cell": "T cell",
+
+        "B cell": "B cell",
+        "Immature B cell": "B cell",
+        "Naive B cell": "B cell",
+        "Precursor B cell": "B cell", 
+        "Early pro-B cell": "B cell",
+        "Late pro-B cell": "B cell",
+        "Plasma cell": "B cell",
+
+        "Macrophage": "Macrophage",
+        "Kupffer cell": "Macrophage",
+        "Lung macrophage": "Macrophage",
+
+        "Monocyte": "Monocyte",
+        "Classical monocyte": "Monocyte", 
+        "Non-classical monocyte": "Monocyte",
+        "Intermediate monocyte": "Monocyte",
+
+        "Dendritic cell": "Dendritic cell",
+        "Plasmacytoid dendritic cell": "Dendritic cell",
+        "Myeloid dendritic cell": "Dendritic cell",
+
+        "Neutrophil": "Granulocyte",
+        "Granulocyte": "Granulocyte",
+        "Basophil": "Granulocyte",
+        "Granulocyte progenitor": "Immune progenitor",
+
+        "Nk cell": "Nk cell",
+        "Thymocyte": "T cell precursor",
+        "Dn4 thymocyte": "T cell precursor",
+
+        "Leukocyte": "Other immune cell",
+        "Antigen presenting cell": "Other immune cell",
+        "Lymphocyte": "Other immune cell",
+        "Myeloid cell": "Other immune cell",
+        "Myeloid leukocyte": "Other immune cell", 
+        "Granulocytopoietic cell": "Immune progenitor",
+        "Promonocyte": "Immune progenitor",
+
+        # Muscle cells - distinguish cardiac, smooth, skeletal
+        "Smooth muscle cell": "Smooth muscle cell",
+        "Bronchial smooth muscle cell": "Smooth muscle cell",
+        "Pulmonary artery smooth muscle": "Smooth muscle cell",
+        "Tracheal smooth muscle": "Smooth muscle cell", 
+        "Ventricular cardiomyocyte": "Cardiomyocyte",
+        "Atrial cardiomyocyte": "Cardiomyocyte",
+        "Skeletal muscle satellite cell": "Skeletal muscle cell",
+
+        # Epithelial cells - group by location/function
+        "Epidermal basal cell": "Skin epithelial cell",
+        "Basal cell": "Basal epithelial cell",
+        "Keratinocyte": "Skin epithelial cell",
+        "Bulge keratinocyte": "Skin epithelial cell",
+
+        "Epithelial cell": "Other epithelial cell",
+        "Epidermal cell": "Skin epithelial cell",
+        "Large intestine epithelial cell": "Intestinal epithelial cell",
+        "Large intestine enterocyte": "Intestinal epithelial cell",
+        "Proximal tubule epithelial cell": "Kidney epithelial cell",
+        "Thymic epithelial cell": "Other epithelial cell",
+        "Bladder urothelial cell": "Urogenital epithelial cell",
+        "Tracheobronchial basal epithelial cell": "Respiratory epithelial cell",
+        "Mammary luminal epithelial cell": "Mammary epithelial cell",
+        "Kidney collecting duct epithelial cell": "Kidney epithelial cell",
+        "Kidney loop of henle epithelial cell": "Kidney epithelial cell",
+
+        # Vascular cells - distinguish endothelial vs pericytes
+        "Endothelial cell": "Endothelial cell",
+        "Coronary endothelial cell": "Endothelial cell",
+        "Hepatic sinusoid endothelial cell": "Endothelial cell",
+        "Aortic endothelial cell": "Endothelial cell",
+        "Venous endothelial cell": "Endothelial cell", 
+        "Lymphatic endothelial cell": "Lymphatic endothelial cell",
+        "Pericyte": "Pericyte",
+        "Brain pericyte": "Pericyte",
+
+        # Stromal cells - distinguish fibroblasts vs other stromal
+        "Vascular stromal cell": "Stromal cell",
+        "Fibroblast": "Fibroblast",
+        "Cardiac fibroblast": "Fibroblast", 
+        "Lung fibroblast": "Fibroblast",
+        "Pulmonary interstitial fibroblast": "Fibroblast",
+        "Kidney interstitial fibroblast": "Fibroblast",
+        "Fibrocyte": "Fibroblast",
+        "Stromal cell": "Stromal cell",
+        "Adventitial cell": "Stromal cell",
+        "Chondrocyte": "Chondrocyte",
+
+        # Stem cells - distinguish by lineage
+        "Mesenchymal stem cell": "Mesenchymal stem cell",
+        "Adipose mesenchymal stem cell": "Mesenchymal stem cell",
+        "Hematopoietic stem cell": "Hematopoietic stem cell",
+        "Neuronal stem cell": "Neural stem cell",
+        "Intestinal crypt stem cell": "Epithelial stem cell",
+        "Keratinocyte stem cell": "Epithelial stem cell",
+        "Lymphoid progenitor cell": "Hematopoietic progenitor",
+        "Proerythroblast": "Hematopoietic progenitor",
+        "Megakaryocyte-erythroid progenitor": "Hematopoietic progenitor",
+
+        # Organ-specific cells - keep organ distinction
+        "Pancreatic alpha cell": "Pancreatic endocrine cell",
+        "Pancreatic beta cell": "Pancreatic endocrine cell",
+        "Pancreatic delta cell": "Pancreatic endocrine cell",
+        "Pancreatic acinar cell": "Pancreatic exocrine cell",
+        "Pancreatic pp cell": "Pancreatic endocrine cell",
+        "Pancreatic ductal cell": "Pancreatic ductal cell",
+        "Pancreatic stellate cell": "Pancreatic stellate cell",
+
+        "Hepatocyte": "Hepatocyte",
+
+        "Kidney collecting duct principal cell": "Kidney tubular cell",
+        "Mesangial cell": "Kidney glomerular cell",
+
+        "Type I pneumocyte": "Alveolar epithelial cell",
+        "Type II pneumocyte": "Alveolar epithelial cell",
+        "Club cell": "Airway epithelial cell",
+        "Lung neuroendocrine cell": "Lung neuroendocrine cell", 
+        "Ciliated tracheobronchial cell": "Airway epithelial cell",
+        "Respiratory basal cell": "Airway epithelial cell",
+
+        "Large intestine brush cell": "Specialized intestinal cell",
+        "Large intestine goblet cell": "Specialized intestinal cell",
+        "Enteroendocrine cell": "Enteroendocrine cell",
+
+        # Special/other cells
+        "Car3+ cell": "Car3+ cell",
+        "Bladder cell": "Bladder cell",
+        "Secretory cell": "Secretory cell",
+        "Mucus secreting cell": "Secretory cell",
+        "Endocardial cell": "Cardiac stromal cell",
+        "Valve cell": "Cardiac stromal cell", 
+        "Fenestrated cell": "Specialized endothelial cell",
+        "Neuroepithelial cell": "Neuroepithelial cell",
+
     }
 
     # Subtissue corrections
     subtissue_corrections = {
-        'T cells': 'T-cells',
-        'ENDOMUCIN': 'Endomucin',
-        'forelimb and hindlimb': 'ForelimbandHindlimb',
-        'Liver non-hepato/SCs_st': 'Liver non-hepato/SCs',
-        'Skin Anagen': 'Anagen'
-    }
+            'T cells': 'T-cells',
+            'ENDOMUCIN': 'Endomucin',
+            'forelimb and hindlimb': 'ForelimbandHindlimb',
+            'Liver non-hepato/SCs_st': 'Liver non-hepato/SCs',
+            'Skin Anagen': 'Anagen'
+        }
+
+    return specific_cell_type_mappings, medium_cell_type_mappings, broad_cell_type_mappings, subtissue_corrections
+
+def apply_cell_type_mapping(cell_types, mapping_level="specific"):
+    """
+    Apply cell type mapping to a list of cell types
     
-    return cell_type_mappings, subtissue_corrections
+    Parameters:
+    cell_types: list of cell type strings
+    mapping_level: "specific" or "broad"
+    
+    Returns:
+    list of mapped cell types
+    """
+    specific_mappings, medium_mappings, broad_mappings, _ = create_cell_type_mappings()
+    
+    if mapping_level == "specific":
+        return [specific_mappings.get(cell_type, cell_type) for cell_type in cell_types]
+    elif mapping_level == "medium":
+        # First apply specific mapping, then medium mapping
+        specific_mapped = [specific_mappings.get(cell_type, cell_type) for cell_type in cell_types]
+        return [medium_mappings.get(cell_type, cell_type) for cell_type in specific_mapped]
+    elif mapping_level == "broad":
+        # First apply specific, then medium, then broad mapping
+        specific_mapped = [specific_mappings.get(cell_type, cell_type) for cell_type in cell_types]
+        medium_mapped = [medium_mappings.get(cell_type, cell_type) for cell_type in specific_mapped]
+        return [broad_mappings.get(cell_type, cell_type) for cell_type in medium_mapped]
+    else:
+        raise ValueError("mapping_level must be 'specific', 'medium', or 'broad'")
 
 def map_cell_type(cell_label, mappings):
     """
@@ -292,31 +702,35 @@ def map_cell_type(cell_label, mappings):
         
     # Handle special cases with Car3+
     if "Car3" in cell_label:
-        return "Other non-neuronal (Car3+)"
+        return "Car3+ cell"
     
     # Check for inhibitory neuron markers
     inhibitory_markers = ["Sst", "Pvalb", "Vip", "Lamp5", "Sncg", "Meis2", "Ntng1", "Pax6", "CR"]
     if any(marker in cell_label for marker in inhibitory_markers):
-        return "Inhibitory Neurons"
+        # Return specific subtype if found in mappings
+        for marker in inhibitory_markers:
+            if marker in cell_label and marker in mappings:
+                return mappings[marker]
+        return "Inhibitory neuron"  # fallback
     
     # Check for excitatory neuron markers
     layer_markers = ["L2", "L3", "L4", "L5", "L6"]
     excitatory_regions = ["CA1", "CA2", "CA3", "DG", "SUB", "ProS", "HATA", "Mossy", "PPP", "RHP"]
     other_excitatory = ["IT", "CT", "PT", "NP", "CTX", "ENT", "PAR", "POST", "RSP", "HPF"]
     
-    if (any(marker in cell_label for marker in layer_markers) or
-        any(marker in cell_label for marker in excitatory_regions) or
-        any(marker in cell_label for marker in other_excitatory)):
-        return "Excitatory Neurons"
+    all_excitatory_markers = layer_markers + excitatory_regions + other_excitatory
+    for marker in all_excitatory_markers:
+        if marker in cell_label and marker in mappings:
+            return mappings[marker]
     
     # Check for broad cell type markers
     broad_markers = {
-        "Micro-PVM": "MICROGLIA",
-        "Astro": "GLIAL CELL",
-        "Oligo": "GLIAL CELL",
-        "VLMC": "VLMCs",
-        "Endo": "ENDOTHELIAL CELL",
-        "SMC-Peri": "PERICYTE"
+        "Micro-PVM": "Microglia",
+        "Astro": "Astrocyte",
+        "Oligo": "Oligodendrocyte",
+        "VLMC": "Vascular stromal cell",
+        "Endo": "Endothelial cell",
+        "SMC-Peri": "Pericyte"
     }
     
     for marker, cell_type in broad_markers.items():
@@ -327,8 +741,8 @@ def map_cell_type(cell_label, mappings):
     if cell_label in mappings:
         return mappings[cell_label]
     
-    # Default: return the original label
-    return cell_label
+    # Default: return the original label with proper capitalization
+    return cell_label.capitalize() if isinstance(cell_label, str) else "Unknown"
 
 def load_datasets():
     """Load splicing, gene expression and metadata datasets"""
@@ -362,7 +776,7 @@ def load_datasets():
         return splice_adata, ge_adata, atses, metadata
         
     except Exception as e:
-        print(f"   ❌ Error loading datasets: {str(e)}")
+        print(f"   Error loading datasets: {str(e)}")
         traceback.print_exc()
         sys.exit(1)
 
@@ -437,7 +851,7 @@ def standardize_cell_types(splice_adata, ge_adata):
     print("\n>> Standardizing cell type annotations...")
     
     # Get cell type mappings
-    cell_type_mappings, _ = create_cell_type_mappings()
+    specific_mappings, medium_mappings, broad_mappings, _ = create_cell_type_mappings()
 
     # Print some sample data before standardization
     print("Before standardization:")
@@ -446,27 +860,45 @@ def standardize_cell_types(splice_adata, ge_adata):
     print("Gene expression data sample:", flush=True)
     print(ge_adata.obs[["cell_id", "cell_ontology_class"]].head(), flush=True)
         
-    # Apply cell type mappings to both datasets
-    splice_adata.obs["broad_cell_type"] = splice_adata.obs["cell_ontology_class"].apply(
-        lambda x: map_cell_type(x, cell_type_mappings)
+    # Apply cell type mappings to both datasets - SPECIFIC LEVEL
+    splice_adata.obs["specific_cell_type"] = splice_adata.obs["cell_ontology_class"].apply(
+        lambda x: map_cell_type(x, specific_mappings)
     )
-    ge_adata.obs["broad_cell_type"] = ge_adata.obs["cell_ontology_class"].apply(
-        lambda x: map_cell_type(x, cell_type_mappings)
+    ge_adata.obs["specific_cell_type"] = ge_adata.obs["cell_ontology_class"].apply(
+        lambda x: map_cell_type(x, specific_mappings)
     )
     
+    # Apply BROAD LEVEL mappings
+    splice_adata.obs["broad_cell_type"] = splice_adata.obs["specific_cell_type"].apply(
+        lambda x: broad_mappings.get(x, x)
+    )
+    ge_adata.obs["broad_cell_type"] = ge_adata.obs["specific_cell_type"].apply(
+        lambda x: broad_mappings.get(x, x)
+    )
+    
+    # Apply MEDIUM LEVEL mappings
+    splice_adata.obs["medium_cell_type"] = splice_adata.obs["specific_cell_type"].apply(
+        lambda x: medium_mappings.get(x, x)
+    )
+    ge_adata.obs["medium_cell_type"] = ge_adata.obs["specific_cell_type"].apply(
+        lambda x: medium_mappings.get(x, x)
+    )
+
     # Print samples after standardization to verify
     print("\nAfter standardization:")
     print("Splicing data with standardized cell types:", flush=True)
-    print(splice_adata.obs[["cell_id", "cell_ontology_class", "broad_cell_type"]].head(), flush=True)
+    print(splice_adata.obs[["cell_id", "cell_ontology_class", "specific_cell_type", "broad_cell_type"]].head(), flush=True)
     print("Gene expression data with standardized cell types:", flush=True)
-    print(ge_adata.obs[["cell_id", "cell_ontology_class", "broad_cell_type"]].head(), flush=True)
+    print(ge_adata.obs[["cell_id", "cell_ontology_class", "specific_cell_type", "broad_cell_type"]].head(), flush=True)
 
-    print(f"   ✓ Top splicing cell types: {dict(splice_adata.obs['broad_cell_type'].value_counts().head(5))}")
-    print(f"   ✓ Top gene expression cell types: {dict(ge_adata.obs['broad_cell_type'].value_counts().head(5))}")
+    print(f"   ✓ Top specific splicing cell types: {dict(splice_adata.obs['specific_cell_type'].value_counts().head(5))}")
+    print(f"   ✓ Top broad splicing cell types: {dict(splice_adata.obs['broad_cell_type'].value_counts().head(5))}")
+    print(f"   ✓ Top specific gene expression cell types: {dict(ge_adata.obs['specific_cell_type'].value_counts().head(5))}")
+    print(f"   ✓ Top broad gene expression cell types: {dict(ge_adata.obs['broad_cell_type'].value_counts().head(5))}")
     
     # Update tissue labels based on cell types (moved from process_splicing_data)
     splice_adata.obs.loc[splice_adata.obs["dataset"] == "AB", "tissue"] = "Brain_Non-Myeloid"
-    is_ab_microglia = (splice_adata.obs["dataset"] == "AB") & (splice_adata.obs["broad_cell_type"] == "microglial cell")
+    is_ab_microglia = (splice_adata.obs["dataset"] == "AB") & (splice_adata.obs["broad_cell_type"] == "Glial cell")
     splice_adata.obs.loc[is_ab_microglia, "tissue"] = "Brain_Myeloid"
     
     # Add sequencing technology information
@@ -546,11 +978,21 @@ def align_datasets(splice_adata, ge_adata):
     ge_adata_view.obs['cell_id_index'] = np.arange(len(ge_adata_view))
     splice_adata_view.obs['cell_id_index'] = np.arange(len(splice_adata_view))
     
-    # Add library size information (via length normalized counts) to gene expression data
-    print("   ⚙️ Computing library size information...")
-    library_size = np.asarray(ge_adata_view.layers["length_norm"].sum(axis=1)).flatten()
-    ge_adata_view.obs["library_size"] = library_size  # 1D column 
-    ge_adata_view.obsm["X_library_size"] = library_size[:, np.newaxis]  # 2D array
+    # Add library size information for GENE EXPRESSION data
+    print("   ⚙️ Computing gene expression library size information...")
+    ge_library_size = np.asarray(ge_adata_view.layers["length_norm"].sum(axis=1)).flatten()
+    # Convert to integer (library size should be count data)
+    ge_library_size = ge_library_size.astype(int)
+    ge_adata_view.obs["library_size"] = ge_library_size  # 1D column 
+    ge_adata_view.obsm["X_library_size"] = ge_library_size[:, np.newaxis]  # 2D array
+    
+    # Add library size information for SPLICING data (sum of junction reads)
+    print("   ⚙️ Computing splicing library size information...")
+    splice_library_size = np.asarray(splice_adata_view.layers["cell_by_junction_matrix"].sum(axis=1)).flatten()
+    # Convert to integer (library size should be count data)
+    splice_library_size = splice_library_size.astype(int)
+    splice_adata_view.obs["library_size"] = splice_library_size  # 1D column
+    splice_adata_view.obsm["X_library_size"] = splice_library_size[:, np.newaxis]  # 2D array
     
     # Verify alignment of cells
     print("   ⚙️ Verifying cell alignment...")
@@ -562,33 +1004,6 @@ def align_datasets(splice_adata, ge_adata):
         sys.exit(1)
     
     return splice_adata_view, ge_adata_view
-
-def compute_centered_psi(splice_adata):
-    """Compute centered PSI values from junction-level splicing data"""
-    print("\n>> Computing centered PSI values...")
-    
-    try:
-        # Extract the junction and cluster count matrices
-        print("   ⚙️ Extracting count matrices...")
-        junction_counts = splice_adata.layers["cell_by_junction_matrix"].tocoo()
-        cluster_counts = splice_adata.layers["cell_by_cluster_matrix"].tocoo()
-        
-        # Compute centered PSI values using the existing function
-        print("   ⚙️ Computing centered PSI values...")
-        psi = wayp.calculate_centered_psi(junction_counts, cluster_counts)
-        
-        # Convert to CSR format and store in the AnnData object
-        print("   ⚙️ Storing centered PSI values...")
-        splice_adata.layers["junc_ratio"] = csr_matrix(psi)
-        
-        print(f"   ✓ Successfully computed centered PSI values")
-        
-        return splice_adata
-        
-    except Exception as e:
-        print(f"   ❌ Error computing centered PSI values: {str(e)}")
-        traceback.print_exc()
-        return splice_adata
 
 def save_aligned_data(splice_adata, ge_adata):
     """Save aligned datasets to disk"""
@@ -617,13 +1032,15 @@ def save_aligned_data(splice_adata, ge_adata):
             f.write(f"## Splicing Dataset\n")
             f.write(f"Number of cells: {splice_adata.n_obs}\n")
             f.write(f"Number of junctions: {splice_adata.n_vars}\n")
-            f.write(f"Cell type distribution: {dict(splice_adata.obs['broad_cell_type'].value_counts())}\n")
+            f.write(f"Specific cell type distribution: {dict(splice_adata.obs['specific_cell_type'].value_counts())}\n")
+            f.write(f"Broad cell type distribution: {dict(splice_adata.obs['broad_cell_type'].value_counts())}\n")
             f.write(f"Dataset distribution: {dict(splice_adata.obs['dataset'].value_counts())}\n\n")
             
             f.write(f"## Gene Expression Dataset\n")
             f.write(f"Number of cells: {ge_adata.n_obs}\n")
             f.write(f"Number of genes: {ge_adata.n_vars}\n")
-            f.write(f"Cell type distribution: {dict(ge_adata.obs['broad_cell_type'].value_counts())}\n")
+            f.write(f"Specific cell type distribution: {dict(ge_adata.obs['specific_cell_type'].value_counts())}\n")
+            f.write(f"Broad cell type distribution: {dict(ge_adata.obs['broad_cell_type'].value_counts())}\n")
             f.write(f"Dataset distribution: {dict(ge_adata.obs['dataset'].value_counts())}\n")
         
         print(f"   ✓ Saved dataset summary to {summary_file}")
@@ -653,10 +1070,16 @@ def main():
     
     # Align datasets
     splice_adata, ge_adata = align_datasets(splice_adata, ge_adata)
-    
-    # Compute centered PSI values
-    splice_adata = compute_centered_psi(splice_adata)
-    
+
+    # Save breakdown of broad, specific, and medium cell types to text in the same output directory
+    with open(os.path.join(OUTPUT_DIR, f"cell_type_breakdown_{timestamp}.txt"), "w") as f:
+        f.write(f"# Mouse Splicing Foundation - Cell Type Breakdown\n")
+        f.write(f"# Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        f.write(f"## Splicing Dataset\n")
+        f.write(f"Specific cell type distribution: {dict(splice_adata.obs['specific_cell_type'].value_counts())}\n")
+        f.write(f"Broad cell type distribution: {dict(splice_adata.obs['broad_cell_type'].value_counts())}\n")
+        f.write(f"Medium cell type distribution: {dict(splice_adata.obs['medium_cell_type'].value_counts())}\n")
+
     # Save aligned datasets
     save_aligned_data(splice_adata, ge_adata)
     
@@ -669,4 +1092,4 @@ if __name__ == "__main__":
     main()
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
-# sbatch --mem=500G -p cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/05_align_splice_ge_anndatas.py"
+# sbatch --mem=550G -p cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/05_align_splice_ge_anndatas.py"

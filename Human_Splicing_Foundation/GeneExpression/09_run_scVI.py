@@ -34,10 +34,10 @@ print(f"Output directory: {OUTPUT_DIR}", flush=True)
 GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250707_121747.h5ad"
 
 # Model configuration
-LINEAR_LATENT = 30
-STANDARD_LATENT = 30
-LINEAR_EPOCHS = 100
-STANDARD_EPOCHS = 100
+LINEAR_LATENT = 20
+STANDARD_LATENT = 20
+LINEAR_EPOCHS = 500
+STANDARD_EPOCHS = 500
 
 def load_data():
     """Load aligned gene expression data"""
@@ -163,11 +163,11 @@ def train_linear_scvi(ge_adata):
     try:
         # Setup for model
         print("   ⚙️ Setting up AnnData for LinearSCVI...")
-        hvg_mask = ge_adata.var["highly_variable"].values
-        adata_hvg = ge_adata[:, hvg_mask].copy()
+        #hvg_mask = ge_adata.var["highly_variable"].values
+        #adata_hvg = ge_adata[:, hvg_mask].copy()
 
-        scvi.model.LinearSCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
-        model = scvi.model.LinearSCVI(adata_hvg, n_latent=LINEAR_LATENT)
+        scvi.model.LinearSCVI.setup_anndata(ge_adata, layer="length_norm", batch_key="dataset")
+        model = scvi.model.LinearSCVI(ge_adata, n_latent=LINEAR_LATENT)
 
         print(f"   ⚙️ Training model for {LINEAR_EPOCHS} epochs...")
         model.train(max_epochs=LINEAR_EPOCHS, check_val_every_n_epoch=10)
@@ -176,11 +176,11 @@ def train_linear_scvi(ge_adata):
         print("   ⚙️ Extracting latent representation...")
         Z_hat = model.get_latent_representation()
         ge_adata.obsm["X_scVI_linear"] = Z_hat
-        
+        ge_adata.obsm["X_normalized_scVI_linear"] = model.get_normalized_expression()
+
         # Get loadings
-        loadings = model.get_loadings()
-        print("   ✓ Top genes with highest loadings in LinearSCVI:")
-        print(loadings.head())
+        loadings = model.get_loadings() 
+        ge_adata.varm["scVI_linear_gene_loadings"] = loadings
         
         # Add model metadata to uns
         ge_adata.uns["scvi_linear"] = {
@@ -205,11 +205,11 @@ def train_standard_scvi(ge_adata):
     try:
         # Setup for model
         print("   ⚙️ Setting up AnnData for standard SCVI...")
-        hvg_mask = ge_adata.var["highly_variable"].values
-        adata_hvg = ge_adata[:, hvg_mask].copy()
+        #hvg_mask = ge_adata.var["highly_variable"].values
+        #adata_hvg = ge_adata[:, hvg_mask].copy()
 
-        scvi.model.SCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
-        model = scvi.model.SCVI(adata_hvg, n_latent=STANDARD_LATENT)
+        scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm", batch_key="dataset")
+        model = scvi.model.SCVI(ge_adata, n_latent=STANDARD_LATENT)
         
         print(f"   ⚙️ Training model for {STANDARD_EPOCHS} epochs...")
         model.train(max_epochs=STANDARD_EPOCHS, check_val_every_n_epoch=10)
@@ -218,7 +218,8 @@ def train_standard_scvi(ge_adata):
         print("   ⚙️ Extracting latent representation...")
         Z_hat = model.get_latent_representation()
         ge_adata.obsm["X_scVI_standard"] = Z_hat
-        
+        ge_adata.obsm["X_normalized_scVI_standard"] = model.get_normalized_expression()
+
         # Add model metadata to uns
         ge_adata.uns["scvi_standard"] = {
             "model_type": "SCVI",
@@ -229,7 +230,7 @@ def train_standard_scvi(ge_adata):
         print("   ✓ Standard SCVI model training complete")
         
         return ge_adata, model
-        
+
     except Exception as e:
         print(f"   ❌ Error training standard SCVI model: {str(e)}")
         traceback.print_exc()
@@ -322,5 +323,5 @@ print("========================================\n")
 
 # conda activate scvi-env
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/scVI
-# sbatch --mem=200G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_run_scVI.py"
+# sbatch --mem=200G -p gpu --gres=gpu:2 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_run_scVI.py"
 # sbatch --mem=300G -p cpu,bigmem -J "scVI_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_run_scVI.py"

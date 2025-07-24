@@ -14,13 +14,13 @@ from scipy.stats import entropy
 from sklearn.preprocessing import MinMaxScaler
 
 # --- Configuration ---
-#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
-#DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
-#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-08/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-07-19/2025-07-21" #date model was trained/date models were summarized for plotting 
+BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
-BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
+#DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
+#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
 os.makedirs(OUTPUT_SUMMARY_DIR, exist_ok=True)
@@ -52,7 +52,6 @@ def main():
         "max_dataset_var",
         "max_celltype_var",
         "max_tissue_var",
-        "global_r2_max", # from global anova analysis maximum value across factors 
         "median_corr_imputed_vs_observed",
         "median_cell_perplexity"
     ]

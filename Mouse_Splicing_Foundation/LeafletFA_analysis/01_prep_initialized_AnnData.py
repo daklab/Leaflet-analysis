@@ -40,7 +40,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file paths
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250707_181219.h5ad"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250723_011203.h5ad"
 print(f"The input file is: {SPLICE_INPUT}")
 
 # Junction ortho mapping
@@ -54,7 +54,7 @@ N_DIM_COMPONENTS = 20
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.55  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.6  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -138,7 +138,7 @@ def compute_atse_scores(splice_adata):
         print("   Computing component scores...")
         
         # 1. Annotation score
-        annotation_weights = {"unannotated": 1.0, "three_prime": 0.8, "five_prime": 0.8, "both": 0.5}
+        annotation_weights = {"unannotated": 0.1, "three_prime": 0.5, "five_prime": 0.5, "both": 0.8}
         splice_adata.var["annotation_status_score"] = splice_adata.var["annotation_status"].map(annotation_weights)
         
         # 2. Expression breadth score
@@ -150,7 +150,7 @@ def compute_atse_scores(splice_adata):
         
         # 3. Read count score (log scale for total reads)
         splice_adata.var["read_count_score"] = np.where(
-            splice_adata.var["total_read_counts"] >= 50,  # Minimum 50 total reads
+            splice_adata.var["total_read_counts"] >= 100,  # Minimum 50 total reads
             np.log1p(splice_adata.var["total_read_counts"]),
             0.0
         )
@@ -164,10 +164,10 @@ def compute_atse_scores(splice_adata):
                         np.where(splice_adata.var["junction_variability"] >= var_percentiles[0], 1.0, 0.5))
             )
         else:
-            splice_adata.var["variability_score"] = 0.5  # Default if no variability
+            splice_adata.var["variability_score"] = 0.1  # Default if no variability
         
         # 5. Conservation score
-        conservation_weights = {"conserved": 1.0, "not_conserved": 0.0}
+        conservation_weights = {"conserved": 2.0, "not_conserved": 0.5}
         splice_adata.var["conservation_score"] = splice_adata.var["junction_conserved"].map(conservation_weights)
         
         # Print conservation distribution
@@ -194,10 +194,10 @@ def compute_atse_scores(splice_adata):
         
         # Calculate composite score with updated weights
         weights = {
-            "annotation": 0.25,     # Annotation novelty
-            "expression": 0.15,     # Expression breadth
-            "read_count": 0.15,     # Read support
-            "variability": 0.20,    # PSI variability
+            "annotation": 0.2,     # Annotation novelty
+            "expression": 0.1,     # Expression breadth
+            "read_count": 0.2,     # Read support
+            "variability": 0.25,    # PSI variability
             "conservation": 0.25    # Evolutionary conservation
         }
         

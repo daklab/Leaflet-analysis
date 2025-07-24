@@ -31,13 +31,13 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250707_122003.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250723_011203.h5ad"
 
 # Model configuration
-LINEAR_LATENT = 30
-STANDARD_LATENT = 30
-LINEAR_EPOCHS = 100
-STANDARD_EPOCHS = 100
+LINEAR_LATENT = 50
+STANDARD_LATENT = 50
+LINEAR_EPOCHS = 300
+STANDARD_EPOCHS = 300
 
 def load_data():
     """Load aligned gene expression data"""
@@ -156,60 +156,66 @@ def check_data_quality(ge_adata, layer_name="length_norm"):
         print(f"   ❌ Error checking data quality: {str(e)}")
         traceback.print_exc()
         
-def train_linear_scvi(ge_adata):
-    """Train LinearSCVI model for gene expression data"""
+def train_linear_scvi(ge_adata, batch_key=None):
+    """Train LinearSCVI model for gene expression data using ALL genes"""
     print("\n>> Training LinearSCVI model...")
     
     try:
-        # Setup for model
-        print("   ⚙️ Setting up AnnData for LinearSCVI...")
-        hvg_mask = ge_adata.var["highly_variable"].values
-        adata_hvg = ge_adata[:, hvg_mask].copy()
+        # Step 1: Setup AnnData for model (using ALL genes)
+        print("   ⚙️ Setting up AnnData for LinearSCVI using ALL genes...")
+        if batch_key is None:
+            scvi.model.LinearSCVI.setup_anndata(ge_adata, layer="length_norm")
+        else:
+            scvi.model.LinearSCVI.setup_anndata(ge_adata, layer="length_norm", batch_key=batch_key)
 
-        scvi.model.LinearSCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
-        model = scvi.model.LinearSCVI(adata_hvg, n_latent=LINEAR_LATENT)
-
+        # Step 2: Train model
+        model = scvi.model.LinearSCVI(ge_adata, n_latent=LINEAR_LATENT)
         print(f"   ⚙️ Training model for {LINEAR_EPOCHS} epochs...")
         model.train(max_epochs=LINEAR_EPOCHS, check_val_every_n_epoch=10)
-        
-        # Extract results and save to obsm
+
+        # Step 3: Save latent representation and normalized expression
         print("   ⚙️ Extracting latent representation...")
-        Z_hat = model.get_latent_representation()
-        ge_adata.obsm["X_scVI_linear"] = Z_hat
+        ge_adata.obsm["X_scVI_linear"] = model.get_latent_representation()
+        ge_adata.obsm["X_normalized_scVI_linear"] = model.get_normalized_expression()
+
+        # Step 4: Save gene loadings for ALL genes
+        print("   ⚙️ Extracting gene loadings for ALL genes...")
+        loadings = model.get_loadings()  # shape: (n_genes, n_latent)
+        ge_adata.varm["scVI_linear_gene_loadings"] = loadings
         
-        # Get loadings
-        loadings = model.get_loadings()
-        print("   ✓ Top genes with highest loadings in LinearSCVI:")
-        print(loadings.head())
-        
-        # Add model metadata to uns
+        # Step 5: Metadata
         ge_adata.uns["scvi_linear"] = {
             "model_type": "LinearSCVI",
             "n_latent": LINEAR_LATENT,
-            "training_date": datetime.datetime.now().strftime("%Y-%m-%d")
+            "training_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "trained_on_all_genes": True,
+            "n_genes_used": ge_adata.n_vars
         }
-        
-        print("   ✓ LinearSCVI model training complete")
-        
-        return ge_adata, model
-        
-    except Exception as e:
-        print(f"   ❌ Error training LinearSCVI model: {str(e)}")
-        traceback.print_exc()
-        return ge_adata, None
 
-def train_standard_scvi(ge_adata):
+        print("   ✓ LinearSCVI training complete.")
+        return ge_adata, model
+                
+    except Exception as e:
+        print(f"   ❌ Error during LinearSCVI training: {str(e)}")
+        traceback.print_exc()
+        raise
+
+def train_standard_scvi(ge_adata, batch_key=None):
     """Train standard SCVI model for gene expression data"""
     print("\n>> Training standard SCVI model...")
     
     try:
         # Setup for model
         print("   ⚙️ Setting up AnnData for standard SCVI...")
-        hvg_mask = ge_adata.var["highly_variable"].values
-        adata_hvg = ge_adata[:, hvg_mask].copy()
 
-        scvi.model.SCVI.setup_anndata(adata_hvg, layer="length_norm", batch_key="dataset")
-        model = scvi.model.SCVI(adata_hvg, n_latent=STANDARD_LATENT)
+        if batch_key is None:
+            print("   ⚙️ Not using batch key for standard SCVI model")
+            scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm")
+        else:
+            print(f"   ⚙️ Using batch key: {batch_key} for standard SCVI model")
+            scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm", batch_key=batch_key)
+
+        model = scvi.model.SCVI(ge_adata, n_latent=STANDARD_LATENT)
         
         print(f"   ⚙️ Training model for {STANDARD_EPOCHS} epochs...")
         model.train(max_epochs=STANDARD_EPOCHS, check_val_every_n_epoch=10)
@@ -218,12 +224,15 @@ def train_standard_scvi(ge_adata):
         print("   ⚙️ Extracting latent representation...")
         Z_hat = model.get_latent_representation()
         ge_adata.obsm["X_scVI_standard"] = Z_hat
+        ge_adata.obsm["X_normalized_scVI_standard"] = model.get_normalized_expression()
         
         # Add model metadata to uns
         ge_adata.uns["scvi_standard"] = {
             "model_type": "SCVI",
             "n_latent": STANDARD_LATENT,
-            "training_date": datetime.datetime.now().strftime("%Y-%m-%d")
+            "training_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+            "trained_on_all_genes": True,
+            "n_genes_used": ge_adata.n_vars
         }
         
         print("   ✓ Standard SCVI model training complete")
@@ -275,8 +284,9 @@ def save_results(ge_adata):
         output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_both_scvi_models_{today}.h5ad")
         
         # Save file
+        print(ge_adata)
         print(f"   ⚙️ Saving updated AnnData to {output_file}...")
-        ge_adata.write_h5ad(output_file, compression="lzf")
+        ge_adata.write_h5ad(output_file, compression="gzip")
         
         print(f"   ✓ Results successfully saved to {output_file}")
         
@@ -290,21 +300,21 @@ def save_results(ge_adata):
 # Main execution
 print("\n========================================")
 print("scVI Model Training - Mouse Splicing Foundation")
-print("Running both LinearSCVI and standard SCVI models")
+print("Running both LinearSCVI and standard SCVI models on ALL genes")
 print("========================================\n")
 
 # Load data
 ge_adata = load_data()
 check_data_quality(ge_adata, "length_norm")
 
-# Train LinearSCVI model
+# Train LinearSCVI model without batch key
 ge_adata, linear_model = train_linear_scvi(ge_adata)
 
 # Plot training metrics for LinearSCVI
 if linear_model is not None:
     plot_training_metrics(linear_model, "LinearSCVI")
 
-# Train standard SCVI model
+# Train standard SCVI model with batch key
 ge_adata, standard_model = train_standard_scvi(ge_adata)
 
 # Plot training metrics for standard SCVI
@@ -322,5 +332,5 @@ print("========================================\n")
 
 # conda activate scvi-env
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/scVI
-# sbatch --mem=250G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"
-# sbatch --mem=300G -p cpu,bigmem -J "scVI_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"
+# sbatch --mem=150G -p gpu --gres=gpu:1 -J "scVI_GE_MOUSE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"
+# sbatch --mem=300G -p cpu,bigmem,dev -J "scVI_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/08_run_scVI.py"

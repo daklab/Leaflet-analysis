@@ -19,7 +19,7 @@ print(f"All outputs will be saved in {base_output_dir}")
 # Define parameter grid
 param_grid = {
     "input_conc": [None],  # 'inf' will be converted to torch.tensor(np.inf)
-    "junc_specific_prior": [True,False],
+    "junc_specific_prior": [True],
     "delta_fixed": [None, 1],
     "K": [20],
     "waypoints_use": [True],
@@ -28,8 +28,8 @@ param_grid = {
     "num_samples": [100],
     'gamma': [0.001],
     'min_delta': [100],
-    "lr": [0.5, 0.8],
-    "num_epochs": [200],
+    "lr": [0.5],
+    "num_epochs": [500],
     "patience": [3],
 }
 

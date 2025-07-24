@@ -9,17 +9,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import scanpy as sc
+# Get today's date 
+from datetime import datetime
 
 # Input/Output paths
 BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 
 # Gene expression data
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-06.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_30_1024_2025-07-06.h5ad"
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-23.h5ad"
+GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_50_1024_2025-07-23.h5ad"
 PLOTS_DIR = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/gene_expression/plots"
-# if doesn't exist, create it
+
+# Get today's date in YYYYMMDD format
+today_str = datetime.today().strftime('%Y%m%d')
+
+# Define output path using today's date
+PLOTS_DIR = os.path.join(PLOTS_DIR, today_str)
+
+# If it doesn't exist, create it
 if not os.path.exists(PLOTS_DIR):
     os.makedirs(PLOTS_DIR)
+
+print(f"Created output directory: {PLOTS_DIR}")
 
 # Load data
 print(f"Loading scVI data from {GE_ANNDATA_scVI_PATH}")

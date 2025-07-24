@@ -1,12 +1,12 @@
 #!/bin/bash
-MODEL_TRAIN_DATE="2025-07-08"
+MODEL_TRAIN_DATE="2025-07-23"
 
 BASE_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 MODEL_OUTPUTS_DIR="${BASE_DIR}/Leaflet/leafletFAmodel/${MODEL_TRAIN_DATE}"
 
-ATSE_ANNDATA_PATH="${BASE_DIR}/MODEL_INPUT/072025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_39656_junctions_20_waypoints_20250708_165928.h5ad"
-GE_ANNDATA_scVI_PATH="${BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-06.h5ad"
-GE_ANNDATA_NMF_PATH="${BASE_DIR}/NMF/ge_adata_with_NMF_standard_50_1024_2025-07-07.h5ad"
+ATSE_ANNDATA_PATH="${BASE_DIR}/MODEL_INPUT/072025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_35195_junctions_20_waypoints_20250723_082429.h5ad"
+GE_ANNDATA_scVI_PATH="${BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-23.h5ad"
+GE_ANNDATA_NMF_PATH="${BASE_DIR}/NMF/ge_adata_with_NMF_standard_50_1024_2025-07-23.h5ad"
 
 AGING_GENES_PATH="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
 RBP_FILE_PATH="/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
@@ -40,7 +40,7 @@ for ((i=0; i<=num_rows-1; i++)); do
 
     sbatch --mem=450G -p cpu,bigmem -J "evaluate_leafletFA_results_$i" --wrap="python $script1 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $GE_ANNDATA_scVI_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
     sbatch --mem=350G -p cpu,bigmem -J "leafletFA_regressions_$i" --wrap="python $script2 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
-    sbatch --mem=220G -p cpu,bigmem -J "differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $ATSE_FILE_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
+    sbatch --mem=300G -p cpu,bigmem -J "differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $ATSE_FILE_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
     sbatch --mem=400G -p cpu,bigmem -J "sanity_checks_$i" --wrap="python $script4 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $OUTPUT_DIR"
 
 done
@@ -49,13 +49,3 @@ done
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/05_summarize_models.py
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/06_summarize_models.py
-
-# Just for testing differentially splicing analysis on param_id 1
-i=1
-echo "Submitting script for param_id: $i"
-OUTPUT_DIR="${RESULTS_BASE_DIR}/${TODAY}/param_id_${i}"
-echo "Output directory: $OUTPUT_DIR"
-
-script3=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/03_differential_splicing_analysis.py
-
-sbatch --mem=220G -p cpu,bigmem --time=5-00:00:00 --cpus-per-task=16 -J "differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $ATSE_FILE_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
