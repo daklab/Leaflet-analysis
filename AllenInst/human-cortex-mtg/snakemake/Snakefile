@@ -6,7 +6,7 @@ configfile: "config_cortex_mtg.yaml"
 # Function to get sample IDs based on the presence of fastq files
 def get_sample_ids():
     sample_ids = []
-    search_path = os.path.join(config["raw_dir"], "F2S4*")  # Assume all directories start with 'SRR'
+    search_path = os.path.join(config["raw_dir"], "F2S4*")  
     for dirpath in glob.glob(search_path):
         sample_id = os.path.basename(dirpath)
         sample_ids.append(sample_id)
@@ -17,13 +17,14 @@ sample_ids = get_sample_ids()
 
 # Print debug information
 print("raw_dir:", config["raw_dir"])
-print("sample_ids:", sample_ids)
+print("Number of samples:", len(sample_ids))
 
 rule all:
     input:
         expand(os.path.join(config["results_dir"], "{sample}_junctions.bed"), sample=sample_ids),
         expand(os.path.join(config["results_dir"], "{sample}_barcodes.txt"), sample=sample_ids),
-        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids)
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=sample_ids),
+        expand(os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv"), sample=sample_ids) 
 
 # Rule to generate STAR index
 rule generate_star_index:
@@ -35,7 +36,7 @@ rule generate_star_index:
         gtf_file = config["gtf_file"]
     shell:
         """
-        star --runThreadN 4 \
+        STAR --runThreadN 4 \
              --runMode genomeGenerate \
              --genomeDir {output[0]} \
              --genomeFastaFiles {params.genome_fasta} \
@@ -53,7 +54,7 @@ rule run_star:
         output_prefix=os.path.join(config["bam_files"], "{sample}/")
     shell:
         """
-        star --genomeDir {params.star_index_dir} \
+        STAR --genomeDir {params.star_index_dir} \
              --readFilesIn {input.fastq1} {input.fastq2} \
              --readFilesCommand zcat \
              --runMode alignReads \
@@ -68,7 +69,7 @@ rule run_star:
 
 rule add_cb_tag:
     input:
-        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam")
+        bam=rules.run_star.output.bam
     output:
         bam_CB=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
     params:
@@ -82,7 +83,7 @@ rule add_cb_tag:
 # Rule to index BAM file
 rule index_bam:
     input:
-        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
+        bam=rules.add_cb_tag.output.bam_CB
     output:
         bai=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai")
     shell:
@@ -93,8 +94,8 @@ rule index_bam:
 
 rule extract_junctions:
     input:
-        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
-        bai=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai")
+        bam=rules.add_cb_tag.output.bam_CB,
+        bai=rules.index_bam.output.bai
     output:
         juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed"),
         barcodes=os.path.join(config["results_dir"], "{sample}_barcodes.txt"),
@@ -107,4 +108,31 @@ rule extract_junctions:
         {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
         paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
         echo "Done extracting junctions with barcodes"
+        """
+
+rule summarize_splicing:
+    input:
+        bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed")
+    output:
+        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv")
+    shell:
+        """
+        echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads" > {output.summary}
+
+        sample=$(basename {input.bam} | cut -d'.' -f1)
+        total_reads=$(samtools view -c -F 4 {input.bam})
+
+        # Ensure the file has at least five columns before extracting spliced reads
+        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+
+        # Ensure spliced_reads is not empty or invalid
+        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+            spliced_reads=0
+        fi
+
+        unspliced_reads=$((total_reads - spliced_reads))
+
+        echo -e "$sample\t$total_reads\t$spliced_reads\t$unspliced_reads" >> {output.summary}
+        echo "Splicing summary written to {output.summary}"
         """

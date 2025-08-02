@@ -5,10 +5,10 @@
 #SBATCH --mem=100G
 #SBATCH --cpus-per-task=4
 #SBATCH --array=0-99%10
-#SBATCH -p cpu
+#SBATCH -p cpu,dev
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730
 
 # Create base directory with today's date
 cd $WD

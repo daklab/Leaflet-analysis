@@ -238,7 +238,7 @@ def plot_correlation_matrix(PHI, PLOTS_DIR, fdr_threshold=0.01):
     """Plot simple correlation matrix with significance stars"""
     
     n_factors = PHI.shape[1]
-    factor_labels = [f"Factor {i+1}" for i in range(n_factors)]
+    factor_labels = [f"SP {i+1}" for i in range(n_factors)]
     
     # Compute correlation matrix
     corr_matrix = np.corrcoef(PHI.T)
@@ -462,6 +462,7 @@ from statsmodels.stats.anova import anova_lm
 def run_variance_explained_analysis(
     splice_adata, 
     sample_id,
+    cell_type_col,
     PLOTS_DIR=None, 
     DATA_DIR=None
 ):
@@ -476,9 +477,15 @@ def run_variance_explained_analysis(
     factor_names = [f"Factor_{i+1}" for i in range(X_phi.shape[1])]
     analysis_df = pd.DataFrame(X_phi, index=splice_adata.obs_names, columns=factor_names)
 
+    # print breakdown by cell type, tissue, sex, and dataset
+    print(splice_adata.obs[cell_type_col].value_counts())
+    print(splice_adata.obs["tissue"].value_counts())
+    print(splice_adata.obs["sex"].value_counts())
+    print(splice_adata.obs[sample_id].value_counts())
+
     # --- Basic Covariates from splice_adata.obs ---
     obs_cols_to_copy = {
-        "broad_cell_type": "cell_type", 
+        cell_type_col: "cell_type", 
         "tissue": "tissue",
         "sex": "sex",
         sample_id: "dataset",
@@ -597,8 +604,8 @@ def run_variance_explained_analysis(
     cbar.ax.tick_params(labelsize=8)
     cbar.set_label('')
     
-    # Save
-    plot_path = os.path.join(PLOTS_DIR, "variance_explained_heatmap.pdf")
+    # Save add cell_type_col to filename    
+    plot_path = os.path.join(PLOTS_DIR, f"variance_explained_heatmap_{cell_type_col}.pdf")
     cg.savefig(plot_path, format="pdf", bbox_inches="tight")
     print(f"  Saved variance explained heatmap to {plot_path}")
     plt.close(cg.fig)

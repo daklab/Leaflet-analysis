@@ -96,9 +96,10 @@ if __name__ == '__main__':
 
 # To run this script, use the following command:
     
+# conda activate LeafletSC
 # SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/06_MergeAnndatas.py
-# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas
-# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/anndatas/merged_anndata.h5ad
+# INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/anndatas
+# OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/anndatas/merged_anndata.h5ad
 # 
 # python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
 # sbatch --job-name=human_SJ_anndata --mem=300G --partition cpu,dev,bigmem --output=run_%j.out --wrap="python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE"

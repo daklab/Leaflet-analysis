@@ -1,16 +1,16 @@
 #!/bin/bash
 
-MODEL_TRAIN_DATE="2025-07-06"
+MODEL_TRAIN_DATE="2025-07-31"
 
 BASE_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION"
 MODEL_OUTPUTS_DIR="${BASE_DIR}/Leaflet/leafletFAmodel/${MODEL_TRAIN_DATE}"
 
-ATSE_ANNDATA_PATH="${BASE_DIR}/MODEL_INPUT/072025/HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_19391_junctions_30_waypoints_20250706_193817.h5ad"
+ATSE_ANNDATA_PATH="${BASE_DIR}/MODEL_INPUT/072025/HUMAN_SPLICING_FOUNDATION_Anndata_ATSE_counts_19486_junctions_20_waypoints_20250731_212922.h5ad"
 
-GE_ANNDATA_scVI_PATH="${BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-06.h5ad"
-GE_ANNDATA_NMF_PATH="${BASE_DIR}/NMF/ge_adata_with_NMF_standard_30_1024_2025-07-06.h5ad"
+GE_ANNDATA_scVI_PATH="${BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-08-01.h5ad"
+GE_ANNDATA_NMF_PATH="${BASE_DIR}/NMF/ge_adata_with_NMF_standard_50_1024_2025-07-31.h5ad"
 
-ATSE_FILE_PATH="${BASE_DIR}/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-07-01_03-02-03.txt.gz"
+ATSE_FILE_PATH="${BASE_DIR}/ATSE_mapper/ATSE_files/TMS_atse_file_unanno_also_2025-07-31_08-10-26.txt.gz"
 RESULTS_BASE_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/${MODEL_TRAIN_DATE}"
 
 AGING_GENES_PATH="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
@@ -41,9 +41,9 @@ for ((i=0; i<=num_rows-1; i++)); do
     script4=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/downstream_analysis/04_sanity_checks.py
 
     sbatch --mem=200G -p dev,cpu,bigmem -J "H_evaluate_leafletFA_results_$i" --wrap="python $script1 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $GE_ANNDATA_scVI_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
-    #sbatch --mem=300G -p cpu,bigmem -J "H_leafletFA_regressions_$i" --wrap="python $script2 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
+    sbatch --mem=300G -p cpu,bigmem -J "H_leafletFA_regressions_$i" --wrap="python $script2 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
     sbatch --mem=220G -p cpu,bigmem -J "H_differential_splicing_analysis_$i" --wrap="python $script3 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $ATSE_FILE_PATH $GE_ANNDATA_scVI_PATH $GE_ANNDATA_NMF_PATH $AGING_GENES_PATH $RBP_FILE_PATH $OUTPUT_DIR"
-    #sbatch --mem=300G -p cpu,bigmem -J "H_sanity_checks_$i" --wrap="python $script4 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $OUTPUT_DIR"
+    sbatch --mem=300G -p cpu,bigmem -J "H_sanity_checks_$i" --wrap="python $script4 $i $MODEL_OUTPUTS_DIR $ATSE_ANNDATA_PATH $OUTPUT_DIR"
 
 done
 

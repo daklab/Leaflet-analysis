@@ -19,10 +19,10 @@ from genome_utils import JunctionAnalyzer, GenomeDB # type: ignore
 from event_detection import ATSEAnalyzer # type: ignore
 
 # gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
-gtf_file = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/2025_collapsed_no_treatment/all_samples_sp_collapse_all_chr_no_treatment_full.gtf"
+gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
 print(f"Using the gtf_file: {gtf_file}!")
 fasta_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa"
-combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250421/results"
+combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/results"
 output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files"
 
 min_intron = 50
@@ -83,7 +83,7 @@ output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_groups, filtered_junctions, output_file)
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/04_ATSEmapping.py
 # sbatch --wrap="python $script_path" --mem=300G --time=3-00:00:00 -J human_splice_ATSE -p cpu,dev,bigmem

@@ -1,8 +1,10 @@
 {
     "__default__": {
-        "cpus": 8,
-        "mem": "64000",
-        "time": "1-00:00",
-        "job-name": "MOUSE_ALLEN_j"
+      "cpus": 8,
+      "mem": "64000",
+      "time": "1-00:00:00",
+      "job-name": "MOUSE_ALLEN_j",
+      "partition": "cpu,dev,bigmem"
     }
-}
+  }
+  

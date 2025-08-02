@@ -29,16 +29,17 @@ STAR --version
 
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/lein-cortex-gru/snakemake
+slurm_out=/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/slurm
 
-slurm_out=/gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/slurm/03032025
-
-if [ ! -d "$slurm_out" ]; then
-    mkdir -p $slurm_out
+# Make a dir inside sliurm_out with today's date
+slurm_out_today=$slurm_out/$(date +%Y%m%d)
+if [ ! -d "$slurm_out_today" ]; then
+    mkdir -p $slurm_out_today
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 32 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
-
+snakemake -j 128 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out_today/slurm-%j.out --error=$slurm_out_today/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 echo "Snakemake workflow submitted"
 
-
+# cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/lein-cortex-gru/snakemake
+# sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/lein-cortex-gru/snakemake/run_snakemake.sh

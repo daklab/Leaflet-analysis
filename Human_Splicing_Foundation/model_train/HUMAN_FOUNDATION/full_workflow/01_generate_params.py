@@ -21,15 +21,15 @@ param_grid = {
     "input_conc": [None, "inf"],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
     "delta_fixed": [None, 1],
-    "K": [30],
+    "K": [20],
     "waypoints_use": [True],
     "num_inits": [1],
     "ELBO_num_particles": [5],
     "num_samples": [100],
-    'gamma': [0.01, 0.001, 0.0001],
+    'gamma': [0.001],
     'min_delta': [100],
     "lr": [0.1, 0.5, 0.8],
-    "num_epochs": [300],
+    "num_epochs": [500],
     "patience": [5],
 }
 

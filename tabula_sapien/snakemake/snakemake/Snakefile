@@ -34,7 +34,7 @@ sample_ids, bam_files = get_sample_ids()
 
 # Print debug information
 print("raw_dir:", config["raw_dir"])
-print("Found samples:", len(sample_ids))
+print("Number of samples:", len(sample_ids))
 
 rule all:
     input:

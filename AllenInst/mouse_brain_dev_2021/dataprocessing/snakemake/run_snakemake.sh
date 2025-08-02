@@ -29,17 +29,21 @@ STAR --version
 
 # Navigate to your directory with the Snakefile for this dataset analysis 
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/mouse_brain_dev_2021/dataprocessing/snakemake/
-
-slurm_out=/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/slurm 
+slurm_out=/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/slurm2025 
 if [ ! -d "$slurm_out" ]; then
     mkdir -p $slurm_out
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 40 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake -j 32 \
+  --cluster-config cluster.json \
+  --cluster "sbatch -N 1 -p {cluster.partition} -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" \
+  --latency-wait 120 \
+  --rerun-incomplete
 
 echo "Snakemake workflow submitted"
 
 # go here first and submit there easier to keep track 
 # cd /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/ 
+# cd $slurm_out
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/mouse_brain_dev_2021/dataprocessing/snakemake/run_snakemake.sh

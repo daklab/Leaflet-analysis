@@ -615,6 +615,8 @@ def compute_age_r2_with_cv_linear_regression(
     splice_adata, 
     ge_adata, 
     min_cells=500, 
+    cell_type_col="broad_cell_type",
+    ge_adata_obsm="X_nmf_standard_mb",
     min_age_groups=2,
     cv=10,
     random_state=42,
@@ -627,7 +629,7 @@ def compute_age_r2_with_cv_linear_regression(
         results_df: Both training and CV R² scores per cell type
         feature_importance: dict with coefficient information per cell type
     """
-    required_cols = ["age_numeric", "broad_cell_type"]
+    required_cols = ["age_numeric", cell_type_col]
     for col in required_cols:
         if col not in splice_adata.obs.columns:
             raise KeyError(f"Missing column: {col}")
@@ -641,8 +643,8 @@ def compute_age_r2_with_cv_linear_regression(
     # Store final list of cell types analyzed here 
     final_cell_types = []
 
-    for ct in splice_adata.obs["broad_cell_type"].unique():
-        mask = splice_adata.obs["broad_cell_type"] == ct
+    for ct in splice_adata.obs[cell_type_col].unique():
+        mask = splice_adata.obs[cell_type_col] == ct
         sub_splice = splice_adata[mask]
         sub_ge = ge_adata[mask]
         
@@ -654,7 +656,7 @@ def compute_age_r2_with_cv_linear_regression(
         final_cell_types.append(ct)
         y = sub_splice.obs["age_numeric"].values
         X_splice = sub_splice.obsm["X_PHI"]
-        X_expr = sub_ge.obsm["X_nmf_standard_mb"]
+        X_expr = sub_ge.obsm[ge_adata_obsm]
         X_combined = np.hstack([X_splice, X_expr])
         
         # Cross-validation scores
@@ -1043,7 +1045,7 @@ def plot_cv_r2_scatter_with_labels(results_df, figsize=(5, 4), annotate_top_k=No
     return filtered_df  # Return the filtered dataframe for reference
 
 
-def global_age_prediction_analysis(splice_adata, ge_adata, cv_folds=10, random_state=42):
+def global_age_prediction_analysis(splice_adata, ge_adata, cv_folds=10, random_state=42, cell_type_col="broad_cell_type", ge_adata_obsm="X_nmf_standard_mb"):
     """
     Global analysis across ALL cells comparing different feature combinations:
     1. Tissue type only
@@ -1059,26 +1061,26 @@ def global_age_prediction_analysis(splice_adata, ge_adata, cv_folds=10, random_s
     # Check that both datasets have same cells and required columns
     assert len(splice_adata) == len(ge_adata), "Datasets must have same number of cells"
     assert "age_numeric" in splice_adata.obs.columns, "Missing age_numeric column"
-    assert "broad_cell_type" in splice_adata.obs.columns, "Missing broad_cell_type column"
+    assert cell_type_col in splice_adata.obs.columns, "Missing cell_type_col column"
     
     print(f"Analyzing {len(splice_adata)} total cells")
-    print(f"Number of cell types: {splice_adata.obs['broad_cell_type'].nunique()}")
+    print(f"Number of cell types: {splice_adata.obs[cell_type_col].nunique()}")
     
     # Prepare target variable
     y = splice_adata.obs["age_numeric"].values
     
     # Prepare tissue type features (one-hot encoded)
     le = LabelEncoder()
-    tissue_encoded = le.fit_transform(splice_adata.obs["broad_cell_type"])
+    tissue_encoded = le.fit_transform(splice_adata.obs[cell_type_col])
+    
     # Convert to one-hot encoding
     n_tissues = len(le.classes_)
     tissue_onehot = np.eye(n_tissues)[tissue_encoded]
-    
     print(f"Created {n_tissues} tissue type indicators")
     
     # Prepare molecular features
     X_splice = splice_adata.obsm["X_PHI"]
-    X_expr = ge_adata.obsm["X_nmf_standard_mb"]
+    X_expr = ge_adata.obsm[ge_adata_obsm]
     
     print(f"Splicing features: {X_splice.shape[1]}")
     print(f"Expression features: {X_expr.shape[1]}")

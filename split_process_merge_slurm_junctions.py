@@ -17,7 +17,6 @@ if module_path not in sys.path:
 # Import functions
 from leafletfa_utils.atsemapper.main import JunctionReader  
 
-
 def split_file_list(input_file: str, chunks: int, output_dir: str):
     """Split input file list into chunks for Slurm array processing"""
     with open(input_file) as f:

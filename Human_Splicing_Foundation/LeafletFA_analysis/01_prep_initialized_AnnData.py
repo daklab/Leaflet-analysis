@@ -40,18 +40,18 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file paths
-SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250706_193026.h5ad"
+SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250731_212313.h5ad"
 print(f"The input file is: {SPLICE_INPUT}")
 
 # Junction ortho mapping
-junc_orthos = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/plots_2025-07-05/junction_mapping_mouse_human_with_annotations.csv"
+junc_orthos = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/plots_2025-07-30/junction_mapping_mouse_human_with_annotations.csv"
 junc_orthos = pd.read_csv(junc_orthos)
 
 # Model configuration
-N_WAYPOINTS = 30
-N_PCA_COMPONENTS = 30
-N_DIM_COMPONENTS = 30
-METACELL_SIZE = 100
+N_WAYPOINTS = 20
+N_PCA_COMPONENTS = 20
+N_DIM_COMPONENTS = 20
+METACELL_SIZE = 200
 
 # ATSE filtering parameters
 ATSE_FILTER_PERCENTILE = 0.8  # Filter out ATSEs below this percentile

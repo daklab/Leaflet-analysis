@@ -505,7 +505,7 @@ read_filter = quantile_filter(splice_adata.obs["total_junction_reads"])
 junctions_filter = quantile_filter(splice_adata.obs["n_detected_annotated_junctions"])
 
 # Additional filter: cell must have at least 100 total junction reads
-min_reads_filter = splice_adata.obs["total_junction_reads"] > 10
+min_reads_filter = splice_adata.obs["total_junction_reads"] > 1000
 min_junctions_filter = splice_adata.obs["n_detected_annotated_junctions"] >= 2
 
 # Final per-cell QC: within percentile range AND above minimum count

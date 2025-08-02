@@ -31,11 +31,11 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250723_011203.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250730_164104.h5ad"
 
 # Model configuration
-LINEAR_LATENT = 50
-STANDARD_LATENT = 50
+LINEAR_LATENT = 20
+STANDARD_LATENT = 20
 LINEAR_EPOCHS = 300
 STANDARD_EPOCHS = 300
 

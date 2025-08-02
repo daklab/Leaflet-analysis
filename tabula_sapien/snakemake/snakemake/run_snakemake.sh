@@ -4,7 +4,7 @@
 #SBATCH -p cpu
 #SBATCH -J TABULA_SAPIEN
 #SBATCH -c 1
-#SBATCH --mem=10G
+#SBATCH --mem=32G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
 #SBATCH --output=TABULA_SAPIEN_%j.log
 
@@ -29,15 +29,16 @@ STAR --version
 
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/tabula_sapien/snakemake/snakemake
-
-# First define the SLURM output directory
 slurm_out="/commons/projects/CZI-tabula-sapiens/slurm/logs"
-if [ ! -d "$slurm_out" ]; then
-    mkdir -p $slurm_out
+
+# Make a dir inside sliurm_out with today's date
+slurm_out_today=$slurm_out/$(date +%Y%m%d)
+if [ ! -d "$slurm_out_today" ]; then
+    mkdir -p $slurm_out_today
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 32 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 200 --rerun-incomplete #--unlock
+snakemake -j 128 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out_today/slurm-%j.out --error=$slurm_out_today/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 echo "Snakemake workflow submitted"
 
 # to submit go here

@@ -20,10 +20,12 @@ WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOU
 cd $WD
 
 # in WD, make junction_files.txt with all the *_junctions_with_barcodes.bed files found in JUNCTION_FILES
-find $JUNCTION_FILES_AB -name "*_junctions_with_barcodes.bed" > $WD/junction_files_AB.txt
-find $JUNCTION_FILES_TS -name "*_junctions_with_barcodes.bed" > $WD/junction_files_TS.txt
+# Add today date to the file name to avoid overwriting and make sure it's in $WD 
+find $JUNCTION_FILES_AB -name "*_junctions_with_barcodes.bed" > $WD/junction_files_AB_$(date +%Y%m%d).txt
+find $JUNCTION_FILES_TS -name "*_junctions_with_barcodes.bed" > $WD/junction_files_TS_$(date +%Y%m%d).txt
 
-# Update junction file for TS and AB using this script /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/tabula_sapien_extract_BAM.ipynb
+# Update junction file for TS and AB using this script /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/metadata/01_TabulaSapien_extract_BAM_files_to_keep.ipynb
+# and /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/metadata/02_TS_vs_AB_make_shared_metadata.py 
 # So that only use the cells that Tabula Sapiens endedup using (had way more raw data...)
 clean_TS_juncs=$WD/junction_files_TS_subset.txt
 clean_AB_juncs=$WD/junction_files_AB_subset.txt

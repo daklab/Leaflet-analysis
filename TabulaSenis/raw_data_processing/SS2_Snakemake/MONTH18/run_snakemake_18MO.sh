@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH -N 1 # Ensure that all cores are on one machine
-#SBATCH -J TMS_3M
+#SBATCH -J TMS_18M
 #SBATCH -c 1
 #SBATCH --mem=16G
 #SBATCH -t 5-00:00 # Runtime in D-HH:MM
@@ -21,10 +21,16 @@ module load samtools
 
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/raw_data_processing/SS2_Snakemake/MONTH18
-slurm_out=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM/
+
+slurm_out=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM2025/MONTH18
+slurm_out_today=$slurm_out/$(date +%Y%m%d)
+if [ ! -d "$slurm_out_today" ]; then
+    mkdir -p $slurm_out_today
+fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake --keep-going -j 32 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake --keep-going -j 64 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out_today/slurm-%j.out --error=$slurm_out_today/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 echo "Snakemake workflow submitted"
 
-
+# cd $slurm_out_today
+# sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/raw_data_processing/SS2_Snakemake/MONTH18/run_snakemake_18MO.sh

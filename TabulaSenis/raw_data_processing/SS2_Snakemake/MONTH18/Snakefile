@@ -26,11 +26,15 @@ rule add_cb_tag:
     input:
         bam = lambda wildcards: sample_bam_map[wildcards.sample]
     output:
-        bam_CB = config["results_dir"] + "/{sample}/CB.bam"
+        bam_CB = os.path.join(config["raw_dir"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
+    params:
+        sample = lambda wildcards: wildcards.sample
     shell:
         """
         echo "Adding CB tag to BAM file: {input.bam}"
-        samtools view -h {input.bam} | awk -v cb={wildcards.sample} 'BEGIN {{OFS="\t"}} {{$NF = $NF"\tCB:Z:"cb; print}}' | samtools view -bS - > {output.bam_CB}
+        samtools view -h {input.bam} | \
+        awk -v cb="{params.sample}" 'BEGIN {{OFS="\t"}} {{if ($1 ~ /^@/) print; else print $0 "\tCB:Z:" cb;}}' | \
+        samtools view -b - > {output.bam_CB}
         """
 
 # rule index the bam file
@@ -38,7 +42,7 @@ rule index_bam:
     input:
         bam = rules.add_cb_tag.output.bam_CB
     output:
-        bai = config["results_dir"] + "/{sample}/CB.bam.bai"
+        bai = rules.add_cb_tag.output.bam_CB + ".bai"
     shell:
         """
         echo "Indexing BAM file: {input.bam}"
@@ -60,20 +64,17 @@ rule extract_junctions:
         """
         echo "Extracting junctions with barcodes from BAM file: {input.bam}"
         {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
-        # Combine junctions and barcodes
         paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
-        # Delete input bam file no longer needed 
-        rm {input.bam}
-        rm {input.bai}
+        rm {input.bam} {input.bai}
         echo "Done extracting junctions with barcodes"
         """
-
+        
 rule summarize_splicing:
     input:
-        bam=rules.add_cb_tag.output.bam_CB,
-        juncs=config["results_dir"] + "/{sample}/junctions.bed"
+        bam = rules.add_cb_tag.output.bam_CB,
+        juncs = config["results_dir"] + "/{sample}/junctions.bed"
     output:
-        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv")
+        summary = config["results_dir"] + "/{sample}_splicing_summary.tsv"
     shell:
         """
         echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads" > {output.summary}
@@ -81,10 +82,7 @@ rule summarize_splicing:
         sample=$(basename {input.bam} | cut -d'.' -f1)
         total_reads=$(samtools view -c -F 4 {input.bam})
 
-        # Ensure the file has at least five columns before extracting spliced reads
         spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
-
-        # Ensure spliced_reads is not empty or invalid
         if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
             spliced_reads=0
         fi

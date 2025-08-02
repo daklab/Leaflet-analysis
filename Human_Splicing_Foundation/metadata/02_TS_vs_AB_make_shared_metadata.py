@@ -36,8 +36,8 @@ from scipy.sparse import csr_matrix
 # === Paths and output ===
 print(f"Reading in the anndata objects...")
 outdir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/"
-ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_2025-04-15.h5ad")
-ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_2025-04-15.h5ad")
+ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_2025-06-22.h5ad")
+ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_2025-06-22.h5ad")
 
 # Columns that we have in the shared metadata file in mouse foundation 
 # cell_id, age, cell_ontology_class, mouse.id, sex, subtissue, tissue
@@ -381,8 +381,8 @@ print("Done saving metadata!")
 
 # Ensure only samples with metadata go through Leaflet and ATSEmapper pipeline
 # Paths generated via /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/ATSE_mapper/ATSEmap_SLURM/01_split_junctions.sh
-ab_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_AB.txt"
-ts_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS.txt"
+ab_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_AB_20250730.txt"
+ts_junc_filelist = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS_20250730.txt"
 
 # Output
 clean_ts = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_files_TS_subset.txt"
