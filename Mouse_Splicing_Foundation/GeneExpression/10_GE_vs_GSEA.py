@@ -44,20 +44,21 @@ OUTPUT_DIR = os.path.join(OUTPUT_DIR, today)
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
-make_plot = False # already made plots
+make_plot = True # already made plots
 mouse = True 
 
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-07-30.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_50_1024_2025-07-30.h5ad"
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_2025-08-03.h5ad"
+GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_20_1024_2025-08-03.h5ad"
 
 AGING_GENES_PATH="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
 RBP_FILE_PATH="/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
 
 # %%
-ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
-print(f"Done reading scVI anndata from {GE_ANNDATA_scVI_PATH}")
 ge_adata_nmf = ad.read_h5ad(GE_ANNDATA_NMF_PATH)
 print(f"Done reading NMF anndata from {GE_ANNDATA_NMF_PATH}")
+
+ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
+print(f"Done reading scVI anndata from {GE_ANNDATA_scVI_PATH}")
 
 # %%
 # If ge_adata.obs doesn't have cell_id make it from cell_id_clean
@@ -95,6 +96,9 @@ assert np.all(ge_adata.var_names == ge_adata_nmf.var_names), "Gene names in ge_a
 
 ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
 ge_adata.varm["nmf_standard_mb_components"] = ge_adata_nmf.varm["nmf_standard_mb_components"]
+# Add PCA loadings to ge_adata
+ge_adata.obsm["X_pca"] = ge_adata_nmf.obsm["X_pca"]
+ge_adata.varm["pca_loadings"] = ge_adata_nmf.varm["pca_loadings"]
 
 # %%
 # from scVI 
@@ -237,14 +241,20 @@ print(len(gene_names))
 nmf_loadings = pd.DataFrame(
     ge_adata.varm["nmf_standard_mb_components"],  # shape: (genes, components)
     index=gene_names,
-    columns=[f"NMF_{i}" for i in range(ge_adata.varm["nmf_standard_mb_components"].shape[1])]
+    columns=[f"NMF_{i+1}" for i in range(ge_adata.varm["nmf_standard_mb_components"].shape[1])]
+)
+
+pca_loadings = pd.DataFrame(
+    ge_adata.varm["pca_loadings"],  # shape: (genes, components)
+    index=gene_names,
+    columns=[f"PCA_{i+1}" for i in range(ge_adata.varm["pca_loadings"].shape[1])]
 )
 
 # scVI linear loadings are already in gene × factor format
 scvi_loadings = pd.DataFrame(
     ge_adata.varm["scVI_linear_gene_loadings"],  # also shape (genes, components)
     index=gene_names,
-    columns=[f"Z_{i}" for i in range(ge_adata.varm["scVI_linear_gene_loadings"].shape[1])]
+    columns=[f"Z_{i+1}" for i in range(ge_adata.varm["scVI_linear_gene_loadings"].shape[1])]
 )
 
 # ### Get associations of NMF / scVI loadings with cell types
@@ -297,6 +307,14 @@ def plot_factor_heatmap(
 
 plot_factor_heatmap(
     ge_adata,
+    factor_key="X_pca",
+    method_label="PCA",
+    output_dir=OUTPUT_DIR,
+    filename="pca_factor_celltype_heatmap.pdf"
+)
+
+plot_factor_heatmap(
+    ge_adata,
     factor_key="X_nmf_standard_mb",
     method_label="NMF",
     output_dir=OUTPUT_DIR,
@@ -314,17 +332,20 @@ plot_factor_heatmap(
 def run_gsea_on_loadings(loadings_df, gene_set="GO_Biological_Process_2021", organism="Mouse"):
     annotations = {}
     for factor in tqdm(loadings_df.columns, desc="Processing factors"):
+        print(factor)
         try:
             res = gp.prerank(rnk=loadings_df[factor].sort_values(ascending=False), 
                            gene_sets=gene_set, organism=organism, permutation_num=100, 
                            outdir=None, threads=16, min_size=15, max_size=500)
             annotations[factor] = res.res2d[["Term", "ES", "NES", "NOM p-val", "FDR q-val", "Lead_genes", "Tag %", "Gene %"]] if not res.res2d.empty else None
-            print(annotations[factor])
         except:
+            print(f"Error with factor {factor}")
             annotations[factor] = None
     return annotations
 
 # Usage
+gsea_pca = run_gsea_on_loadings(pca_loadings)   
+print(f"Done with GSEA on PCA!")
 gsea_nmf = run_gsea_on_loadings(nmf_loadings)
 print(f"Done with GSEA on NMF!")
 gsea_scvi = run_gsea_on_loadings(scvi_loadings)
@@ -334,10 +355,10 @@ print(f"Done with GSEA on scVI!")
 # Save to compressed tsv files 
 nmf_loadings.to_csv(os.path.join(OUTPUT_DIR, "nmf_loadings.tsv.gz"), sep="\t", compression="gzip")
 scvi_loadings.to_csv(os.path.join(OUTPUT_DIR, "scvi_loadings.tsv.gz"), sep="\t", compression="gzip")
+pca_loadings.to_csv(os.path.join(OUTPUT_DIR, "pca_loadings.tsv.gz"), sep="\t", compression="gzip")
+print(f"Done saving loadings to {OUTPUT_DIR}")
 
-print(f"Done saving GSEA results to {OUTPUT_DIR}")
-
-def build_factor_term_matrix(gsea_results, score_type='NES', qval_threshold=0.05, max_terms=5):
+def build_factor_term_matrix(gsea_results, score_type='NES', qval_threshold=1, max_terms=5):
     """
     Build matrix of terms vs factors using ES, NES, or -log10(q-value)
     
@@ -356,7 +377,7 @@ def build_factor_term_matrix(gsea_results, score_type='NES', qval_threshold=0.05
     for factor, df in gsea_results.items():
         if df is not None:
             # Filter for significant terms first
-            sig_df = df[df['FDR q-val'] < qval_threshold]
+            sig_df = df[df['FDR q-val'] <= qval_threshold]
             
             # If more than max_terms significant, keep top max_terms
             if len(sig_df) > max_terms:
@@ -373,19 +394,42 @@ def build_factor_term_matrix(gsea_results, score_type='NES', qval_threshold=0.05
     
     return pd.DataFrame(term_dict).T.fillna(0)
 
+def flatten_gsea_results(gsea_dict, label):
+    """
+    Convert a dict of DataFrames (one per factor) into a single concatenated DataFrame
+    with a 'Factor' column and a 'Method' label.
+    """
+    all_rows = []
+    for factor, df in gsea_dict.items():
+        if df is not None:
+            temp = df.copy()
+            temp["Factor"] = factor
+            temp["Method"] = label
+            all_rows.append(temp)
+    return pd.concat(all_rows, axis=0) if all_rows else pd.DataFrame()
+
+
+# Flatten all GSEA outputs
+flat_nmf = flatten_gsea_results(gsea_nmf, label="NMF")
+flat_scvi = flatten_gsea_results(gsea_scvi, label="scVI")
+flat_pca = flatten_gsea_results(gsea_pca, label="PCA")
+
+# Save as compressed TSVs
+flat_nmf.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_flat_nmf.tsv.gz"), sep="\t", index=False, compression="gzip")
+flat_scvi.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_flat_scvi.tsv.gz"), sep="\t", index=False, compression="gzip")
+flat_pca.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_flat_pca.tsv.gz"), sep="\t", index=False, compression="gzip")
+
+print("✅ Saved flattened GSEA result tables (one row per term-factor pair) for NMF, scVI, PCA")
+
 # Build matrices using different scores
 nmf_nes_matrix = build_factor_term_matrix(gsea_nmf, score_type='NES')
 scvi_nes_matrix = build_factor_term_matrix(gsea_scvi, score_type='NES')
+pca_nes_matrix = build_factor_term_matrix(gsea_pca, score_type='NES')
 
 nmf_es_matrix = build_factor_term_matrix(gsea_nmf, score_type='ES')
 scvi_es_matrix = build_factor_term_matrix(gsea_scvi, score_type='ES')
+pca_es_matrix = build_factor_term_matrix(gsea_pca, score_type='ES')
 
-# Save all matrices to output directory compressed tsv files 
-nmf_nes_matrix.to_csv(os.path.join(OUTPUT_DIR, "nmf_gsea_nes_matrix.tsv"), sep="\t")
-scvi_nes_matrix.to_csv(os.path.join(OUTPUT_DIR, "scvi_gsea_nes_matrix.tsv"), sep="\t")
-
-nmf_es_matrix.to_csv(os.path.join(OUTPUT_DIR, "nmf_gsea_es_matrix.tsv"), sep="\t")
-scvi_es_matrix.to_csv(os.path.join(OUTPUT_DIR, "scvi_gsea_es_matrix.tsv"), sep="\t")
 
 # %%
 def plot_gsea_heatmap(term_matrix, title, filename, output_dir=None, score_type='NES'):
@@ -405,7 +449,7 @@ def plot_gsea_heatmap(term_matrix, title, filename, output_dir=None, score_type=
         term_matrix,
         cmap="PRGn",  # Purple-Green colormap
         center=0,     # Center colormap at 0 for NES
-        figsize=(7, 12),
+        figsize=(7, 15),
         col_cluster=True,
         row_cluster=True,
         xticklabels=True,
@@ -436,6 +480,15 @@ def plot_gsea_heatmap(term_matrix, title, filename, output_dir=None, score_type=
 
 # %%
 # Updated plotting calls
+
+plot_gsea_heatmap(
+    pca_nes_matrix,
+    title="PCA Factors – GSEA Terms",
+    filename="pca_gsea_nes_clustermap.pdf",
+    output_dir=OUTPUT_DIR,
+    score_type='NES'
+)
+
 plot_gsea_heatmap(
     nmf_nes_matrix,
     title="NMF Factors – GSEA Terms",
@@ -454,4 +507,4 @@ plot_gsea_heatmap(
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
 # script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/10_GE_vs_GSEA.py
-# sbatch --mem=350G -p cpu,bigmem -J "MUS_GE_vs_AGING" --wrap="python $script"
+# sbatch --mem=300G -p dev,cpu,bigmem -J "MUS_GE_vs_AGING" --wrap="python $script"

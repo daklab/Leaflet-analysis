@@ -36,8 +36,8 @@ GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPL
 # Model configuration
 LINEAR_LATENT = 20
 STANDARD_LATENT = 20
-LINEAR_EPOCHS = 300
-STANDARD_EPOCHS = 300
+LINEAR_EPOCHS = 500
+STANDARD_EPOCHS = 500
 
 def load_data():
     """Load aligned gene expression data"""
@@ -307,6 +307,8 @@ print("========================================\n")
 ge_adata = load_data()
 check_data_quality(ge_adata, "length_norm")
 
+print(f"Number of latent dimensions: {LINEAR_LATENT}")
+
 # Train LinearSCVI model without batch key
 ge_adata, linear_model = train_linear_scvi(ge_adata)
 
@@ -315,11 +317,11 @@ if linear_model is not None:
     plot_training_metrics(linear_model, "LinearSCVI")
 
 # Train standard SCVI model with batch key
-ge_adata, standard_model = train_standard_scvi(ge_adata)
+#ge_adata, standard_model = train_standard_scvi(ge_adata)
 
 # Plot training metrics for standard SCVI
-if standard_model is not None:
-    plot_training_metrics(standard_model, "StandardSCVI")
+#if standard_model is not None:
+#    plot_training_metrics(standard_model, "StandardSCVI")
 
 # Save combined results to single AnnData object
 save_results(ge_adata)

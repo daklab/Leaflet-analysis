@@ -21,6 +21,7 @@ import seaborn as sns
 from tqdm import tqdm
 from scipy.sparse import csr_matrix, issparse
 from sklearn.decomposition import MiniBatchNMF
+from sklearn.decomposition import PCA
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -32,8 +33,8 @@ print(f"Output directory: {OUTPUT_DIR}", flush=True)
 GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250730_164104.h5ad"
 
 # Define NMF model parameters
-STANDARD_LATENT = 50
-STANDARD_EPOCHS = 200
+STANDARD_LATENT = 20
+STANDARD_EPOCHS = 300
 NMF_BATCH_SIZE = 1024 # Batch size for MiniBatchNMF
 
 def load_data():
@@ -76,12 +77,60 @@ def check_data_quality(adata, layer_name):
         print(f"   Data quality check passed for layer '{layer_name}'.")
 
 
+def run_standard_PCA(ge_adata):
+    """Run standard PCA on HVGs using the same layer as NMF"""
+    print("\n>> Running PCA on HVGs...")
+
+    layer_name = "log_norm"
+    if layer_name not in ge_adata.layers:
+        print(f"  Error: Layer '{layer_name}' not found.")
+        sys.exit(1)
+
+    if "highly_variable" not in ge_adata.var.columns:
+        print("  Error: 'highly_variable' column not found in .var.")
+        sys.exit(1)
+
+    # Subset to HVGs
+    hvg_mask = ge_adata.var["highly_variable"].values
+    adata_hvg = ge_adata[:, hvg_mask]
+    data_matrix = adata_hvg.layers[layer_name]
+
+    if issparse(data_matrix):
+        data_matrix = data_matrix.toarray()
+
+    print(f"  Using {hvg_mask.sum()} HVGs for PCA.")
+
+    # Center the data
+    data_matrix -= np.nanmean(data_matrix, axis=0)
+
+    # Run PCA
+    pca_model = PCA(n_components=STANDARD_LATENT, random_state=0)
+    X_pca = pca_model.fit_transform(data_matrix)
+
+    # Save cell embeddings
+    ge_adata.obsm["X_pca"] = X_pca
+
+    # Save gene loadings (components) into full matrix (NaN for non-HVGs)
+    H_pca_full = np.full((ge_adata.n_vars, STANDARD_LATENT), np.nan)
+    H_pca_full[hvg_mask, :] = pca_model.components_.T
+    ge_adata.varm["pca_loadings"] = H_pca_full
+
+    # Save explained variance
+    ge_adata.uns["pca_variance_ratio"] = pca_model.explained_variance_ratio_
+
+    print(f"  PCA complete.")
+    print(f"    Cell embeddings → ge_adata.obsm['X_pca']: {X_pca.shape}")
+    print(f"    Gene loadings   → ge_adata.varm['pca_loadings']: {H_pca_full.shape}")
+    print(f"    Explained variance ratio (first 5): {pca_model.explained_variance_ratio_[:5]}")
+
+    return ge_adata
+
 def train_mini_batch_NMF(ge_adata):
 
     """Train standard MiniBatchNMF model on HVGs using sklearn's MiniBatchNMF"""
     print("\n>> Training Standard MiniBatchNMF model...")
 
-    layer_name = "predicted_log_norm_tms"
+    layer_name = "log_norm"
     if layer_name not in ge_adata.layers:
         print(f"  Error: Layer '{layer_name}' not found. Cannot proceed with NMF.")
         sys.exit(1)
@@ -194,7 +243,10 @@ print("========================================\n")
 
 # Load data
 ge_adata = load_data()
-check_data_quality(ge_adata, "predicted_log_norm_tms") 
+check_data_quality(ge_adata, "log_norm") 
+
+# Run standard PCA
+ge_adata = run_standard_PCA(ge_adata)
 
 # Train mini batch NMF model
 ge_adata = train_mini_batch_NMF(ge_adata)

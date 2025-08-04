@@ -23,12 +23,11 @@ os.makedirs(log_dir, exist_ok=True)
 # Slurm job script template
 job_script_template = """#!/bin/bash
 #SBATCH --job-name=leaflet_{job_id}
-#SBATCH --output={log_dir}/leaflet_{job_id}.out
-#SBATCH --error={log_dir}/leaflet_{job_id}.err
-#SBATCH --time=2-12:00:00
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=850G
-#SBATCH --partition=bigmem
+#SBATCH --output={log_dir}/leaflet_gpu_{job_id}.out
+#SBATCH --error={log_dir}/leaflet_gpu_{job_id}.err
+#SBATCH --mem=300G
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
 
 # Set Python to run in unbuffered mode to ensure real-time output
 export PYTHONUNBUFFERED=1
@@ -49,7 +48,7 @@ for i, params in enumerate(param_list):
     )
 
     # Save job script
-    job_file = os.path.join(base_output_dir, f"leaflet_job_{i}.slurm")
+    job_file = os.path.join(base_output_dir, f"leaflet_gpu_job_{i}.slurm")
     with open(job_file, "w") as f:
         f.write(job_script)
 
