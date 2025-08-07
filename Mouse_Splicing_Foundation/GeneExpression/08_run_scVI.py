@@ -23,6 +23,19 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+import openpyxl 
+
+# Import LeafletFA differential splicing code
+src_path = "/gpfs/commons/home/kisaev/Leaflet-private/src/"
+utils_path = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils/"
+
+if src_path not in sys.path:
+    sys.path.append(src_path)
+if utils_path not in sys.path:
+    sys.path.append(utils_path)
+
+# Import custom modules
+from utils import *
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -35,9 +48,76 @@ GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPL
 
 # Model configuration
 LINEAR_LATENT = 20
-STANDARD_LATENT = 20
-LINEAR_EPOCHS = 500
-STANDARD_EPOCHS = 500
+LINEAR_EPOCHS = 200
+
+# Gene selection configuration
+N_TOP_GENES = 2000  # Number of highly variable genes to select
+
+# Clustering and visualization configuration
+SCVI_LATENT_KEY = "X_scVI_linear"
+SCVI_CLUSTERS_KEY = "leiden_scVI"
+N_NEIGHBORS = 10
+UMAP_MIN_DIST = 0.3
+UMAP_SPREAD = 1.0
+LEIDEN_RESOLUTION = 0.8
+
+# Reference files
+AGING_GENES_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
+RBP_FILE_PATH = "/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
+
+def load_reference_genes(aging_genes_path, rbp_file_path):
+    """Load aging genes and RBP genes."""
+    aging_genes_mouse, aging_genes_human = load_aging_genes(aging_genes_path)
+    rbps = load_rbp_genes(rbp_file_path)
+    
+    # Process gene names
+    rbps["mouse_gene_name"] = rbps["mouse_gene_name"].str.upper()
+    aging_genes_mouse = [g.upper() for g in aging_genes_mouse]
+    
+    return aging_genes_mouse, rbps
+
+def annotate_genes(ge_adata, aging_genes_mouse, rbps):
+    """Annotate genes with aging and RBP information."""
+    print("\n>> Annotating genes with reference information...")
+    
+    try:
+        # Check if gene_name column exists
+        if "gene_name" not in ge_adata.var.columns:
+            print("   ⚠️ 'gene_name' column not found in var, using var_names")
+            ge_adata.var["gene_name"] = ge_adata.var_names.str.upper()
+        else:
+            # Ensure gene names are uppercase for matching
+            ge_adata.var["gene_name"] = ge_adata.var["gene_name"].str.upper()
+        
+        # Annotate RBP genes
+        if not rbps.empty and "mouse_gene_name" in rbps.columns:
+            ge_adata.var["RBP_gene"] = ge_adata.var["gene_name"].isin(rbps["mouse_gene_name"])
+            n_rbp_found = ge_adata.var["RBP_gene"].sum()
+            print(f"   ✓ Found {n_rbp_found} RBP genes in dataset")
+        else:
+            print("   ⚠️ No RBP gene data available, setting all to False")
+            ge_adata.var["RBP_gene"] = False
+            n_rbp_found = 0
+        
+        # Annotate aging genes
+        if aging_genes_mouse:
+            ge_adata.var["Aging_gene"] = ge_adata.var["gene_name"].isin(aging_genes_mouse)
+            n_aging_found = ge_adata.var["Aging_gene"].sum()
+            print(f"   ✓ Found {n_aging_found} aging genes in dataset")
+        else:
+            print("   ⚠️ No aging gene data available, setting all to False")
+            ge_adata.var["Aging_gene"] = False
+            n_aging_found = 0
+        
+        return ge_adata, n_rbp_found, n_aging_found
+        
+    except Exception as e:
+        print(f"   ❌ Error annotating genes: {str(e)}")
+        traceback.print_exc()
+        # Set default annotations
+        ge_adata.var["RBP_gene"] = False
+        ge_adata.var["Aging_gene"] = False
+        return ge_adata, 0, 0
 
 def load_data():
     """Load aligned gene expression data"""
@@ -156,6 +236,96 @@ def check_data_quality(ge_adata, layer_name="length_norm"):
         print(f"   ❌ Error checking data quality: {str(e)}")
         traceback.print_exc()
         
+def select_genes_for_training(ge_adata, n_top_genes=N_TOP_GENES):
+    """
+    Select genes for scVI training: top N highly variable genes + RBP genes + aging genes
+    Uses the pre-annotated RBP_gene and Aging_gene columns
+    """
+    print(f"\n>> Selecting genes for scVI training...")
+    print(f"   ⚙️ Target: {n_top_genes} HVGs + RBP genes + aging genes")
+    
+    try:
+        # Make a copy to avoid modifying the original
+        adata_copy = ge_adata.copy()
+        
+        # Step 1: Calculate highly variable genes
+        print("   ⚙️ Calculating highly variable genes...")
+        sc.pp.highly_variable_genes(
+            adata_copy, 
+            layer="length_norm",
+            n_top_genes=n_top_genes,
+            flavor='seurat_v3', 
+            batch_key="dataset"
+        )
+        
+        # Get HVG gene names
+        hvg_genes = adata_copy.var_names[adata_copy.var.highly_variable].tolist()
+        print(f"   ✓ Found {len(hvg_genes)} highly variable genes")
+        
+        # Step 2: Get RBP genes from annotations
+        if "RBP_gene" in ge_adata.var.columns:
+            rbp_genes = ge_adata.var_names[ge_adata.var.RBP_gene].tolist()
+            print(f"   ✓ Found {len(rbp_genes)} RBP genes in dataset")
+        else:
+            print("   ⚠️ RBP_gene annotation not found")
+            rbp_genes = []
+        
+        # Step 3: Get aging genes from annotations
+        if "Aging_gene" in ge_adata.var.columns:
+            aging_genes = ge_adata.var_names[ge_adata.var.Aging_gene].tolist()
+            print(f"   ✓ Found {len(aging_genes)} aging genes in dataset")
+        else:
+            print("   ⚠️ Aging_gene annotation not found")
+            aging_genes = []
+        
+        # Step 4: Combine all selected genes (remove duplicates)
+        selected_genes = list(set(hvg_genes + rbp_genes + aging_genes))
+        print(f"   ✓ Total selected genes: {len(selected_genes)}")
+        
+        # Step 5: Create subset AnnData with selected genes
+        print("   ⚙️ Creating subset with selected genes...")
+        ge_adata_subset = ge_adata[:, selected_genes].copy()
+        
+        # Step 6: Add gene selection metadata
+        ge_adata_subset.var['is_hvg'] = ge_adata_subset.var_names.isin(hvg_genes)
+        ge_adata_subset.var['is_rbp'] = ge_adata_subset.var.get('RBP_gene', False)
+        ge_adata_subset.var['is_aging'] = ge_adata_subset.var.get('Aging_gene', False)
+        
+        # Count overlaps
+        hvg_rbp_overlap = len(set(hvg_genes) & set(rbp_genes))
+        hvg_aging_overlap = len(set(hvg_genes) & set(aging_genes))
+        rbp_aging_overlap = len(set(rbp_genes) & set(aging_genes))
+        
+        print(f"   ✓ Gene category breakdown:")
+        print(f"      - HVGs only: {len(hvg_genes) - hvg_rbp_overlap - hvg_aging_overlap}")
+        print(f"      - RBP genes only: {len(rbp_genes) - hvg_rbp_overlap - rbp_aging_overlap}")
+        print(f"      - Aging genes only: {len(aging_genes) - hvg_aging_overlap - rbp_aging_overlap}")
+        print(f"      - HVG + RBP overlap: {hvg_rbp_overlap}")
+        print(f"      - HVG + Aging overlap: {hvg_aging_overlap}")
+        print(f"      - RBP + Aging overlap: {rbp_aging_overlap}")
+        
+        # Add selection metadata to uns
+        ge_adata_subset.uns['gene_selection'] = {
+            'n_top_hvgs_requested': n_top_genes,
+            'n_hvgs_found': len(hvg_genes),
+            'n_rbp_genes_found': len(rbp_genes),
+            'n_aging_genes_found': len(aging_genes),
+            'total_selected_genes': len(selected_genes),
+            'selection_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'hvg_rbp_overlap': hvg_rbp_overlap,
+            'hvg_aging_overlap': hvg_aging_overlap,
+            'rbp_aging_overlap': rbp_aging_overlap
+        }
+        
+        print(f"   ✓ Gene selection complete: {ge_adata_subset.n_vars} genes selected for training")
+        
+        return ge_adata_subset
+        
+    except Exception as e:
+        print(f"   ❌ Error during gene selection: {str(e)}")
+        traceback.print_exc()
+        raise
+
 def train_linear_scvi(ge_adata, batch_key=None):
     """Train LinearSCVI model for gene expression data using ALL genes"""
     print("\n>> Training LinearSCVI model...")
@@ -200,79 +370,61 @@ def train_linear_scvi(ge_adata, batch_key=None):
         traceback.print_exc()
         raise
 
-def train_standard_scvi(ge_adata, batch_key=None):
-    """Train standard SCVI model for gene expression data"""
-    print("\n>> Training standard SCVI model...")
-    
-    try:
-        # Setup for model
-        print("   ⚙️ Setting up AnnData for standard SCVI...")
+def perform_clustering_and_visualization(
+        ge_adata,
+        latent_key=SCVI_LATENT_KEY,
+        clusters_key=SCVI_CLUSTERS_KEY,
+        neighbors=N_NEIGHBORS,
+        min_dist=UMAP_MIN_DIST,
+        spread=UMAP_SPREAD,
+        leiden_res=LEIDEN_RESOLUTION,
+        plot=True,
+):
+    """
+    Compute neighbors → UMAP → Leiden on an existing latent space and
+    (optionally) save a UMAP PNG coloured by clusters.
+    """
+    if latent_key not in ge_adata.obsm:
+        raise KeyError(f"Latent key '{latent_key}' not found in .obsm")
 
-        if batch_key is None:
-            print("   ⚙️ Not using batch key for standard SCVI model")
-            scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm")
-        else:
-            print(f"   ⚙️ Using batch key: {batch_key} for standard SCVI model")
-            scvi.model.SCVI.setup_anndata(ge_adata, layer="length_norm", batch_key=batch_key)
+    # Nearest-neighbour graph on latent space
+    sc.pp.neighbors(ge_adata, use_rep=latent_key, n_neighbors=neighbors)
 
-        model = scvi.model.SCVI(ge_adata, n_latent=STANDARD_LATENT)
-        
-        print(f"   ⚙️ Training model for {STANDARD_EPOCHS} epochs...")
-        model.train(max_epochs=STANDARD_EPOCHS, check_val_every_n_epoch=10)
-        
-        # Extract results and save to obsm
-        print("   ⚙️ Extracting latent representation...")
-        Z_hat = model.get_latent_representation()
-        ge_adata.obsm["X_scVI_standard"] = Z_hat
-        ge_adata.obsm["X_normalized_scVI_standard"] = model.get_normalized_expression()
-        
-        # Add model metadata to uns
-        ge_adata.uns["scvi_standard"] = {
-            "model_type": "SCVI",
-            "n_latent": STANDARD_LATENT,
-            "training_date": datetime.datetime.now().strftime("%Y-%m-%d"),
-            "trained_on_all_genes": True,
-            "n_genes_used": ge_adata.n_vars
-        }
-        
-        print("   ✓ Standard SCVI model training complete")
-        
-        return ge_adata, model
-        
-    except Exception as e:
-        print(f"   ❌ Error training standard SCVI model: {str(e)}")
-        traceback.print_exc()
-        return ge_adata, None
+    # 2-D UMAP embedding
+    sc.tl.umap(ge_adata, min_dist=min_dist, spread=spread)
 
-def plot_training_metrics(model, model_type):
-    """Plot training metrics for the scVI model"""
-    print(f"\n>> Generating training metrics plot for {model_type}...")
-    
-    try:
-        # Extract ELBO loss curves
-        train_elbo = model.history["elbo_train"][1:]
-        test_elbo = model.history["elbo_validation"]
-        
-        # Create figure
-        plt.figure(figsize=(10, 6))
-        ax = train_elbo.plot(label="Training ELBO")
-        test_elbo.plot(ax=ax, label="Validation ELBO")
-        plt.title(f"{model_type} Training Metrics")
-        plt.legend()
-        
-        # Save plot
-        plot_file = os.path.join(OUTPUT_DIR, f"scvi_{model_type.lower()}_training_metrics_{timestamp}.png")
-        plt.savefig(plot_file, dpi=300, bbox_inches="tight")
+    # Leiden clustering
+    sc.tl.leiden(ge_adata, key_added=clusters_key, resolution=leiden_res)
+
+    # Metadata for reproducibility
+    ge_adata.uns[f"{clusters_key}_params"] = dict(
+        latent_key_used=latent_key,
+        n_neighbors=neighbors,
+        umap_min_dist=min_dist,
+        umap_spread=spread,
+        leiden_resolution=leiden_res,
+        date=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
+
+    # Optional PNG
+    if plot:
+        fig_path = os.path.join(
+            OUTPUT_DIR, f"umap_linear_scvi_{timestamp}.png"
+        )
+        sc.pl.umap(
+            ge_adata,
+            color=[clusters_key, "broad_cell_type"],
+            # display in one column two rows 
+            ncols=1,
+            size=10,
+            frameon=False,
+            show=False,
+        )
+        plt.savefig(fig_path, dpi=300, bbox_inches="tight")
         plt.close()
-        
-        print(f"   ✓ Training metrics plot saved to {plot_file}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"   ❌ Error plotting training metrics: {str(e)}")
-        traceback.print_exc()
-        return False
+        print(f"   ✓ UMAP figure saved to {fig_path}")
+
+    return ge_adata
 
 def save_results(ge_adata):
     """Save updated AnnData with both scVI results"""
@@ -281,7 +433,7 @@ def save_results(ge_adata):
     try:
         # Define output filename
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_both_scvi_models_{today}.h5ad")
+        output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_both_scvi_models_latent_{LINEAR_LATENT}_{today}.h5ad")
         
         # Save file
         print(ge_adata)
@@ -297,39 +449,41 @@ def save_results(ge_adata):
         traceback.print_exc()
         return False
 
-# Main execution
 print("\n========================================")
-print("scVI Model Training - Mouse Splicing Foundation")
-print("Running both LinearSCVI and standard SCVI models on ALL genes")
+print("LinearSCVI – Mouse Splicing Foundation")
 print("========================================\n")
 
-# Load data
+# 1. Load & QC
 ge_adata = load_data()
 check_data_quality(ge_adata, "length_norm")
-
 print(f"Number of latent dimensions: {LINEAR_LATENT}")
 
-# Train LinearSCVI model without batch key
-ge_adata, linear_model = train_linear_scvi(ge_adata)
+# Load reference genes
+aging_genes_mouse, rbps = load_reference_genes(AGING_GENES_PATH, RBP_FILE_PATH)
+# Annotate genes with reference information
+ge_adata, n_rbp_found, n_aging_found = annotate_genes(
+    ge_adata, aging_genes_mouse, rbps
+)
 
-# Plot training metrics for LinearSCVI
-if linear_model is not None:
-    plot_training_metrics(linear_model, "LinearSCVI")
+# 3. Get ge_adata subset for training 
+ge_adata_subset = select_genes_for_training(ge_adata)
 
-# Train standard SCVI model with batch key
-#ge_adata, standard_model = train_standard_scvi(ge_adata)
+# 2. Train LinearSCVI
+ge_adata_subset, linear_model = train_linear_scvi(ge_adata_subset)
 
-# Plot training metrics for standard SCVI
-#if standard_model is not None:
-#    plot_training_metrics(standard_model, "StandardSCVI")
+# 3. UMAP + Leiden on latent space
+ge_adata_subset = perform_clustering_and_visualization(
+    ge_adata_subset,
+    latent_key="X_scVI_linear",
+    clusters_key="leiden_scVI",
+)
 
-# Save combined results to single AnnData object
-save_results(ge_adata)
+# 5. Save updated AnnData
+save_results(ge_adata_subset)
 
 print("\n========================================")
-print("Both scVI models training complete!")
-print("Low-dimensional representations saved for downstream analysis")
-print(f"Results saved to: {OUTPUT_DIR}")
+print("LinearSCVI training + UMAP complete!")
+print(f"Outputs written to: {OUTPUT_DIR}")
 print("========================================\n")
 
 # conda activate scvi-env

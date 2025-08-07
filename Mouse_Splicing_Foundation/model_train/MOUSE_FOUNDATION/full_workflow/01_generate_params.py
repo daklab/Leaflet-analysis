@@ -26,11 +26,11 @@ param_grid = {
     "num_inits": [1],
     "ELBO_num_particles": [5],
     "num_samples": [100],
-    'gamma': [0.01, 0.001, 0.0001, 0.00001],
+    'gamma': [0.01, 0.001],
     'min_delta': [100],
-    "lr": [0.5, 0.8],
+    "lr": [0.5],
     "num_epochs": [500],
-    "patience": [5],
+    "patience": [3],
 }
 
 # Generate all parameter combinations

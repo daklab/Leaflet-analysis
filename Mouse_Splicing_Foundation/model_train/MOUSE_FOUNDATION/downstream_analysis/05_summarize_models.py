@@ -13,13 +13,13 @@ import seaborn as sns
 from scipy.stats import entropy
 
 # --- Configuration ---
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-30/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-07-30/2025-07-31" #date model was trained/date models were summarized for plotting 
-BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+# MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-01/parameter_combinations.csv"
+# DATE_RESULTS_TO_SUMMARIZE = "2025-08-01/2025-08-03" #date model was trained/date models were summarized for plotting 
+# BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
-#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
-#DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
-#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-31/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-07-31/2025-08-01" #date model was trained/date models were summarized for plotting 
+BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
 os.makedirs(OUTPUT_SUMMARY_DIR, exist_ok=True)
@@ -49,14 +49,6 @@ def main():
         pi = np.load(os.path.join(data_dir, "PI_values.npy"))
         
         perplexity_df = pd.read_csv(os.path.join(data_dir, "median_cell_perplexity.csv"))
-
-        #global_var_r2_df = pd.read_csv(os.path.join(data_dir, "variance_explained_r_squared.csv"))
-        aging_r2 = pd.read_csv(os.path.join(data_dir, "age_prediction_results.csv")).iloc[1:].T
-        aging_r2.columns = ["r2", "mse"]
-        aging_r2["features"] = aging_r2.index
-        aging_r2 = aging_r2.reset_index(drop=True)
-
-        cell_type_classification_df = pd.read_csv(os.path.join(data_dir, "broad_cell_type_prediction_metrics_factors_only.csv"))
 
         # Variance components
         vc_df = pd.read_csv(os.path.join(data_dir, "variance_components_by_dataset.csv"))
@@ -97,18 +89,9 @@ def main():
         diversity_min = vc_df["variance_diversity"].min()
         diversity_max = vc_df["variance_diversity"].max()
 
-        #global_r2_median = global_var_r2_df["r2_overall"].median()
-        #global_r2_max = global_var_r2_df["r2_overall"].max()
-
         sanity_check_df = pd.read_csv(os.path.join(data_dir, "PSI_imputed_vs_observed_correlations_summary.txt"))
         sanity_check_dict = {row.iloc[0].split(":")[0].strip(): float(row.iloc[0].split(":")[1].strip()) for _, row in sanity_check_df.iterrows()}
         sanity_check_df = pd.DataFrame([sanity_check_dict])
-
-        aging_metrics_dict = {}
-        for _, row in aging_r2.iterrows():
-            key_prefix = row["features"].lower().replace(" ", "_")
-            aging_metrics_dict[f"aging_r2__{key_prefix}"] = float(row["r2"])
-            aging_metrics_dict[f"aging_mse__{key_prefix}"] = float(row["mse"])
 
         summary_row = {
             "param_id": param_id,
@@ -125,9 +108,6 @@ def main():
             "learned_dir_conc": learned_params_df.loc[0, "dir_conc"] if "dir_conc" in learned_params_df.columns else np.nan,
             "likelihood_type": model_params.get("likelihood_type", "unknown"),
             "median_cell_perplexity": perplexity_df["median_cell_perplexity"].values[0],
-            "celltype_classification_accuracy": float(cell_type_classification_df["accuracy"].values[0]),
-      #      "global_r2_median": global_r2_median,
-      #      "global_r2_max": global_r2_max,
             "mean_dataset_var": mean_dataset_var,
             "max_dataset_var": max_dataset_var,
             "top3_dataset_var": top3_dataset_var,
@@ -149,7 +129,6 @@ def main():
             "median_corr_imputed_vs_observed": sanity_check_df["median_corr"].values[0],
         }
 
-        summary_row.update(aging_metrics_dict)
         summary_table_rows.append(summary_row)
         model_summaries.append({"param_id": param_id})
 

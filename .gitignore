@@ -13,6 +13,7 @@ __pycache__/
 *.csv
 *.tsv
 *.h5ad
+*.tsv.gz
 
 **/Archive/
 Multi_Species_Splicing_Foundation/compare_ATSEs.ipynb

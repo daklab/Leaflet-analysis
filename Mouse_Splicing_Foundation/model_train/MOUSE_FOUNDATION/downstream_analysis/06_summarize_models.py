@@ -14,13 +14,13 @@ from scipy.stats import entropy
 from sklearn.preprocessing import MinMaxScaler
 
 # --- Configuration ---
-MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-30/parameter_combinations.csv"
-DATE_RESULTS_TO_SUMMARIZE = "2025-07-30/2025-07-31" #date model was trained/date models were summarized for plotting 
-BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+# MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-01/parameter_combinations.csv"
+# DATE_RESULTS_TO_SUMMARIZE = "2025-08-01/2025-08-03" #date model was trained/date models were summarized for plotting 
+# BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
-#MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-06/parameter_combinations.csv"
-#DATE_RESULTS_TO_SUMMARIZE = "2025-07-06/2025-07-07" #date model was trained/date models were summarized for plotting 
-#BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
+MODEL_CONFIG_MAPPING_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-07-31/parameter_combinations.csv"
+DATE_RESULTS_TO_SUMMARIZE = "2025-07-31/2025-08-01" #date model was trained/date models were summarized for plotting 
+BASE_RESULTS_DIR = f"/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/model_train/HUMAN_FOUNDATION/results/{DATE_RESULTS_TO_SUMMARIZE}"
 
 OUTPUT_SUMMARY_DIR = os.path.join(BASE_RESULTS_DIR, "comparison_summary" + pd.Timestamp.now().strftime("%Y%m%d"))
 os.makedirs(OUTPUT_SUMMARY_DIR, exist_ok=True)
@@ -41,9 +41,9 @@ def main():
     metrics_to_plot = [
         "range_pi", "alpha_pi",
         "new_K", 
-        "aging_r2__tissue_and_splicing_factors",
-        "aging_r2__tissue_splicing_and_nmf_ge_factors",
-        "celltype_classification_accuracy",
+#        "aging_r2__tissue_and_splicing_factors",
+#        "aging_r2__tissue_splicing_and_nmf_ge_factors",
+#        "celltype_classification_accuracy",
         "n_dataset_var_above_0.5",
         "n_celltype_var_above_0.5",
         "n_tissue_var_above_0.5",

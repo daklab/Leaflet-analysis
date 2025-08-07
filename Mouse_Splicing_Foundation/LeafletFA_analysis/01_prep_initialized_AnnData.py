@@ -35,7 +35,7 @@ import BetaDirichletFactor.waypoints as wayp
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025"
+OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/082025"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
@@ -54,7 +54,7 @@ N_DIM_COMPONENTS = 20
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.7  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.25  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -535,5 +535,5 @@ print("LeafletFA input preparation complete!")
 print(f"Results saved to: {OUTPUT_DIR}")
 print("========================================\n")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/082025
 # sbatch --mem=400G -p cpu,bigmem -J "prep_initialized_AnnData" --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/01_prep_initialized_AnnData.py"

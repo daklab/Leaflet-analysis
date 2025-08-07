@@ -277,7 +277,7 @@ def plot_correlation_matrix(PHI, PLOTS_DIR, fdr_threshold=0.01):
         df_corr,
         cmap="PRGn",
         center=0,
-        figsize=(8, 8),
+        figsize=(6, 6),
         xticklabels=True,
         yticklabels=True,
         linewidths=0.5,
@@ -305,6 +305,7 @@ def plot_correlation_matrix(PHI, PLOTS_DIR, fdr_threshold=0.01):
     os.makedirs(PLOTS_DIR, exist_ok=True)
     out_pdf = os.path.join(PLOTS_DIR, "correlation_matrix_PHI.pdf")
     g.savefig(out_pdf, bbox_inches="tight", dpi=300)
+    print(f"Saved correlation matrix to {PLOTS_DIR}/correlation_matrix_PHI.pdf")
     plt.close()
     
     return pd.DataFrame(corr_matrix, index=factor_labels, columns=factor_labels)
@@ -474,14 +475,8 @@ def run_variance_explained_analysis(
         
     # 1. Prepare analysis DataFrame
     X_phi = splice_adata.obsm["X_PHI"]
-    factor_names = [f"Factor_{i+1}" for i in range(X_phi.shape[1])]
+    factor_names = [f"SP_{i+1}" for i in range(X_phi.shape[1])]
     analysis_df = pd.DataFrame(X_phi, index=splice_adata.obs_names, columns=factor_names)
-
-    # print breakdown by cell type, tissue, sex, and dataset
-    print(splice_adata.obs[cell_type_col].value_counts())
-    print(splice_adata.obs["tissue"].value_counts())
-    print(splice_adata.obs["sex"].value_counts())
-    print(splice_adata.obs[sample_id].value_counts())
 
     # --- Basic Covariates from splice_adata.obs ---
     obs_cols_to_copy = {
@@ -530,10 +525,11 @@ def run_variance_explained_analysis(
             print(f"    Skipping factor {factor_col} due to insufficient observations")
             continue
             
-        r2_scores_list.append({'factor': factor_col, 'r2_overall': model.rsquared, 'n_obs': model.nobs})
+        r2_scores_list.append({'SP': factor_col, 'r2_overall': model.rsquared, 'n_obs': model.nobs})
         
         anova_res = anova_lm(model, typ=2)
-        anova_res['factor'] = factor_col
+        anova_res['SP'] = factor_col
+        print(anova_res)
         anova_results_list.append(anova_res.reset_index())
 
     r2_df = pd.DataFrame(r2_scores_list)
@@ -546,7 +542,7 @@ def run_variance_explained_analysis(
     anova_df_filtered.dropna(subset=['sum_sq'], inplace=True)
 
     anova_pivot = anova_df_filtered.pivot_table(
-            index='factor', columns='covariate_term', values='sum_sq', aggfunc='sum' )
+            index='SP', columns='covariate_term', values='sum_sq', aggfunc='sum' )
     anova_pivot = anova_pivot.loc[:, (anova_pivot.sum(axis=0).abs() > 1e-9)] 
         
     total_explained_ss_per_factor = anova_pivot.sum(axis=1)
@@ -554,8 +550,8 @@ def run_variance_explained_analysis(
 
     # Map: factor name → label with R²
     factor_r2_map = {
-        row['factor']: f"{row['factor']} (R²={row['r2_overall']:.2f})"
-        for _, row in r2_df.set_index("factor").loc[anova_prop.index].reset_index().iterrows()
+        row['SP']: f"{row['SP']} (R²={row['r2_overall']:.2f})"
+        for _, row in r2_df.set_index("SP").loc[anova_prop.index].reset_index().iterrows()
     }
     
     # Ensure plot_data has finite values for masking operations
@@ -597,7 +593,7 @@ def run_variance_explained_analysis(
     
     # Axis labels
     cg.ax_heatmap.set_xlabel('Covariate Terms', fontsize=11, fontweight='bold')
-    cg.ax_heatmap.set_ylabel('LeafletFA Factors', fontsize=11, fontweight='bold')
+    cg.ax_heatmap.set_ylabel('LeafletFA Splicing Programs', fontsize=11, fontweight='bold')
     
     # Colorbar formatting
     cbar = cg.ax_heatmap.collections[0].colorbar
@@ -608,52 +604,4 @@ def run_variance_explained_analysis(
     plot_path = os.path.join(PLOTS_DIR, f"variance_explained_heatmap_{cell_type_col}.pdf")
     cg.savefig(plot_path, format="pdf", bbox_inches="tight")
     print(f"  Saved variance explained heatmap to {plot_path}")
-    plt.close(cg.fig)
-
-    # Annotate each factor 
-    # Convert string annotations to float
-    annot_data_float = annot_data.astype(float)
-
-    # Step 2: Get top covariates (1 or 2 depending on max contribution)
-    factor_labels = []
-
-    for factor, row in annot_data_float.iterrows():
-        sorted_covs = row.sort_values(ascending=False)
-        top1_val = sorted_covs.iloc[0]
-
-        if top1_val < 0.75:
-            top_covs = sorted_covs.head(2)
-        else:
-            top_covs = sorted_covs.head(1)
-
-        label = ", ".join([f"{term} ({val:.2f})" for term, val in top_covs.items()])
-
-        factor_labels.append({
-            "factor": factor,
-            "top_covariates": label,
-            "top_covariate_name": top_covs.index[0],
-            "top_covariate_value": float(top_covs.iloc[0])
-        })
-
-    # Step 3: Create DataFrame and extract R²
-    factor_label_df = pd.DataFrame(factor_labels)
-    factor_label_df[["factor_id", "r2_str"]] = factor_label_df["factor"].str.extract(r"(Factor_\d+)\s+\(R²=(.*)\)")
-    factor_label_df["r2"] = factor_label_df["r2_str"].astype(float)
-
-    # Step 4: Compute explained variance
-    factor_label_df["explained_variance_score"] = (
-        factor_label_df["r2"] * factor_label_df["top_covariate_value"]
-    )
-
-    # Step 5: Sort and assign ranked labels directly by top_covariate_name
-    factor_label_df = factor_label_df.sort_values(
-        by=["top_covariate_name", "explained_variance_score"], ascending=[True, False]
-    )
-
-    factor_label_df["category_ranked_label"] = (
-        factor_label_df["top_covariate_name"] + " #" + 
-        (factor_label_df.groupby("top_covariate_name").cumcount() + 1).astype(str)
-    )
-
-    # Save factor_label_df to DATA_DIR
-    return factor_label_df 
+    plt.show()

@@ -25,19 +25,19 @@ today = datetime.now().strftime("%Y%m%d")
 print(f"Today's date: {today}")
 
 # %%
-BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
+BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION"
 
 # Output directory 
-OUTPUT_DIR = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/GE_PLOTS/MOUSE"
+OUTPUT_DIR = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/GE_PLOTS/HUMAN"
 OUTPUT_DIR = os.path.join(OUTPUT_DIR, today)
 
 # If doesn't exist, make dir
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
-mouse = True 
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_both_scvi_models_latent_20_2025-08-04.h5ad"
-GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_20_1024_2025-08-03.h5ad"
+mouse = False 
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_scvi_model_latent_20_2025-08-04.h5ad"
+# GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_20_1024_2025-08-03.h5ad"
 
 AGING_GENES_PATH="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
 RBP_FILE_PATH="/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
@@ -179,9 +179,7 @@ def run_focused_gsea(loadings_df, organism="Mouse", output_dir=None):
         
         # High-quality pathway database
         'Reactome_2022': 'Reactome Pathways',
-        
-        # Single cell atlas for cell type specificity
-        'Tabula_Muris': 'Single Cell Atlas',
+        'PanglaoDB_Augmented_2021': 'Human Cell Type Markers',  # replace if available
     }
     
     all_results = {}
@@ -594,6 +592,6 @@ print(f"scVI: {len(scvi_summary)} pathway annotations across {scvi_loadings.shap
 #print(f"PCA: {len(pca_summary)} pathway annotations across {pca_loadings.shape[1]} factors")
 print(f"Results saved to: {OUTPUT_DIR}")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
-# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/10_GE_vs_GSEA.py
-# sbatch --mem=300G -p dev,cpu,bigmem -J "MUS_GE_vs_AGING" --wrap="python $script"
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION
+# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/10_GE_vs_GSEA.py
+# sbatch --mem=300G -p dev,cpu,bigmem -J "HUM_GE_vs_AGING" --wrap="python $script"

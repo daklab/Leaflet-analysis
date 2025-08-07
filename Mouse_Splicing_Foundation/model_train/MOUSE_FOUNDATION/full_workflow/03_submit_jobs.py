@@ -4,9 +4,9 @@ import datetime
 
 # Define where to save outputs 
 # Should be directory in which model params are saved
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-01"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-04"
 leafletfa_script = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/02_run_leaflet.py"
-anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_26212_junctions_20_waypoints_20250801_200518.h5ad" 
+anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/082025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_65392_junctions_20_waypoints_20250804_131636.h5ad" 
 
 # Load parameter list from JSON file
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -23,11 +23,10 @@ os.makedirs(log_dir, exist_ok=True)
 # Slurm job script template
 job_script_template = """#!/bin/bash
 #SBATCH --job-name=leaflet_{job_id}
-#SBATCH --output={log_dir}/leaflet_gpu_{job_id}.out
-#SBATCH --error={log_dir}/leaflet_gpu_{job_id}.err
-#SBATCH --mem=300G
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --output={log_dir}/leaflet_{job_id}.out
+#SBATCH --error={log_dir}/leaflet_{job_id}.err
+#SBATCH --mem=750G
+#SBATCH --partition=bigmem,cpu
 
 # Set Python to run in unbuffered mode to ensure real-time output
 export PYTHONUNBUFFERED=1
@@ -48,7 +47,7 @@ for i, params in enumerate(param_list):
     )
 
     # Save job script
-    job_file = os.path.join(base_output_dir, f"leaflet_gpu_job_{i}.slurm")
+    job_file = os.path.join(base_output_dir, f"leaflet_job_{i}.slurm")
     with open(job_file, "w") as f:
         f.write(job_script)
 
@@ -58,5 +57,5 @@ for i, params in enumerate(param_list):
 
 print(f"\nSubmitted {len(param_list)} jobs to Slurm.")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-01
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-04
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/03_submit_jobs.py
