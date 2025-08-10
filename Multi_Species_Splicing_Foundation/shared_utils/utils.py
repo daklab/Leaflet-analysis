@@ -469,14 +469,17 @@ def run_variance_explained_analysis(
 ):
     """
     Run variance explained analysis for splicing factors using OLS regression and ANOVA.
-    Uses pre-computed RBP NMF features and derives NMF features for aging genes.
     """
     print("Running variance explained analysis...")
         
     # 1. Prepare analysis DataFrame
+    from sklearn.preprocessing import StandardScaler
     X_phi = splice_adata.obsm["X_PHI"]
-    factor_names = [f"SP_{i+1}" for i in range(X_phi.shape[1])]
-    analysis_df = pd.DataFrame(X_phi, index=splice_adata.obs_names, columns=factor_names)
+
+    # Z-score each column (factor) across cells
+    X_phi_z = StandardScaler(with_mean=True, with_std=True).fit_transform(X_phi)
+    factor_names = [f"SP_{i+1}" for i in range(X_phi_z.shape[1])]
+    analysis_df = pd.DataFrame(X_phi_z, index=splice_adata.obs_names, columns=factor_names)
 
     # --- Basic Covariates from splice_adata.obs ---
     obs_cols_to_copy = {
@@ -493,17 +496,16 @@ def run_variance_explained_analysis(
     # 2. Define Covariate List for Formula (using the approach that worked before)
     base_formula_covariates = [
         'C(cell_type)', 
-        'C(tissue)', 
+        'C(tissue)',
         'C(sex)', 
-        'C(dataset)', 
-        'age'
-    ]
+        'age',
+        'C(dataset)']
     
     # Add NMF components as regular column names (no backticks)
     all_covariates = base_formula_covariates
     
     # Define interaction term
-    interaction_terms = ['C(cell_type):age', 'C(tissue):age', 'C(sex):age']
+    interaction_terms = ['C(cell_type):age', 'C(sex):age']
 
     # 3. Run ANOVA for each factor (simplified based on working approach)
     r2_scores_list = []

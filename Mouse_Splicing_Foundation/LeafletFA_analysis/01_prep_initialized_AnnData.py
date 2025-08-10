@@ -54,7 +54,7 @@ N_DIM_COMPONENTS = 20
 METACELL_SIZE = 200
 
 # ATSE filtering parameters
-ATSE_FILTER_PERCENTILE = 0.25  # Filter out ATSEs below this percentile
+ATSE_FILTER_PERCENTILE = 0.7  # Filter out ATSEs below this percentile
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -193,14 +193,8 @@ def compute_atse_scores(splice_adata):
         atse_scores.columns = ['_'.join(col).strip() for col in atse_scores.columns.values]
         
         # Calculate composite score with updated weights
-        weights = {
-            "annotation": 0.2,     # Annotation novelty
-            "expression": 0.15,     # Expression breadth
-            "read_count": 0.2,     # Read support
-            "variability": 0.25,    # PSI variability
-            "conservation": 0.2   # Evolutionary conservation
-        }
-        
+        weights = {"annotation":0.05, "expression":0.05, "read_count":0.1, "variability":0.75, "conservation":0.05}
+
         annotation_component = (0.7 * atse_scores["annotation_status_score_max"] + 
                                0.3 * atse_scores["annotation_status_score_mean"])
         
