@@ -27,6 +27,29 @@ def get_sample_ids():
     print(f"Found {len(sample_ids)} samples.")
     return sample_ids
 
+def validate_bam(bam_file):
+    """Validate BAM file - check if it exists, has content, and is not corrupt"""
+    if not os.path.exists(bam_file):
+        return False
+    
+    # Check file size
+    if os.path.getsize(bam_file) == 0:
+        print(f"Warning: BAM file {bam_file} is empty (0 bytes)")
+        return False
+    
+    # Check if BAM file is readable with samtools
+    try:
+        result = subprocess.run(['samtools', 'quickcheck', bam_file], 
+                              capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            print(f"Warning: BAM file {bam_file} failed samtools quickcheck")
+            return False
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+        print(f"Warning: Could not validate BAM file {bam_file}")
+        return False
+    
+    return True
+
 # Extract sample IDs (without validation)
 sample_ids = get_sample_ids()
 
@@ -82,74 +105,135 @@ rule run_star:
              --outFileNamePrefix {params.output_prefix}
         """
 
-rule add_cb_tag:
+# New rule to validate BAM file
+rule validate_bam:
     input:
         bam=rules.run_star.output.bam
+    output:
+        validated=os.path.join(config["bam_files"], "{sample}", "bam_validated.flag")
+    run:
+        if validate_bam(input.bam):
+            # Create validation flag file
+            with open(output.validated, 'w') as f:
+                f.write(f"BAM file {input.bam} validated successfully\n")
+            print(f"BAM validation passed for {wildcards.sample}")
+        else:
+            # Create empty outputs to prevent downstream rules from running
+            print(f"BAM validation failed for {wildcards.sample}. Skipping downstream processing.")
+            # Touch the flag file but mark it as failed
+            with open(output.validated, 'w') as f:
+                f.write(f"BAM file {input.bam} validation FAILED\n")
+
+rule add_cb_tag:
+    input:
+        bam=rules.run_star.output.bam,
+        validated=rules.validate_bam.output.validated
     output:
         bam_CB=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam")
     params:
         sample=lambda wildcards: wildcards.sample
-    shell:
-        """
-        echo "Adding CB tag to BAM file: {input.bam}"
-        samtools view -h {input.bam} | awk -v cb="{params.sample}" 'BEGIN {{OFS="\t"}} {{if ($1 ~ /^@/) print; else print $0 "\tCB:Z:" cb;}}' | samtools view -b - > {output.bam_CB}
-        """
+    run:
+        # Check if validation passed
+        with open(input.validated, 'r') as f:
+            validation_content = f.read()
+        
+        if "validation FAILED" in validation_content:
+            print(f"Skipping CB tag addition for {wildcards.sample} due to failed BAM validation")
+            # Create empty output file to satisfy Snakemake
+            shell("touch {output.bam_CB}")
+        else:
+            print(f"Adding CB tag to BAM file: {input.bam}")
+            shell("""
+            samtools view -h {input.bam} | awk -v cb="{params.sample}" 'BEGIN {{OFS="\t"}} {{if ($1 ~ /^@/) print; else print $0 "\tCB:Z:" cb;}}' | samtools view -b - > {output.bam_CB}
+            """)
 
 # Rule to index BAM file
 rule index_bam:
     input:
-        bam=rules.add_cb_tag.output.bam_CB
+        bam=rules.add_cb_tag.output.bam_CB,
+        validated=rules.validate_bam.output.validated
     output:
         bai=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai")
-    shell:
-        """
-        echo "Indexing BAM file: {input.bam}"
-        samtools index {input.bam}
-        """
+    run:
+        # Check if validation passed
+        with open(input.validated, 'r') as f:
+            validation_content = f.read()
+        
+        if "validation FAILED" in validation_content:
+            print(f"Skipping BAM indexing for {wildcards.sample} due to failed BAM validation")
+            # Create empty output file to satisfy Snakemake
+            shell("touch {output.bai}")
+        else:
+            print(f"Indexing BAM file: {input.bam}")
+            shell("samtools index {input.bam}")
 
 rule extract_junctions:
     input:
         bam=rules.add_cb_tag.output.bam_CB,
-        bai=rules.index_bam.output.bai
+        bai=rules.index_bam.output.bai,
+        validated=rules.validate_bam.output.validated
     output:
         juncs=os.path.join(config["results_dir"], "{sample}", "junctions.bed"),
         barcodes=os.path.join(config["results_dir"], "{sample}", "barcodes.txt"),
         juncswbarcodes=os.path.join(config["results_dir"], "{sample}", "junctions_with_barcodes.bed")
     params:
         regtools_path=config["regtools_path"]
-    shell:
-        """
-        mkdir -p $(dirname {output.juncs})
-        echo "Extracting junctions with barcodes from BAM file: {input.bam}"
-        {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
-        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
-        echo "Done extracting junctions with barcodes"
-        """
+    run:
+        shell("mkdir -p $(dirname {output.juncs})")
+        
+        # Check if validation passed
+        with open(input.validated, 'r') as f:
+            validation_content = f.read()
+        
+        if "validation FAILED" in validation_content:
+            print(f"Skipping junction extraction for {wildcards.sample} due to failed BAM validation")
+            # Create empty output files
+            shell("touch {output.juncs} {output.barcodes} {output.juncswbarcodes}")
+        else:
+            print(f"Extracting junctions with barcodes from BAM file: {input.bam}")
+            shell("""
+            {params.regtools_path} junctions extract -a 6 -m 50 -M 500000 {input.bam} -o {output.juncs} -s XS -b {output.barcodes}
+            paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncswbarcodes}
+            echo "Done extracting junctions with barcodes"
+            """)
 
 rule summarize_splicing:
     input:
         bam=os.path.join(config["bam_files"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
-        juncs=os.path.join(config["results_dir"], "{sample}", "junctions.bed")
+        juncs=os.path.join(config["results_dir"], "{sample}", "junctions.bed"),
+        validated=rules.validate_bam.output.validated
     output:
         summary=os.path.join(config["results_dir"], "{sample}", "splicing_summary.tsv")
-    shell:
-        """
-        mkdir -p $(dirname {output.summary})
-        echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads" > {output.summary}
+    run:
+        shell("mkdir -p $(dirname {output.summary})")
+        
+        # Check if validation passed
+        with open(input.validated, 'r') as f:
+            validation_content = f.read()
+        
+        if "validation FAILED" in validation_content:
+            print(f"Skipping splicing summary for {wildcards.sample} due to failed BAM validation")
+            # Create summary with failure message
+            with open(output.summary, 'w') as f:
+                f.write("Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads\tStatus\n")
+                f.write(f"{wildcards.sample}\t0\t0\t0\tBAM_VALIDATION_FAILED\n")
+        else:
+            shell("""
+            echo -e "Sample\tTotal_Reads\tSpliced_Reads\tUnspliced_Reads\tStatus" > {output.summary}
 
-        sample=$(basename {input.bam} | cut -d'.' -f1)
-        total_reads=$(samtools view -c -F 4 {input.bam})
+            sample=$(basename {input.bam} | cut -d'.' -f1)
+            total_reads=$(samtools view -c -F 4 {input.bam})
 
-        # Ensure the file has at least five columns before extracting spliced reads
-        spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
+            # Ensure the file has at least five columns before extracting spliced reads
+            spliced_reads=$(awk '{{ sum += $5 }} END {{ print (sum == "" ? 0 : sum) }}' "{input.juncs}")
 
-        # Ensure spliced_reads is not empty or invalid
-        if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
-            spliced_reads=0
-        fi
+            # Ensure spliced_reads is not empty or invalid
+            if [[ -z "$spliced_reads" || ! "$spliced_reads" =~ ^[0-9]+$ ]]; then
+                spliced_reads=0
+            fi
 
-        unspliced_reads=$((total_reads - spliced_reads))
+            unspliced_reads=$((total_reads - spliced_reads))
 
-        echo -e "$sample\t$total_reads\t$spliced_reads\t$unspliced_reads" >> {output.summary}
-        echo "Splicing summary written to {output.summary}"
-        """
+            echo -e "$sample\t$total_reads\t$spliced_reads\t$unspliced_reads\tSUCCESS" >> {output.summary}
+            echo "Splicing summary written to {output.summary}"
+            """)

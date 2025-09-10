@@ -7,7 +7,7 @@ import pandas as pd
 
 # Define output directory
 # Define base output directory
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train"
 
 # Create output directory if it doesn't exist with today's date inside base_output_dir
 today = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -18,24 +18,24 @@ print(f"All outputs will be saved in {base_output_dir}")
 # Define parameter grid
 param_grid = {
     "input_conc": [None],  # 'inf' will be converted to torch.tensor(np.inf)
-    "junc_specific_prior": [True],
+    "junc_specific_prior": [True, False],
     "delta_fixed": [None],
-    "K": [20],
+    "K": [20, 50],
     "waypoints_use": [True],  # Test both with and without waypoints
     
     # Multi-pass mini-batch parameters
-    "batch_size": [8192],  # GPU batch size
-    "num_passes": [5],  # Number of times each cell is seen
+    "batch_size": [8192, 4096, 2048],  # GPU batch size
+    "num_passes": [3],  # Number of times each cell is seen
     "num_epochs_first": [300],  # Epochs for very first batch
     "num_epochs_later": [300],  # Epochs for subsequent batches
     
     # Training parameters
     "ELBO_num_particles": [5],
     "num_samples": [100],
-    'gamma': [0.001, 0.01, 0.1],  # Learning rate decay
+    'gamma': [0.001, 0.01],  # Learning rate decay
     'min_delta': [100],
-    "lr": [0.001, 0.01, 0.1, 0.5],  # Initial learning rate
-    "patience": [50],
+    "lr": [0.5, 0.2, 0.1],  # Initial learning rate
+    "patience": [10],
     
     # Data filtering
     "max_junctions": [5],  # Maximum number of junctions per ATSE
@@ -145,5 +145,5 @@ summary_file = os.path.join(base_output_dir, "training_summary.csv")
 training_summary.to_csv(summary_file, index=False)
 print(f"\nTraining summary saved to: {summary_file}")
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/
-# python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/01_generate_params.py
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train
+# python /gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/joint_model_train/full_workflow/01_generate_params.py

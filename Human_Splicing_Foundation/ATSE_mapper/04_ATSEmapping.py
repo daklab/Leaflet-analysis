@@ -20,6 +20,7 @@ from event_detection import ATSEAnalyzer # type: ignore
 
 # gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
 gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
+db_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencodev45.db"
 print(f"Using the gtf_file: {gtf_file}!")
 fasta_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa"
 combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/results"
@@ -49,7 +50,7 @@ reader = JunctionReader(batch_size=batch_size,
 filtered_junctions = reader.SJ_QC(combined_junctions)
 
 # Initialize genome database 
-genome_db = GenomeDB(db_name="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/hg38_stella_gtf", gtf_file=gtf_file, fasta_file=fasta_file)
+genome_db = GenomeDB(db_name=db_file, gtf_file=gtf_file, fasta_file=fasta_file)
 print(f"Done initializing genome db!")
 
 # Initialize junction analyzer

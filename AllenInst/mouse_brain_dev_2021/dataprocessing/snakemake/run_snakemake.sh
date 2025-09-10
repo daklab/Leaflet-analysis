@@ -5,7 +5,7 @@
 #SBATCH -J MOUSE_ALLEN
 #SBATCH -c 1
 #SBATCH --mem=10G
-#SBATCH -t 5-00:00 # Runtime in D-HH:MM
+#SBATCH -t 5-00:00:00 # Runtime in D-HH:MM
 #SBATCH --output=MOUSE_ALLEN_%j.log
 
 conda activate python3ENV
@@ -30,20 +30,20 @@ STAR --version
 # Navigate to your directory with the Snakefile for this dataset analysis 
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/mouse_brain_dev_2021/dataprocessing/snakemake/
 slurm_out=/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/slurm2025 
-if [ ! -d "$slurm_out" ]; then
-    mkdir -p $slurm_out
+slurm_out_today=$slurm_out/$(date +%Y%m%d)
+if [ ! -d "$slurm_out_today" ]; then
+    mkdir -p $slurm_out_today
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 32 \
+snakemake -j 64 \
   --cluster-config cluster.json \
   --cluster "sbatch -N 1 -p {cluster.partition} -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" \
   --latency-wait 120 \
-  --rerun-incomplete
-
+  --rerun-incomplete #--unlock
+  
 echo "Snakemake workflow submitted"
 
 # go here first and submit there easier to keep track 
-# cd /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/ 
-# cd $slurm_out
+# cd $slurm_out_today
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/AllenInst/mouse_brain_dev_2021/dataprocessing/snakemake/run_snakemake.sh

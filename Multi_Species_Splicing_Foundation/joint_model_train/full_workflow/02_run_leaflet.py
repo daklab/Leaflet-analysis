@@ -366,8 +366,6 @@ for pass_idx in range(NUM_PASSES):
                 waypoints_use=True,  # Use the "waypoint" initialization we just created
                 input_conc_prior=params.get("input_conc", None),
                 delta_fixed=torch.tensor(global_dir_conc, device=device) if global_dir_conc is not None else None,
-                pi_init=torch.tensor(global_pi, dtype=torch.float32) if global_pi is not None else None,
-                alpha_pi_init=torch.tensor(global_alpha_pi, dtype=torch.float32) if global_alpha_pi is not None else None,
                 num_epochs=NUM_EPOCHS_LATER,
                 print_epochs=5,
                 ELBO_num_particles=params["ELBO_num_particles"],

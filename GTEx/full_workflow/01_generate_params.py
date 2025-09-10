@@ -24,18 +24,18 @@ param_grid = {
     "waypoints_use": [True],  # Test both with and without waypoints
     
     # Multi-pass mini-batch parameters
-    "batch_size": [8192],  # GPU batch size
-    "num_passes": [5],  # Number of times each cell is seen
-    "num_epochs_first": [300],  # Epochs for very first batch
-    "num_epochs_later": [300],  # Epochs for subsequent batches
+    "batch_size": [8192, 4096],  # GPU batch size
+    "num_passes": [3],  # Number of times each cell is seen
+    "num_epochs_first": [50, 100],  # Epochs for very first batch
+    "num_epochs_later": [100, 500],  # Epochs for subsequent batches
     
     # Training parameters
     "ELBO_num_particles": [5],
     "num_samples": [100],
     'gamma': [0.001, 0.01, 0.1],  # Learning rate decay
     'min_delta': [100],
-    "lr": [0.001, 0.01, 0.1, 0.5],  # Initial learning rate
-    "patience": [50],
+    "lr": [0.1],  # Initial learning rate
+    "patience": [10],
     
     # Data filtering
     "max_junctions": [5],  # Maximum number of junctions per ATSE

@@ -1,16 +1,17 @@
 #!/bin/bash
 #SBATCH -J RH_pseudobulk
 #SBATCH --mem=64G
-#SBATCH -t 5-00:00 # Runtime in D-HH:MM
-#SBATCH --array=1-23498
+#SBATCH -t 0-03:00 # Runtime in D-HH:MM
+#SBATCH -p cpu,bigmem,dev
+#SBATCH --array=1-26093 # number of metacells in DT_w_RH_cells_anndata_meta.tsv
 
 #conda activate python3ENV 
 module load samtools
 
 # Input variables
-CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_cells.csv"   
+CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/DT_w_RH_cells_anndata_meta.tsv"   
 ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/" 
-OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells" 
+OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI" 
 
 # make subdir for RH with date 
 RH_DIR="$OUTPUT_DIR/RH"
@@ -20,7 +21,6 @@ echo "Output directory: $RH_DIR"
 
 # Make OUTPUT_DIR if it does not exist
 mkdir -p "$RH_DIR"
-
 tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > $RH_DIR/RH_cluster_list.txt
 
 # Get the cluster name corresponding to this task ID
@@ -36,7 +36,10 @@ mkdir -p "$cluster_dir"
 
 # Collect and process BAM files for the cluster
 sorted_bam_list=()
-while IFS=',' read -r sample type primer main_cluster main_cluster_wkmeans bam_file; do
+while IFS=',' read -r -a fields; do
+    main_cluster_wkmeans="${fields[4]}"  
+    bam_file="${fields[24]}"             
+    main_cluster="${fields[3]}"          
     if [[ "$main_cluster_wkmeans" == "$cluster" ]]; then
         bam_path="$ROOT_DIR/${main_cluster}/RH/${bam_file}"
         if [[ -f "$bam_path" ]]; then
@@ -78,3 +81,7 @@ else
 fi
 
 echo "Finished processing cluster: $cluster"
+
+# cd $ROOT_DIR/slurm 
+# cd 092025
+# sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/01_Metacell_analysis/MetaCellMakePseudobulk_RH.sh

@@ -3,8 +3,8 @@
 #SBATCH -N 1 # Ensure that all cores are on one machine
 #SBATCH -J TMS_3M
 #SBATCH -c 1
-#SBATCH --mem=16G
-#SBATCH -t 5-00:00 # Runtime in D-HH:MM
+#SBATCH --mem=10G
+#SBATCH -t 5-00:00:00 # Runtime in D-HH:MM
 #SBATCH --output=TMS_3M_%j.log
 
 # Load necessary modules
@@ -28,7 +28,7 @@ if [ ! -d "$slurm_out_today" ]; then
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake --keep-going -j 64 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out_today/slurm-%j.out --error=$slurm_out_today/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
+snakemake --keep-going -j 50 --cluster-config cluster.json --cluster "sbatch -N 1 -p cpu -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out_today/slurm-%j.out --error=$slurm_out_today/slurm-%j.err" --latency-wait 120 --rerun-incomplete #--unlock
 echo "Snakemake workflow submitted"
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM2025 # to submit job 

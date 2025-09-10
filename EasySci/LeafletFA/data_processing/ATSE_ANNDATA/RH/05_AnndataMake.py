@@ -13,7 +13,7 @@ from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, cr
 # Constants
 #metadata = pd.read_csv(metadata_path, sep=",")
 METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_anndata_meta.tsv"  
-INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26_lifted_mm39.txt.gz"
+INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-07-01_00-02-00_lifted_mm39.txt.gz"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 

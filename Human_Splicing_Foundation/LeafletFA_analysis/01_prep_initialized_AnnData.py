@@ -35,7 +35,7 @@ import BetaDirichletFactor.waypoints as wayp
 
 # Configuration
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025"
+OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/082025"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
@@ -115,8 +115,8 @@ def compute_atse_scores(splice_adata):
         # Calculate junction variability with proper filtering
         print("   Computing junction variability...")
         junction_variability = []
-        min_cells = 10
-        min_mean_ratio = 0.01
+        min_cells = 50
+        min_mean_ratio = 0.1
         
         if hasattr(junc_ratio_matrix, 'toarray'):
             junc_ratio_csc = junc_ratio_matrix.tocsc()
@@ -151,7 +151,7 @@ def compute_atse_scores(splice_adata):
         
         # 2. Expression breadth score
         splice_adata.var["expression_breadth_score"] = np.where(
-            splice_adata.var["non_zero_cell_prop"] >= 0.05,
+            splice_adata.var["non_zero_cell_prop"] >= 0.1,
             np.log1p(splice_adata.var["non_zero_cell_prop"] * 100),
             0.0
         )
@@ -202,10 +202,10 @@ def compute_atse_scores(splice_adata):
         
         # Calculate composite score with updated weights
         weights = {
-            "annotation": 0.25,     # Annotation novelty
-            "expression": 0.15,     # Expression breadth
-            "read_count": 0.15,     # Read support
-            "variability": 0.20,    # PSI variability
+            "annotation": 0.05,     # Annotation novelty
+            "expression": 0.2,     # Expression breadth
+            "read_count": 0.3,     # Read support
+            "variability": 0.2,    # PSI variability
             "conservation": 0.25    # Evolutionary conservation
         }
         

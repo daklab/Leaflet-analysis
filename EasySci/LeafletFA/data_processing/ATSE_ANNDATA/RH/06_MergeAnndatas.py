@@ -99,9 +99,10 @@ if __name__ == '__main__':
     main()
 
 # To run this script, use the following command:
-    
-#SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
-#INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
-#OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas/merged_anndata.h5ad
-# 
-#python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
+
+"""  
+SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
+INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
+OUTPUT_FILE=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas/merged_anndata.h5ad
+python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
+"""
