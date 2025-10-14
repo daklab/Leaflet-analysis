@@ -1,106 +1,76 @@
 #!/usr/bin/env python
 """
-Apply Regression Model to Allen Brain Dataset - Mouse Splicing Foundation
+Combine Gene Expression Data - Mouse Splicing Foundation
 
 This script:
-1. Loads preprocessed gene expression and intron data
-2. Applies a pre-trained linear model to predict total spliced counts
-3. Harmonizes cell type annotations across datasets
-4. Outputs a combined dataset with adjusted gene expression values
+1. Loads preprocessed gene expression data from Allen Brain and Tabula Muris Senis
+2. Harmonizes cell type annotations across datasets
+3. Outputs a combined dataset using the existing log-normalized expression values
 
-This script bridges single-nucleus data (Allen Brain) to estimated single-cell data
-(Tabula Muris Senis) by applying a regression model to account for differences in
-spliced products between protocols.
+This script combines single-nucleus data (Allen Brain) with single-cell data
+(Tabula Muris Senis) without applying any regression adjustments.
 """
 
 import os
 import sys
-import pickle
 import datetime
 import numpy as np
 import pandas as pd
 import anndata as ad
 from scipy.sparse import csr_matrix
-from tqdm import tqdm
 
 # Add the directory containing the shared utils to the Python path
 sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
 
 # Import utility functions
 from gene_processing import (
-    extract_gene_transcript_info, 
-    normalize_by_gene_length,
     safe_stringify_obs,
-    preprocess_anndata,
-    normalize_and_log_transform
+    preprocess_anndata
 )
 
 # Set up logging and configuration
 today = datetime.datetime.now().strftime("%Y-%m-%d")
 print("="*80)
-print(f"APPLY REGRESSION MODEL TO GENE EXPRESSION DATA - {today}")
+print(f"COMBINE GENE EXPRESSION DATA - {today}")
 print("="*80)
 
 # Configuration
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/processed_data"
-OUTDIR = os.path.join(WD, "adjusted_gene_expression")
+OUTDIR = os.path.join(WD, "combined_gene_expression")
 os.makedirs(OUTDIR, exist_ok=True)
 
 # Input files
-LINEAR_MODEL_PATH = "/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/linear_log_norm_ts_model.pkl"
-GE_ADATA_PATH = f"{WD}/tms_ab_exons_combo_ge_adata_{today}.h5ad"
-INTRON_ADATA_PATH = f"{WD}/ab_adata_introns_{today}.h5ad"
+date_file="2025-10-02"
+GE_ADATA_PATH = f"{WD}/tms_ab_exons_combo_ge_adata_{date_file}.h5ad"
 
-def load_datasets():
-    """Load processed gene expression and intron datasets"""
-    print("\n>> Loading processed datasets...")
+def load_dataset():
+    """Load processed gene expression dataset"""
+    print("\n>> Loading processed gene expression dataset...")
     
     try:
         # Try with today's date first
         ge_adata_path = GE_ADATA_PATH
-        intron_adata_path = INTRON_ADATA_PATH
         
         # Fall back to hardcoded date if today's files don't exist
         if not os.path.exists(ge_adata_path):
             print(f"   Could not find file with current date: {ge_adata_path}")
             ge_adata_path = f"{WD}/tms_ab_exons_combo_ge_adata_2025-05-12.h5ad"
             print(f"   Trying alternative path: {ge_adata_path}")
-            
-        if not os.path.exists(intron_adata_path):
-            print(f"   Could not find file with current date: {intron_adata_path}")
-            intron_adata_path = f"{WD}/ab_adata_introns_2025-05-12.h5ad"
-            print(f"   Trying alternative path: {intron_adata_path}")
         
         print(f"   Loading combined gene expression data from: {ge_adata_path}")
         ge_adata = ad.read_h5ad(ge_adata_path)
         
-        print(f"   Loading intron data from: {intron_adata_path}")
-        intron_adata = ad.read_h5ad(intron_adata_path)
-        
         print(f"   Loaded gene expression data: {ge_adata.shape[0]} cells, {ge_adata.shape[1]} genes")
-        print(f"   Loaded intron data: {intron_adata.shape[0]} cells, {intron_adata.shape[1]} genes")
         
-        return ge_adata, intron_adata
+        # Verify log_norm layer exists
+        if "log_norm" not in ge_adata.layers:
+            raise ValueError("log_norm layer not found in the dataset!")
+        print("   ✓ Confirmed log_norm layer exists")
+        
+        return ge_adata
         
     except Exception as e:
-        print(f"   Error loading datasets: {str(e)}")
-        sys.exit(1)
-
-def load_linear_model(model_path):
-    """Load the pre-trained linear regression model"""
-    print("\n>> Loading linear regression model...")
-    
-    try:
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
-            
-        print("   Model loaded successfully")
-        print("   Model summary:")
-        print(model.summary())
-        
-        return model
-    except Exception as e:
-        print(f"   Error loading model: {str(e)}")
+        print(f"   Error loading dataset: {str(e)}")
         sys.exit(1)
 
 def create_cell_type_mappings():
@@ -200,7 +170,7 @@ def create_cell_type_mappings():
 
         # Macrophages 
         'macrophage': 'MACROPHAGE',
-        'Kupffer cell': 'MACROPHAGE',  # macrophages in the liver
+        'Kupffer cell': 'MACROPHAGE',
         'lung macrophage': 'MACROPHAGE',
 
         # Monocytes
@@ -390,16 +360,15 @@ def map_cell_type(cell_label, mappings):
     # Default: return the original label
     return cell_label
 
-def prepare_annotations(ge_adata, intron_adata):
+def prepare_annotations(ge_adata):
     """
     Standardize cell annotations and prepare metadata
     
     Args:
         ge_adata (AnnData): Gene expression data
-        intron_adata (AnnData): Intron data
         
     Returns:
-        tuple: Updated gene expression and intron AnnData objects
+        AnnData: Updated gene expression AnnData object
     """
     print("\n>> Standardizing cell annotations...")
     
@@ -408,7 +377,6 @@ def prepare_annotations(ge_adata, intron_adata):
     
     # Ensure cell ontology class is string type
     ge_adata.obs['cell_ontology_class'] = ge_adata.obs['cell_ontology_class'].astype(str)
-    intron_adata.obs['cell_ontology_class'] = intron_adata.obs['cell_ontology_class'].astype(str)
     
     # Clean subtissue information if it exists
     if 'subtissue' in ge_adata.obs.columns:
@@ -417,12 +385,9 @@ def prepare_annotations(ge_adata, intron_adata):
         # Drop the old subtissue 
         ge_adata.obs.drop(columns=['subtissue'], inplace=True)
     
-    # Apply cell type mapping to both datasets
+    # Apply cell type mapping
     print("   Mapping cell types to standardized categories...")
     ge_adata.obs['broad_cell_type'] = ge_adata.obs['cell_ontology_class'].apply(
-        lambda x: map_cell_type(x, cell_type_mappings)
-    )
-    intron_adata.obs['broad_cell_type'] = intron_adata.obs['cell_ontology_class'].apply(
         lambda x: map_cell_type(x, cell_type_mappings)
     )
     
@@ -435,61 +400,20 @@ def prepare_annotations(ge_adata, intron_adata):
     ab_microglia_mask = ab_mask & (ge_adata.obs["broad_cell_type"] == "MICROGLIA")
     ge_adata.obs.loc[ab_microglia_mask, "tissue"] = "Brain_Myeloid"
     
-    print(f"   Standardized annotations for {ge_adata.shape[0]} cells")
+    # Count cells by dataset
+    ab_count = ab_mask.sum()
+    tms_count = (~ab_mask).sum()
     
-    return ge_adata, intron_adata
-
-def apply_linear_model(ge_adata, intron_adata, model):
-    """
-    Apply linear model to predict total spliced counts for Allen Brain data
+    print(f"   ✓ Standardized annotations for {ge_adata.shape[0]} cells:")
+    print(f"      - Allen Brain: {ab_count} cells")
+    print(f"      - Tabula Muris Senis: {tms_count} cells")
     
-    Args:
-        ge_adata (AnnData): Gene expression data
-        intron_adata (AnnData): Intron data
-        model: Statsmodels linear model
-        
-    Returns:
-        AnnData: Updated combined dataset with predicted values
-    """
-    print("\n>> Applying linear model to estimate total spliced counts...")
+    # Count broad cell types
+    print(f"\n   Broad cell type distribution:")
+    for cell_type, count in ge_adata.obs['broad_cell_type'].value_counts().head(10).items():
+        print(f"      - {cell_type}: {count} cells")
     
-    # Extract model coefficients
-    intercept = model.params["const"]
-    coef_exons = model.params["exons"]
-    coef_introns = model.params["introns"]
-    
-    print(f"   Model coefficients: intercept={intercept:.4f}, exons={coef_exons:.4f}, introns={coef_introns:.4f}")
-    
-    # Create a copy of the gene expression data
-    combined_adata = ge_adata.copy()
-    
-    # Identify Allen Brain cells
-    ab_mask = combined_adata.obs["dataset"] == "allen_brain_exons"
-    ab_cells = combined_adata[ab_mask]
-    
-    print(f"   Applying model to {sum(ab_mask)} Allen Brain cells...")
-    
-    # Extract normalized expression matrices
-    log_exons = ab_cells.layers["log_norm"]
-    log_introns = intron_adata.layers["log_norm"]
-    
-    # Apply the linear regression equation: intercept + coef_exons * exons + coef_introns * introns
-    log_pred_tot = log_exons.multiply(coef_exons) + log_introns.multiply(coef_introns)
-    log_pred_tot_with_intercept = log_pred_tot.copy()
-    log_pred_tot_with_intercept.data += intercept
-    
-    # Create the new layer for all cells (initialized with log_norm values)
-    combined_adata.layers["predicted_log_norm_tms"] = combined_adata.layers["log_norm"].copy()
-    
-    # Update Allen Brain cells with predicted values
-    combined_adata.layers["predicted_log_norm_tms"][ab_mask] = log_pred_tot_with_intercept
-    
-    print(f"   ✓ Applied model successfully")
-    print(f"   ✓ Final dataset contains {combined_adata.n_obs} cells:")
-    print(f"      - Allen Brain cells: {sum(ab_mask)}")
-    print(f"      - Tabula Muris Senis cells: {sum(~ab_mask)}")
-    
-    return combined_adata
+    return ge_adata
 
 def save_dataset(adata, filename, compression_method="lzf"):
     """
@@ -498,10 +422,7 @@ def save_dataset(adata, filename, compression_method="lzf"):
     Args:
         adata (AnnData): Object to save
         filename (str): Output filename
-        compression_method (str): Compression method to use:
-            - 'lzf': Fast but less compression (default)
-            - 'gzip': Slower but better compression
-            - None: No compression
+        compression_method (str): Compression method to use
         
     Returns:
         bool: Success status
@@ -511,7 +432,6 @@ def save_dataset(adata, filename, compression_method="lzf"):
         start_time = datetime.datetime.now()
         
         # Save the AnnData object with specified compression
-        # LZF doesn't accept compression options
         if compression_method == "lzf":
             adata.write_h5ad(filename, compression=compression_method)
         elif compression_method in ["gzip", "zlib"]:
@@ -537,26 +457,21 @@ def save_dataset(adata, filename, compression_method="lzf"):
     
 # Main execution flow
 try:
-    # Load datasets
-    ge_adata, intron_adata = load_datasets()
-    
-    # Load the pre-trained linear model
-    model = load_linear_model(LINEAR_MODEL_PATH)
+    # Load dataset
+    ge_adata = load_dataset()
     
     # Standardize cell type annotations
-    ge_adata, intron_adata = prepare_annotations(ge_adata, intron_adata)
-    
-    # Apply the linear model to predict total spliced counts
-    combined_adata = apply_linear_model(ge_adata, intron_adata, model)
+    ge_adata = prepare_annotations(ge_adata)
     
     # Save the combined dataset
-    print("\n>> Saving adjusted gene expression data...")
-    output_path = os.path.join(OUTDIR, f"Combined_adjusted_GeneExpression_{today}.h5ad")
-    save_dataset(combined_adata, output_path)
+    print("\n>> Saving combined gene expression data...")
+    output_path = os.path.join(OUTDIR, f"Combined_GeneExpression_{today}.h5ad")
+    save_dataset(ge_adata, output_path)
     
     print("\n" + "="*80)
     print("PROCESSING COMPLETE")
-    print(f"Adjusted gene expression data saved to: {OUTDIR}")
+    print(f"Combined gene expression data saved to: {OUTDIR}")
+    print(f"Dataset contains {ge_adata.shape[0]} cells and {ge_adata.shape[1]} genes")
     print("="*80)
     
 except Exception as e:
@@ -567,4 +482,5 @@ except Exception as e:
     sys.exit(1)
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
-# sbatch --mem=250G -p cpu,dev --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/04_apply_regression_model.py"
+# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/GeneExpression/02_combined_AB_TMS.py
+# sbatch --mem=250G -p cpu,dev,bigmem --wrap "python $script"

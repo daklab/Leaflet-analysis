@@ -39,11 +39,11 @@ import random
 
 # Output DIR 
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025"
+output_dir="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025"
 print(f"Output directory: {output_dir}", flush=True)
 
 # --- Splice data ---
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/anndatas/merged_anndata.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250920/anndatas/merged_anndata.h5ad"
 assert os.path.exists(input_file), f"Splice input file does not exist: {input_file}"
 
 splice_adata = ad.read_h5ad(input_file)
@@ -55,7 +55,7 @@ splice_adata.obs["cell_id_index"] = splice_adata.obs.index
 print(f"The number of cells in the splice dataset is {splice_adata.shape[0]}", flush=True)
 
 # --- ATSEs ---
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/TMS_atse_file_unanno_also_2025-07-31_08-10-26.txt.gz"
+ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/HUMAN_FOUNDATION_ATSE_FILE_unanno_also_2025-09-21_05-02-35.txt.gz"
 assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
 
 atses = pd.read_csv(ATSE_file, sep="\t")
@@ -65,7 +65,7 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # --- Gene expression data ---
-ge_input = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/ts_ab_exons_combo_ge_adata_2025-06-23.h5ad"
+ge_input = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/ts_ab_exons_combo_ge_adata_2025-10-01.h5ad"
 assert os.path.exists(ge_input), f"Gene expression file does not exist: {ge_input}"
 
 ge_adata = ad.read_h5ad(ge_input)
@@ -477,5 +477,5 @@ ge_adata.write_h5ad(ge_adata_file, compression="lzf")
 print(f"Saved ge_adata to {ge_adata_file}")
 
 # Submit script like this:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025
 # sbatch --mem=100G --partition=cpu,dev,bigmem --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/06_align_splice_ge_anndatas.py"

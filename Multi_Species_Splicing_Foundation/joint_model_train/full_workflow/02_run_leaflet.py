@@ -65,11 +65,9 @@ import BetaDirichletFactor.waypoints as wayp
 # Get arguments from command line
 param_id = int(sys.argv[1])
 base_output_dir = sys.argv[2]
-ATSE_anndata_file = sys.argv[3]
 
 print(f"Loading parameter set {param_id}...")
 print(f"Base output directory: {base_output_dir}")
-print(f"Anndata file: {ATSE_anndata_file}")
 
 # Load parameters
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -79,6 +77,8 @@ params = param_list[param_id]
 
 # Convert 'inf' string to torch.tensor(np.inf)
 params["input_conc"] = None if params["input_conc"] is None else torch.tensor(np.inf)
+ATSE_anndata_file = params["anndata_file"]
+print(f"Anndata file: {ATSE_anndata_file}")
 
 # Define output directory
 output_dir = os.path.join(base_output_dir, f"run_{param_id}")
@@ -651,6 +651,7 @@ if pi_evolution:
 # Create results summary
 results_df = pd.DataFrame([{
     "param_id": param_id,
+    "anndata_file": params["anndata_file"],
     "K": params["K"],
     "pruned_K": new_K,
     "junc_specific_prior": params["junc_specific_prior"],

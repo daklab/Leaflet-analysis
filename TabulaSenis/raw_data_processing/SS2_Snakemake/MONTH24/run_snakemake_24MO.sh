@@ -21,7 +21,6 @@ module load samtools
 
 # Navigate to your directory with the Snakefile
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/TabulaSenis/raw_data_processing/SS2_Snakemake/MONTH24
-
 slurm_out=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/SLURM2025/MONTH24
 slurm_out_today=$slurm_out/$(date +%Y%m%d)
 if [ ! -d "$slurm_out_today" ]; then

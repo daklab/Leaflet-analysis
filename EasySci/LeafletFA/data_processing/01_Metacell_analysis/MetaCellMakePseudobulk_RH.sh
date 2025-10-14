@@ -85,3 +85,6 @@ echo "Finished processing cluster: $cluster"
 # cd $ROOT_DIR/slurm 
 # cd 092025
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/01_Metacell_analysis/MetaCellMakePseudobulk_RH.sh
+
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/RH 
+# how many values from DT_w_RH_cells_anndata_meta.tsv are missing in the directory 5th column?

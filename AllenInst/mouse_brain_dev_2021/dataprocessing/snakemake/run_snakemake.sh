@@ -36,7 +36,7 @@ if [ ! -d "$slurm_out_today" ]; then
 fi
 
 # Run Snakemake with SLURM cluster submission
-snakemake -j 64 \
+snakemake -j 80 \
   --cluster-config cluster.json \
   --cluster "sbatch -N 1 -p {cluster.partition} -c {cluster.cpus} --mem={cluster.mem} -t {cluster.time} -J {cluster.job-name} --output=$slurm_out/slurm-%j.out --error=$slurm_out/slurm-%j.err" \
   --latency-wait 120 \

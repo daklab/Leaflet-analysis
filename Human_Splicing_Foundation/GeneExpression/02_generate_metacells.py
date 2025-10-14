@@ -40,16 +40,16 @@ def log_print(message):
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
 OUTPUT_DIR = WD  # Save in the same directory
 today = datetime.datetime.now().strftime("%Y-%m-%d")
-
+date = "2025-09-30"
 # Cell types to focus on for pseudobulk analysis
 COMMON_BROAD_TYPES = ['Other_Neuron', 'Pericyte', 'General_Fibroblast', 'Microglia', 'CNS_Glia']
 
 # Load data
 print("Loading data...")
-ab_exons = sc.read_h5ad(f"{WD}/ab_adata_exons_2025-06-22.h5ad")
-ab_introns = sc.read_h5ad(f"{WD}/ab_adata_introns_2025-06-22.h5ad")
-ts_adata = sc.read_h5ad(f"{WD}/tabsap_adata_2025-06-22.h5ad")
-gene_info_df = pd.read_csv(f"{WD}/gene_info_df_2025-06-22.csv")
+ab_exons = sc.read_h5ad(f"{WD}/ab_adata_exons_{date}.h5ad")
+ab_introns = sc.read_h5ad(f"{WD}/ab_adata_introns_{date}.h5ad")
+ts_adata = sc.read_h5ad(f"{WD}/tabsap_adata_{date}.h5ad")
+gene_info_df = pd.read_csv(f"{WD}/gene_info_df_{date}.csv")
 
 # === Clean up gene symbols and merge gene info ===
 print("Cleaning up gene symbols and merging gene information...")
@@ -598,9 +598,7 @@ else:
     print("No common broad cell types found between datasets!")
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
-# sbatch --job-name=prep_ge_data --mem=100G --partition dev,cpu,bigmem --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/02_generate_metacells.py"
-
-#sbatch --job-name=prep_ge_data \
+# sbatch --job-name=prep_ge_data \
 #       --mem=100G \
 #       --partition dev,cpu,bigmem \
 #       --output=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/prep_ge_data_%j.out \

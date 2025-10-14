@@ -8,9 +8,9 @@
 #SBATCH --partition=cpu,dev,bigmem
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223
-OUTPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/anndatas
-CHUNK_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/chunks
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
+OUTPUT_DIR=${WD}/anndatas
+CHUNK_DIR=${WD}/chunks
 
 # Create base directory with today's date
 cd $WD
@@ -25,5 +25,5 @@ python $SCRIPT_PATH \
   --output-dir $OUTPUT_DIR \
   --chunk-id ${SLURM_ARRAY_TASK_ID}
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake_slurm.sh

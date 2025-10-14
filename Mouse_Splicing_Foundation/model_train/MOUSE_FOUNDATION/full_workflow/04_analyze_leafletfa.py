@@ -95,7 +95,6 @@ def check_psi_correlation(splice_adata, PSI_CELLS, n_samples=10, sample_size=500
     
     print(f"PSI Correlation: {mean_corr:.3f} ± {std_corr:.3f}")
     print(f"Min: {np.min(correlations):.3f}, Max: {np.max(correlations):.3f}")
-    
     return correlations, mean_corr
 
 def analyze_age_regression(splice_adata, PHI, output_dir):
@@ -415,11 +414,11 @@ def analyze_factor_characteristics(PHI, PI, splice_adata, output_dir):
     
     return n_effective
 
-def analyze_batch_effects(splice_adata, PHI, output_dir):
+def analyze_batch_effects(splice_adata, batch_column, cell_type_column, PHI, output_dir):
     """Check for batch effects in the learned representation"""
     print("\n=== Batch Effect Analysis ===")
     
-    if 'dataset' not in splice_adata.obs.columns:
+    if batch_column not in splice_adata.obs.columns:
         print("No dataset/batch information available")
         return
     
@@ -429,40 +428,52 @@ def analyze_batch_effects(splice_adata, PHI, output_dir):
     sc.pp.neighbors(splice_adata, use_rep='X_PHI', n_neighbors=15)
     sc.tl.umap(splice_adata)
     
-    # Create visualization
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    # Create visualization - single plot with clear legend
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     
     # UMAP by dataset
-    sc.pl.umap(splice_adata, color='dataset', ax=axes[0], show=False, 
-               frameon=True, title='UMAP by Dataset')
+    sc.pl.umap(splice_adata, color=batch_column, ax=ax, show=False, 
+               frameon=True, title=f'UMAP by {batch_column}')
     
-    # UMAP by cell type (if available)
-    if 'broad_cell_type' in splice_adata.obs.columns:
-        # Show top 10 cell types
-        top_types = splice_adata.obs['broad_cell_type'].value_counts().head(10).index
-        splice_adata.obs['cell_type_display'] = splice_adata.obs['broad_cell_type'].apply(
-            lambda x: x if x in top_types else 'Other'
-        )
-        sc.pl.umap(splice_adata, color='cell_type_display', ax=axes[1], show=False,
-                  frameon=True, title='UMAP by Cell Type (Top 10)')
+    # Improve legend if it exists
+    legend = ax.get_legend()
+    if legend is not None:
+        # Move legend to the right side with better formatting
+        legend.set_bbox_to_anchor((1.05, 1))
+        legend.set_loc('upper left')
+        legend.set_title(batch_column, prop={'weight':'bold', 'size': 12})
+        # Make legend text larger and clearer
+        for text in legend.get_texts():
+            text.set_fontsize(11)
+        # Add a frame around the legend
+        legend.set_frame_on(True)
+        legend.get_frame().set_facecolor('white')
+        legend.get_frame().set_alpha(0.9)
+        legend.get_frame().set_edgecolor('black')
+        legend.get_frame().set_linewidth(0.5)
     
-    # UMAP by perplexity
-    splice_adata.obs['perplexity'] = calculate_perplexity(PHI)[0]
-    sc.pl.umap(splice_adata, color='perplexity', ax=axes[2], show=False,
-              frameon=True, title='UMAP by Perplexity', cmap='viridis')
+    # Improve plot aesthetics
+    ax.set_xlabel('UMAP 1', fontsize=12, fontweight='bold')
+    ax.set_ylabel('UMAP 2', fontsize=12, fontweight='bold')
+    ax.set_title(f'UMAP Colored by {batch_column}', fontsize=14, fontweight='bold', pad=20)
     
+    # Save with proper layout
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'batch_effects_umap.png'))
+    plt.savefig(os.path.join(output_dir, 'batch_effects_umap.png'), 
+                bbox_inches='tight', dpi=300, facecolor='white')
     plt.close()
     
     # Quantify variance explained by batch
     from sklearn.linear_model import LinearRegression
     
-    # Use first 10 PHI dimensions
-    X = PHI[:, :min(10, PHI.shape[1])]
+    # Use all PHI dimensions
+    X = PHI
     
-    # One-hot encode dataset
-    datasets = pd.get_dummies(splice_adata.obs['dataset'])
+    if batch_column in splice_adata.obs.columns:
+        # One-hot encode dataset
+        datasets = pd.get_dummies(splice_adata.obs[batch_column])
+    else:
+        datasets = None
     
     # Calculate R² for each PHI dimension
     r2_scores = []
@@ -474,9 +485,8 @@ def analyze_batch_effects(splice_adata, PHI, output_dir):
         r2_scores.append(r2)
     
     mean_r2 = np.mean(r2_scores)
-    print(f"Mean R² of batch on first 10 factors: {mean_r2:.3f}")
+    print(f"Mean R² of batch on all factors: {mean_r2:.3f}")
     print(f"Max R² on any factor: {np.max(r2_scores):.3f}")
-    
     return mean_r2
 
 def analyze_training_convergence(model_meta, output_dir):
@@ -563,6 +573,15 @@ def generate_summary_report(results, output_dir):
     report.append(f"Median perplexity: {results.get('median_perplexity', 'N/A'):.2f}")
     report.append(f"Mean perplexity: {results.get('mean_perplexity', 'N/A'):.2f}")
     
+    # Age regression
+    if 'age_regression_global_r2' in results:
+        report.append(f"\n--- AGE REGRESSION ---")
+        report.append(f"Global R² (test): {results.get('age_regression_global_r2', 'N/A'):.3f}")
+        if results.get('age_regression_global_r2', 0) > 0.3:
+            report.append("✓ Good age prediction capability")
+        else:
+            report.append("⚠️ Limited age prediction - may need more age-related factors")
+    
     # Batch effects
     report.append(f"\n--- BATCH EFFECTS ---")
     report.append(f"Batch variance explained (R²): {results.get('batch_r2', 'N/A'):.3f}")
@@ -592,24 +611,48 @@ def main():
     """Main analysis pipeline"""
     
     # Parse arguments
-    if len(sys.argv) < 4:
-        print("Usage: python analyze_leafletfa.py <param_id> <model_dir> <adata_path> [output_dir]")
+    if len(sys.argv) < 7:
+        print("Usage: python analyze_leafletfa.py <param_id> <model_dir> <adata_path> <output_dir> <batch_column> <cell_type_column>")
         sys.exit(1)
     
     param_id = sys.argv[1]
     model_dir = sys.argv[2]
     adata_path = sys.argv[3]
     output_dir = sys.argv[4] if len(sys.argv) > 4 else f"analysis_run_{param_id}"
-    
-    # Create output directory
-    os.makedirs(output_dir, exist_ok=True)
-    print(f"Output directory: {output_dir}")
-    
+    batch_column = sys.argv[5]
+    cell_type_column = sys.argv[6]
+
+    # For given param load all the parameters that were used --> lr, gamma, initial_K, from corresponding json file
+    param_file = os.path.join(model_dir, "parameter_combinations.csv")
+    param_df = pd.read_csv(param_file)
+
     # Initialize results dictionary
     results = {
         'param_id': param_id,
-        'model_path': os.path.join(model_dir, f"run_{param_id}", "leafletfa_model.pkl.gz")
+        'model_path': os.path.join(model_dir, f"run_{param_id}", "leafletfa_model.pkl.gz"),
+        'batch_column': batch_column,
+        'cell_type_column': cell_type_column
     }
+
+    # ensure param_id is an integer
+    param_id = int(param_id)
+    
+    results['lr'] = param_df.iloc[param_id]['lr']
+    results['gamma'] = param_df.iloc[param_id]['gamma']
+    results['initial_K'] = param_df.iloc[param_id]['K']
+    results['num_passes'] = param_df.iloc[param_id]['num_passes']
+    results['batch_size'] = param_df.iloc[param_id]['batch_size']
+    results['num_epochs_first'] = param_df.iloc[param_id]['num_epochs_first']
+    results['num_epochs_later'] = param_df.iloc[param_id]['num_epochs_later']
+    results['ELBO_num_particles'] = param_df.iloc[param_id]['ELBO_num_particles']
+    results['junc_specific_prior'] = param_df.iloc[param_id]['junc_specific_prior']
+    results["waypoints_use"] = param_df.iloc[param_id]['waypoints_use']
+    results["max_junctions"] = param_df.iloc[param_id]['max_junctions']
+    results["n_waypoints"] = param_df.iloc[param_id]['n_waypoints']
+
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Output directory: {output_dir}")
     
     print("\n" + "="*60)
     print(f"LEAFLETFA MODEL ANALYSIS - Param ID: {param_id}")
@@ -625,7 +668,12 @@ def main():
     
     model_data, model_meta = load_model(model_path)
     results.update(model_meta)
-    
+
+    # load pruned_K and original_K from model metadata
+    results['pruned_K'] = model_meta.get('pruned_K', 'Unknown')
+    results['original_K'] = model_meta.get('original_K', 'Unknown')
+    print(f"Pruned K: {results['pruned_K']}, Original K: {results['original_K']}")
+
     # Extract key components
     PHI = model_data['assign_post']
     PSI = model_data['psi']
@@ -636,7 +684,7 @@ def main():
     K = model_data['K']
     results['K'] = K
     results['best_elbo'] = model_data.get('best_elbo', np.nan)
-    
+
     print(f"Model loaded: K={K}, PHI shape={PHI.shape}")
     
     # 2. Load data
@@ -645,7 +693,9 @@ def main():
     print(f"Data shape: {splice_adata.shape}")
     
     # Filter ATSEs by Junction Count (if specified)
-    MAX_JUNCTIONS = 4 
+    MAX_JUNCTIONS = results["max_junctions"]
+    # make sure MAX_JUNCTIONS is an integer
+    MAX_JUNCTIONS = int(MAX_JUNCTIONS)
     if "num_junctions" in splice_adata.var.columns:
         splice_adata = splice_adata[:, splice_adata.var["num_junctions"] <= MAX_JUNCTIONS].copy()
         splice_adata.var["junction_id_index"] = np.arange(splice_adata.shape[1])
@@ -718,22 +768,22 @@ def main():
     plt.savefig(os.path.join(output_dir, 'perplexity_distribution.png'))
     plt.close()
     
-    # 5.5 Age regression analysis
+    # 6. Age regression analysis
     print("\n>>> Performing age regression analysis...")
     age_results = analyze_age_regression(splice_adata, PHI, output_dir)
     if age_results:
         results['age_regression_global_r2'] = age_results['global']['r2_test']
-
-    # 6. Batch effects (if applicable)
+    
+    # 7. Batch effects (if applicable)
     print("\n>>> Checking for batch effects...")
-    batch_r2 = analyze_batch_effects(splice_adata, PHI, output_dir)
+    batch_r2 = analyze_batch_effects(splice_adata, batch_column, cell_type_column, PHI, output_dir)
     results['batch_r2'] = batch_r2 if batch_r2 is not None else np.nan
     
-    # 7. Training convergence
+    # 8. Training convergence
     print("\n>>> Analyzing training convergence...")
     analyze_training_convergence(model_meta, output_dir)
     
-    # 8. Generate summary report
+    # 9. Generate summary report
     print("\n>>> Generating summary report...")
     generate_summary_report(results, output_dir)
     
@@ -744,21 +794,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# python analyze_leafletfa.py <param_id> <model_dir> <adata_path> [output_dir]
-# Example:
-"""
-script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/model_train/MOUSE_FOUNDATION/full_workflow/04_analyze_leafletfa.py
-param_id=18
-model_output=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-08-27
-anndata_file=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_splicing_data_20250730_164104.h5ad
-output_dir=${model_output}/analysis_run_${param_id}
-cd $model_output
-sbatch --job-name=leaflet_post \
-       --partition=bigmem,cpu,dev \
-       --mem=300G \
-       --time=1-00:00:00 \
-       --output=leaflet_post_%j.out \
-       --error=leaflet_post_%j.err \
-       --wrap="python $script $param_id $model_output $anndata_file $output_dir"
-"""

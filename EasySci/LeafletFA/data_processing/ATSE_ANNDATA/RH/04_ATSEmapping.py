@@ -19,14 +19,14 @@ from event_detection import ATSEAnalyzer
 
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode.vM27.basic.annotation.gtf"
 fasta_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/GRCm39.primary_assembly.genome.fa"
-combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223/results"
-output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles"
+combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917/results"
+output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/ATSEfiles"
 db_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode_vM27.db"
 
 min_intron = 50
 max_intron = 500000
-min_junc_reads = 10 
-min_num_cells_wjunc = 3
+min_junc_reads = 100 
+min_num_cells_wjunc = 2
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
@@ -84,7 +84,7 @@ output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/ATSEfiles
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/ATSEfiles
 # conda activate LeafletSC
 # script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/04_ATSEmapping.py
-# sbatch --mem=300G --time=3-00:00:00 -J EasySciRHATSE -p bigmem,cpu,dev --wrap="python $script_path" 
+# sbatch --mem=300G --time=3-00:00:00 -J EasySciRHATSE -p bigmem,cpu --wrap="python $script_path" 

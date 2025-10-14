@@ -44,14 +44,14 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 print(f"Output directory: {OUTPUT_DIR}", flush=True)
 
 # Input file path
-GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/072025/aligned_gene_expression_data_20250731_212313.h5ad"
+GE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025/aligned_gene_expression_data_20251003_010354.h5ad"
 
 # Model configuration
 LINEAR_LATENT = 20
 LINEAR_EPOCHS = 200
 
 # Gene selection configuration
-N_TOP_GENES = 2000  # Number of highly variable genes to select
+N_TOP_GENES = 20000
 
 # Clustering and visualization configuration
 SCVI_LATENT_KEY = "X_scVI_linear"
@@ -433,7 +433,7 @@ def save_results(ge_adata):
     try:
         # Define output filename
         today = datetime.datetime.now().strftime("%Y-%m-%d")
-        output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_scvi_model_latent_{LINEAR_LATENT}_{today}.h5ad")
+        output_file = os.path.join(OUTPUT_DIR, f"ge_adata_with_scvi_model_latent_{LINEAR_LATENT}_{N_TOP_GENES}_{today}.h5ad")
 
         # Fix AnnData.var index name before saving
         if ge_adata.var.index.name == "gene_name":
@@ -493,5 +493,5 @@ print("========================================\n")
 
 # conda activate scvi-env
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/scVI
-# sbatch --mem=200G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_run_scVI.py"
+# sbatch --mem=200G -p gpu --gres=gpu:1 --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/08_run_scVI.py"
 # sbatch --mem=300G -p cpu,bigmem -J "scVI_GE" --wrap "python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_run_scVI.py"

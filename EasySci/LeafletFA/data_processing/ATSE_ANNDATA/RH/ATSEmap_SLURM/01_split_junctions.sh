@@ -9,12 +9,15 @@
 conda activate LeafletSC
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-JUNCTION_FILES=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/RH
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output
+JUNCTION_FILES=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/SpliceVI/RH
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output
+cd $WD
 
 # in WD, make junction_files.txt with all the *_junctions_with_barcodes.bed files found in JUNCTION_FILES
-find $JUNCTION_FILES -name "*_junctions_with_barcodes.bed" > $WD/junction_files.txt
+find $JUNCTION_FILES -path "*/junctions_with_barcodes.bed" > $WD/junction_files.txt
 INPUT_FILE=$WD/junction_files.txt
+# print number of files in INPUT_FILE
+echo "Number of files in INPUT_FILE: $(wc -l $INPUT_FILE)"
 
 # Create base directory with today's date
 BASE_DIR="junction_processing_$(date +%Y%m%d)"

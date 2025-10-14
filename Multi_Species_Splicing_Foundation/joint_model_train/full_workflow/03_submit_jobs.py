@@ -4,9 +4,8 @@ import datetime
 
 # Define where to save outputs 
 # Should be directory in which model params are saved
-base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train/2025-09-04"
+base_output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train/2025-09-18"
 leafletfa_script = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/joint_model_train/full_workflow/02_run_leaflet.py"
-anndata_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/input_files/joint_anndata_20250903.h5ad"
 
 # Load parameter list from JSON file
 param_file = os.path.join(base_output_dir, "parameter_combinations.json")
@@ -33,7 +32,7 @@ job_script_template = """#!/bin/bash
 export PYTHONUNBUFFERED=1
 
 # Run Python script with proper output handling
-python -u {leafletfa_script} {param_id} {base_output_dir} {anndata_file} 2>&1
+python -u {leafletfa_script} {param_id} {base_output_dir} 2>&1
 """
 
 # Generate and submit jobs
@@ -43,8 +42,7 @@ for i, params in enumerate(param_list):
         log_dir=log_dir,
         param_id=i,
         leafletfa_script=leafletfa_script,
-        base_output_dir=base_output_dir,
-        anndata_file=anndata_file
+        base_output_dir=base_output_dir
     )
 
     # Save job script
@@ -59,5 +57,5 @@ for i, params in enumerate(param_list):
 print(f"\nSubmitted {len(param_list)} jobs to Slurm.")
 
 # conda activate LeafletSC
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train/2025-09-04
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/CROSS_SPECIES_AGING/Leaflet/model_combo_train/2025-09-18
 # python /gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/joint_model_train/full_workflow/03_submit_jobs.py

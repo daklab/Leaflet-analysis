@@ -1,8 +1,10 @@
 {
     "__default__": {
-        "cpus": 4,
-        "mem": "64000",
-        "time": "4-00:00",
-        "job-name": "EASYSCI_job"
+      "cpus": 1,
+      "mem": "32000",
+      "time": "00:30:00",
+      "job-name": "EASYSCI_RH_j",
+      "partition": "cpu,dev"
     }
-}
+  }
+  

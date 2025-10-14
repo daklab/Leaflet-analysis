@@ -2,13 +2,13 @@
 #SBATCH --job-name=junction_proc
 #SBATCH --output=logs/junction_%A_%a.out
 #SBATCH --error=logs/junction_%A_%a.err
-#SBATCH --mem=100G
-#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=1
 #SBATCH --array=0-99%10
 #SBATCH -p cpu,dev
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250920
 
 # Create base directory with today's date
 cd $WD

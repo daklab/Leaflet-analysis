@@ -36,17 +36,13 @@ if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
 mouse = False 
-GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_scvi_model_latent_20_2025-08-04.h5ad"
-# GE_ANNDATA_NMF_PATH = f"{BASE_DIR}/NMF/ge_adata_with_NMF_standard_20_1024_2025-08-03.h5ad"
+GE_ANNDATA_scVI_PATH = f"{BASE_DIR}/scVI/ge_adata_with_scvi_model_latent_20_2025-10-03.h5ad"
 
 AGING_GENES_PATH="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/27857814"
 RBP_FILE_PATH="/gpfs/commons/groups/knowles_lab/Karin/VanNostrand_2020_supptable1_41586_2020_2077_MOESM3_ESM.xlsx"
 
 # %%
 print("Loading data...")
-#ge_adata_nmf = ad.read_h5ad(GE_ANNDATA_NMF_PATH)
-#print(f"Done reading NMF anndata from {GE_ANNDATA_NMF_PATH}")
-
 ge_adata = ad.read_h5ad(GE_ANNDATA_scVI_PATH)
 print(f"Done reading scVI anndata from {GE_ANNDATA_scVI_PATH}")
 
@@ -55,7 +51,6 @@ print("Setting up data...")
 # If ge_adata.obs doesn't have cell_id make it from cell_id_clean
 if "cell_id" not in ge_adata.obs.columns:
     ge_adata.obs["cell_id"] = ge_adata.obs["cell_id_clean"]
-    #ge_adata_nmf.obs["cell_id"] = ge_adata_nmf.obs["cell_id_clean"]
 
 # Load aging gene lists
 aging_genes_mouse, aging_genes_human = load_aging_genes(AGING_GENES_PATH)
@@ -83,44 +78,23 @@ else:
 print(f"RBP genes found: {ge_adata.var.RBP_gene.sum()}")
 print(f"Aging genes found: {ge_adata.var.Aging_gene.sum()}")
 
-# Merge data
-#assert np.all(ge_adata.obs_names == ge_adata_nmf.obs_names), "Cell IDs do not match"
-#assert np.all(ge_adata.var_names == ge_adata_nmf.var_names), "Gene names do not match"
-
-#ge_adata.obsm["X_nmf_standard_mb"] = ge_adata_nmf.obsm["X_nmf_standard_mb"]
-#ge_adata.varm["nmf_standard_mb_components"] = ge_adata_nmf.varm["nmf_standard_mb_components"]
-#ge_adata.obsm["X_pca"] = ge_adata_nmf.obsm["X_pca"]
-#ge_adata.varm["pca_loadings"] = ge_adata_nmf.varm["pca_loadings"]
-
 # %%
 print("Building factor loading matrices...")
 gene_names = ge_adata.var["gene_name"].values
 print(f"Total genes: {len(gene_names)}")
 
-# Build loading DataFrames
-#nmf_loadings = pd.DataFrame(
-#    ge_adata.varm["nmf_standard_mb_components"],
-#    index=gene_names,
-#    columns=[f"NMF_{i+1}" for i in range(ge_adata.varm["nmf_standard_mb_components"].shape[1])]
-#)
+print("Building factor loading matrices...")
+gene_names = ge_adata.var["gene_name"].values
+print(f"Total genes: {len(gene_names)}")
 
-#pca_loadings = pd.DataFrame(
-#    ge_adata.varm["pca_loadings"],
-#    index=gene_names,
-#    columns=[f"PCA_{i+1}" for i in range(ge_adata.varm["pca_loadings"].shape[1])]
-#)
-
+# Use .values to get the raw numpy array
 scvi_loadings = pd.DataFrame(
-    ge_adata.varm["scVI_linear_gene_loadings"],
+    ge_adata.varm["scVI_linear_gene_loadings"].values,  # <-- Add .values here!
     index=gene_names,
     columns=[f"Z_{i}" for i in range(ge_adata.varm["scVI_linear_gene_loadings"].shape[1])]
 )
 
-scvi_loadings.columns = [f"Z_{i+1}" for i in range(scvi_loadings.shape[1])]
 print(scvi_loadings.head())
-
-#print(f"NMF factors: {nmf_loadings.shape[1]}")
-#print(f"PCA factors: {pca_loadings.shape[1]}")
 print(f"scVI factors: {scvi_loadings.shape[1]}")
 
 # %%
@@ -155,11 +129,6 @@ def plot_factor_heatmap(adata, factor_key, method_label="NMF", celltype_col="bro
     return g
 
 print("Plotting factor-celltype associations...")
-#plot_factor_heatmap(ge_adata, factor_key="X_pca", method_label="PCA", 
-#                   output_dir=OUTPUT_DIR, filename="pca_factor_celltype_heatmap.pdf")
-
-#plot_factor_heatmap(ge_adata, factor_key="X_nmf_standard_mb", method_label="NMF",
-#                   output_dir=OUTPUT_DIR, filename="nmf_factor_celltype_heatmap.pdf")
 
 plot_factor_heatmap(ge_adata, factor_key="X_scVI_linear", method_label="scVI",
                    output_dir=OUTPUT_DIR, filename="scvi_factor_celltype_heatmap.pdf")
@@ -457,20 +426,10 @@ def plot_gsea_heatmap(term_matrix, title, filename, output_dir=None, score_type=
 print("=== RUNNING FOCUSED GSEA ANALYSIS ===")
 
 # Run focused GSEA
-#focused_gsea_nmf = run_focused_gsea(nmf_loadings, organism="Mouse", output_dir=OUTPUT_DIR)
 focused_gsea_scvi = run_focused_gsea(scvi_loadings, organism="Mouse", output_dir=OUTPUT_DIR)  
-#focused_gsea_pca = run_focused_gsea(pca_loadings, organism="Mouse", output_dir=OUTPUT_DIR)
-
 print("=== FILTERING RESULTS FOR SPECIFICITY ===")
 
 # Filter for high-quality, specific results
-#filtered_nmf = filter_and_rank_gsea_results(
-#    focused_gsea_nmf,
-#    fdr_threshold=0.05,
-#    min_abs_nes=1.5,
-#    top_n_per_factor=8
-#)
-
 filtered_scvi = filter_and_rank_gsea_results(
     focused_gsea_scvi,
     fdr_threshold=0.05,
@@ -478,34 +437,20 @@ filtered_scvi = filter_and_rank_gsea_results(
     top_n_per_factor=8
 )
 
-#filtered_pca = filter_and_rank_gsea_results(
-#    focused_gsea_pca,
-#    fdr_threshold=0.05,
-#    min_abs_nes=1.5,
-#    top_n_per_factor=8
-#)
-
 print("=== CREATING FOCUSED SUMMARIES ===")
 
 # Create summaries
-#nmf_summary = create_focused_pathway_summary(filtered_nmf, output_dir=OUTPUT_DIR)
 scvi_summary = create_focused_pathway_summary(filtered_scvi, output_dir=OUTPUT_DIR)
-#pca_summary = create_focused_pathway_summary(filtered_pca, output_dir=OUTPUT_DIR)
 
 print("=== PLOTTING TOP PATHWAYS ===")
-
 # Plot focused heatmaps
-#plot_top_pathways_per_factor(nmf_summary, method_name="NMF", output_dir=OUTPUT_DIR)
 plot_top_pathways_per_factor(scvi_summary, method_name="scVI", output_dir=OUTPUT_DIR)
-#plot_top_pathways_per_factor(pca_summary, method_name="PCA", output_dir=OUTPUT_DIR)
 
 # %%
 print("=== SAVING RESULTS ===")
 
 # Save loadings
-#nmf_loadings.to_csv(os.path.join(OUTPUT_DIR, "nmf_loadings.tsv.gz"), sep="\t", compression="gzip")
 scvi_loadings.to_csv(os.path.join(OUTPUT_DIR, "scvi_loadings.tsv.gz"), sep="\t", compression="gzip")
-#pca_loadings.to_csv(os.path.join(OUTPUT_DIR, "pca_loadings.tsv.gz"), sep="\t", compression="gzip")
 print(f"Saved loadings to {OUTPUT_DIR}")
 
 # Flatten and save comprehensive results
@@ -523,17 +468,9 @@ def flatten_comprehensive_results(gsea_dict, label):
     return pd.concat(all_rows, axis=0) if all_rows else pd.DataFrame()
 
 # Save comprehensive results
-#flat_nmf_comprehensive = flatten_comprehensive_results(focused_gsea_nmf, label="NMF")
 flat_scvi_comprehensive = flatten_comprehensive_results(focused_gsea_scvi, label="scVI")
-#flat_pca_comprehensive = flatten_comprehensive_results(focused_gsea_pca, label="PCA")
-
-#flat_nmf_comprehensive.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_comprehensive_nmf.tsv.gz"), 
-#                             sep="\t", index=False, compression="gzip")
 flat_scvi_comprehensive.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_comprehensive_scvi.tsv.gz"), 
                               sep="\t", index=False, compression="gzip")
-#flat_pca_comprehensive.to_csv(os.path.join(OUTPUT_DIR, "gsea_results_comprehensive_pca.tsv.gz"), 
-#                             sep="\t", index=False, compression="gzip")
-
 print("✅ Saved comprehensive GSEA result tables")
 
 # %%  
@@ -554,18 +491,7 @@ def build_simple_matrix(filtered_results):
     return pd.DataFrame(term_dict).T.fillna(0)
 
 # Build matrices
-#nmf_matrix = build_simple_matrix(filtered_nmf)
 scvi_matrix = build_simple_matrix(filtered_scvi)  
-#pca_matrix = build_simple_matrix(filtered_pca)
-
-# Plot heatmaps
-#plot_gsea_heatmap(
-#    nmf_matrix,
-#    title="NMF Factors – Top GSEA Terms",
-#    filename="nmf_gsea_focused_heatmap.pdf",
-#    output_dir=OUTPUT_DIR,
-#    score_type='NES'
-#)
 
 plot_gsea_heatmap(
     scvi_matrix,
@@ -575,23 +501,13 @@ plot_gsea_heatmap(
     score_type='NES'
 )
 
-#plot_gsea_heatmap(
-#    pca_matrix,
-#    title="PCA Factors – Top GSEA Terms",
-#    filename="pca_gsea_focused_heatmap.pdf",
-#    output_dir=OUTPUT_DIR,
-#    score_type='NES'
-#)
-
 print("✅ Focused GSEA analysis complete!")
 
 # Summary statistics
 print(f"\n=== SUMMARY STATISTICS ===")
-#print(f"NMF: {len(nmf_summary)} pathway annotations across {nmf_loadings.shape[1]} factors")
 print(f"scVI: {len(scvi_summary)} pathway annotations across {scvi_loadings.shape[1]} factors")  
-#print(f"PCA: {len(pca_summary)} pathway annotations across {pca_loadings.shape[1]} factors")
 print(f"Results saved to: {OUTPUT_DIR}")
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION
-# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/10_GE_vs_GSEA.py
+# script=/gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/GeneExpression/09_GE_vs_GSEA.py
 # sbatch --mem=300G -p dev,cpu,bigmem -J "HUM_GE_vs_AGING" --wrap="python $script"

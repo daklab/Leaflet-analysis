@@ -19,11 +19,14 @@ from genome_utils import JunctionAnalyzer, GenomeDB # type: ignore
 from event_detection import ATSEAnalyzer # type: ignore
 
 # gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
-gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
-db_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencodev45.db"
+# gtf_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
+
+gtf_file = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/paper_figures/isoform_gazers/all_samples_sp_collapse_all_chr_no_treatment_hashid_isoform_full.gtf"
+db_file = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/paper_figures/isoform_gazers/long_read_hg38.db"
 print(f"Using the gtf_file: {gtf_file}!")
+
 fasta_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa"
-combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250730/results"
+combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250920/results"
 output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files"
 
 min_intron = 50
@@ -33,6 +36,10 @@ min_num_cells_wjunc = 10
 batch_size = 32
 num_workers = 10
 annot_status = "unanno_also"
+
+# Initialize genome database 
+genome_db = GenomeDB(db_name=db_file, gtf_file=gtf_file, fasta_file=fasta_file)
+print(f"Done initializing genome db!")
 
 # Load pkl file with junctions
 pkl_path = f"{combined_junctions_file}/final_junctions.pkl"
@@ -48,10 +55,6 @@ reader = JunctionReader(batch_size=batch_size,
 
 # Run QC on the junctions
 filtered_junctions = reader.SJ_QC(combined_junctions)
-
-# Initialize genome database 
-genome_db = GenomeDB(db_name=db_file, gtf_file=gtf_file, fasta_file=fasta_file)
-print(f"Done initializing genome db!")
 
 # Initialize junction analyzer
 analyzer = JunctionAnalyzer(fasta_file=fasta_file, db=genome_db.get_db(), tolerance=100)
@@ -78,7 +81,7 @@ ATSE_groups, sorted_counts = atse_analyzer.find_atse_groups(sgraph)
 # Save the ATSEs to a file
 date = datetime.datetime.now().strftime("%Y-%m-%d")
 time = datetime.datetime.now().strftime("%H-%M-%S")
-atse_file = f"TMS_atse_file_{annot_status}_{date}_{time}.txt"
+atse_file = f"HUMAN_FOUNDATION_ATSE_FILE_{annot_status}_{date}_{time}.txt"
 output_file = os.path.join(output_path, atse_file)
 # Use ATSE_groups directly since it's already classified and renamed
 atse_analyzer.save_atse_file(ATSE_groups, filtered_junctions, output_file)

@@ -31,8 +31,8 @@ from datetime import date
 
 # === Paths and input files ===
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
-ab_adata_file = "AB_adjusted_GeneExpression_via_exon_intron_regression_2025-06-23.h5ad"
-ts_adata_file = "TS_GeneExpression_with_length_norm_2025-06-23.h5ad"
+ab_adata_file = "AB_adjusted_GeneExpression_via_exon_intron_regression_2025-10-01.h5ad"
+ts_adata_file = "TS_GeneExpression_with_length_norm_2025-10-01.h5ad"
 
 # === Load AnnData objects ===
 print("Loading AnnData objects...")

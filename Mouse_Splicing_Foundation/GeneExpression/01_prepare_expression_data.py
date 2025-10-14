@@ -18,6 +18,11 @@ import scanpy as sc
 import anndata as ad
 from scipy.sparse import csr_matrix
 import numpy as np
+from collections import defaultdict
+import scipy.sparse as sp
+import gffutils 
+from tqdm import tqdm
+import mygene
 
 # Add the directory containing the shared utils to the Python path
 sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
@@ -42,8 +47,8 @@ OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_S
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Input file paths
-GTF_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf"
-DB_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/GENCODE_vM19"
+GTF_FILE = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/2025_mouse_longread/2025_mouse_collapse_GRCm38/all_samples_sp_collapse_all_chr_full.gtf"
+DB_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/genomes/lr_GRCm38.db"
 AB_METADATA = "/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/metadata.csv"
 
 # These are raw data files:
@@ -53,6 +58,143 @@ TMS_EXPRESSION = "/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis
 
 # Step 1: Process gene annotation data
 print("\n>> Processing gene annotation data...")
+
+# %%
+def validate_file_exists(filepath, description=""):
+    """Validate that a file exists and is readable."""
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"❌ {description} file not found: {filepath}")
+    if not os.access(filepath, os.R_OK):
+        raise PermissionError(f"❌ {description} file not readable: {filepath}")
+    print(f"✅ {description} file found: {filepath}")
+    return True
+
+def extract_gene_transcript_info(gtf_file, db_file):
+    """
+    Parses a GENCODE GTF file to compute gene transcript information.
+    
+    Returns:
+        DataFrame with gene_id, gene_name, mean_transcript_length, mean_intron_length, 
+        num_transcripts, and transcript_biotypes.
+    """
+    print("\n=== EXTRACTING GENE TRANSCRIPT INFORMATION ===")
+    
+    # SANITY CHECK 1: Validate input files
+    validate_file_exists(gtf_file, "GTF")
+    
+    # Load or create database
+    if os.path.exists(db_file):
+        print("✅ Using existing GTF database")
+        db = gffutils.FeatureDB(db_file, keep_order=True)
+        print("✅ Database loaded successfully!")
+    else:
+        print("⏳ Creating GTF database (this may take a few minutes)...")
+        validate_file_exists(gtf_file, "GTF")
+        db = gffutils.create_db(
+            gtf_file,
+            db_file,
+            force=True,
+            keep_order=True,
+            disable_infer_transcripts=False,
+            disable_infer_genes=True
+        )
+        print("✅ Database created successfully!")
+
+    # Initialize data structures
+    gene_exon_lengths = defaultdict(list)
+    gene_intron_lengths = defaultdict(list)
+    gene_names = {}
+    gene_biotypes = defaultdict(set)
+    transcript_counts = defaultdict(int)
+    
+    # Counters for sanity checks
+    total_transcripts = 0
+    skipped_transcripts = 0
+
+    print("⏳ Processing transcripts to compute exon and intron lengths...")
+    
+    for transcript in tqdm(db.features_of_type("transcript"), desc="Processing Transcripts"):
+        total_transcripts += 1
+        
+        # Extract transcript attributes
+        gene_id = transcript.attributes.get("gene_id", [None])[0]
+        gene_name = transcript.attributes.get("gene_name", ["unknown"])[0]
+        transcript_biotype = transcript.attributes.get("transcript_type", ["unknown"])[0]
+        
+        if gene_id is None:
+            print(f"⚠️  Skipping transcript without gene_id: {transcript.id}")
+            skipped_transcripts += 1
+            continue
+
+        # Get exons for this transcript
+        exons = list(db.children(transcript, featuretype="exon", order_by="start"))
+        if len(exons) == 0:
+            skipped_transcripts += 1
+            continue
+
+        # Calculate lengths
+        exon_length = sum(exon.end - exon.start + 1 for exon in exons)
+        transcript_start = min(exon.start for exon in exons)
+        transcript_end = max(exon.end for exon in exons)
+        transcript_span = transcript_end - transcript_start + 1
+        intron_length = transcript_span - exon_length
+
+        # Store data
+        gene_exon_lengths[gene_id].append(exon_length)
+        gene_intron_lengths[gene_id].append(max(0, intron_length))
+        gene_names[gene_id] = gene_name
+        gene_biotypes[gene_id].add(transcript_biotype)
+        transcript_counts[gene_id] += 1
+
+    # SANITY CHECK 2: Processing summary
+    print(f"\n=== TRANSCRIPT PROCESSING SUMMARY ===")
+    print(f"Total transcripts processed: {total_transcripts:,}")
+    print(f"Transcripts skipped (no exons/gene_id): {skipped_transcripts:,}")
+    print(f"Transcripts used: {total_transcripts - skipped_transcripts:,}")
+    print(f"Unique genes found: {len(gene_exon_lengths):,}")
+
+    if len(gene_exon_lengths) == 0:
+        raise ValueError("❌ No valid genes found in GTF file!")
+
+    # Create final DataFrame
+    gene_ids = list(gene_exon_lengths.keys())
+    gene_info_df = pd.DataFrame({
+        "gene_id": gene_ids,
+        "gene_name": [gene_names[g] for g in gene_ids],
+        "mean_transcript_length": [sum(gene_exon_lengths[g]) / len(gene_exon_lengths[g]) for g in gene_ids],
+        "mean_intron_length": [sum(gene_intron_lengths[g]) / len(gene_intron_lengths[g]) for g in gene_ids],
+        "num_transcripts": [transcript_counts[g] for g in gene_ids],
+        "transcript_biotypes": [", ".join(sorted(gene_biotypes[g])) for g in gene_ids]
+    })
+
+    # SANITY CHECK 3: Final DataFrame validation
+    print(f"\n=== GENE INFO VALIDATION ===")
+    print(f"Gene info DataFrame shape: {gene_info_df.shape}")
+    print(f"Columns: {list(gene_info_df.columns)}")
+    
+    # Check for missing values
+    missing_counts = gene_info_df.isnull().sum()
+    if missing_counts.any():
+        print(f"⚠️  Missing values found:\n{missing_counts[missing_counts > 0]}")
+    else:
+        print("✅ No missing values in gene info")
+    
+    # Basic statistics
+    print(f"Mean transcript length range: {gene_info_df['mean_transcript_length'].min():.0f} - {gene_info_df['mean_transcript_length'].max():.0f}")
+    print(f"Mean intron length range: {gene_info_df['mean_intron_length'].min():.0f} - {gene_info_df['mean_intron_length'].max():.0f}")
+    print(f"Transcript count range: {gene_info_df['num_transcripts'].min()} - {gene_info_df['num_transcripts'].max()}")
+    
+    # Check for duplicates
+    gene_id_dups = gene_info_df['gene_id'].duplicated().sum()
+    gene_name_dups = gene_info_df['gene_name'].duplicated().sum()
+    print(f"Duplicate gene_ids: {gene_id_dups}")
+    print(f"Duplicate gene_names: {gene_name_dups}")
+    
+    if gene_id_dups > 0 or gene_name_dups > 0:
+        print("⚠️  WARNING: Duplicates found in gene info!")
+
+    return gene_info_df
+
 gene_info_df = extract_gene_transcript_info(GTF_FILE, DB_FILE)
 
 # Step 2: Load Allen Brain data
@@ -129,6 +271,54 @@ print("\n>> Harmonizing genes across datasets...")
 # Dictionary to store lost gene information
 lost_genes_info = {}
 
+# Initialize mygene
+mg = mygene.MyGeneInfo()
+
+# Create a clean gene_id column without version numbers
+gene_info_df['gene_id_clean'] = gene_info_df['gene_id'].str.replace(r'\.\d+$', '', regex=True)
+
+# Query gene info - request the gene biotype field
+gene_ids = gene_info_df['gene_id_clean'].tolist()
+results = mg.querymany(gene_ids, 
+                       scopes='ensembl.gene', 
+                       fields='symbol,type_of_gene',  # type_of_gene gives you the gene biotype
+                       species='mouse', 
+                       returnall=True)
+
+# Process results
+gene_info = pd.DataFrame(results['out'])
+
+# Merge back to original dataframe
+df_merged = gene_info_df.merge(
+    gene_info[['query', 'symbol', 'type_of_gene']], 
+    left_on='gene_id_clean',
+    right_on='query', 
+    how='left'
+)
+
+# Rename columns for clarity
+df_merged = df_merged.rename(columns={
+    'symbol': 'gene_name_new',
+    'type_of_gene': 'gene_biotype'
+})
+
+# Drop the temporary columns if desired
+df_merged = df_merged.drop(columns=['gene_id_clean', 'query'])
+
+# Update the gene_name column with the new data where available
+df_merged['gene_name'] = df_merged['gene_name_new'].fillna(df_merged['gene_name'])
+df_merged = df_merged.drop(columns=['gene_name_new'])
+
+# Let's remove any genes whose gene_name is unknown 
+df_merged = df_merged[df_merged['gene_name'] != 'unknown']
+
+# Remove transcript_biotype column
+df_merged = df_merged.drop(columns=['transcript_biotypes'])
+
+# remove genes that are not protein coding
+df_merged = df_merged[df_merged['gene_biotype'] == 'protein-coding']
+gene_info_df = df_merged.copy() 
+
 # Add gene info to all datasets
 for adata, name in zip([tms_adata, ab_adata_introns, ab_adata_exons], 
                        ["TMS", "AB introns", "AB exons"]):
@@ -174,10 +364,35 @@ tms_adata = tms_adata[:, tms_adata.var["gene_name"].isin(common_genes)].copy()
 ab_adata_introns = ab_adata_introns[:, ab_adata_introns.var["gene_name"].isin(common_genes)].copy()
 ab_adata_exons = ab_adata_exons[:, ab_adata_exons.var["gene_name"].isin(common_genes)].copy()
 
+# Check for and remove duplicate gene names
+print("\n>> Checking for duplicate gene names...")
+for adata, name in zip([tms_adata, ab_adata_introns, ab_adata_exons], 
+                       ["TMS", "AB introns", "AB exons"]):
+    n_duplicates = adata.var["gene_name"].duplicated().sum()
+    if n_duplicates > 0:
+        print(f"\n   {name}: Found {n_duplicates} duplicate gene names")
+        duplicate_genes = adata.var[adata.var["gene_name"].duplicated(keep=False)].sort_values("gene_name")
+        print(f"   Duplicate genes: {sorted(set(duplicate_genes['gene_name']))}")
+    else:
+        print(f"   {name}: No duplicate gene names found")
+
+# Remove duplicate gene names - keep first occurrence
+print("\n>> Removing duplicate gene names (keeping first occurrence)...")
+tms_adata = tms_adata[:, ~tms_adata.var["gene_name"].duplicated(keep='first')].copy()
+ab_adata_introns = ab_adata_introns[:, ~ab_adata_introns.var["gene_name"].duplicated(keep='first')].copy()
+ab_adata_exons = ab_adata_exons[:, ~ab_adata_exons.var["gene_name"].duplicated(keep='first')].copy()
+
+print(f"   ✓ After removing duplicates:")
+print(f"     TMS: {tms_adata.shape[1]} genes")
+print(f"     AB introns: {ab_adata_introns.shape[1]} genes")
+print(f"     AB exons: {ab_adata_exons.shape[1]} genes")
+
 # Sort by gene name
+print("\n>> Sorting genes by name...")
 tms_adata = tms_adata[:, tms_adata.var.sort_values("gene_name").index].copy()
 ab_adata_introns = ab_adata_introns[:, ab_adata_introns.var.sort_values("gene_name").index].copy()
 ab_adata_exons = ab_adata_exons[:, ab_adata_exons.var.sort_values("gene_name").index].copy()
+print("   ✓ Gene sorting complete")
 
 # Verification
 gene_match_1 = all(tms_adata.var["gene_name"].values == ab_adata_exons.var["gene_name"].values)

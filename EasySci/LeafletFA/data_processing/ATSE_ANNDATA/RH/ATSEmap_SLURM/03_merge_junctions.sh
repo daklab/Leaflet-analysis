@@ -6,8 +6,10 @@
 #SBATCH --mem=32G
 #SBATCH --cpus-per-task=4
 
+conda activate LeafletSC
+
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/RH/output/junction_processing_20250223
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
 
 # Create base directory with today's date
 cd $WD
@@ -17,3 +19,5 @@ python $SCRIPT_PATH \
     --mode merge \
     --output-dir results \
     --merge-output results/final_junctions.pkl
+
+

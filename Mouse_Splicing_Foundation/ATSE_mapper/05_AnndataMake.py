@@ -13,7 +13,7 @@ from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, cr
 # Constants
 #metadata = pd.read_csv(metadata_path, sep=",")
 METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/metadata_mouse_metadata_combined.csv" #note this metadata might be just Smart-seq2 cells/nuceli... 
-INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-07-01_00-02-00.txt.gz"
+INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40.txt.gz"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 
@@ -39,7 +39,7 @@ def main():
     print(metadata.head())
 
     # Load in the actual junctions observed in MOUSE SPLICING FOUNDATION
-    with open('/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250622/results/final_junctions.pkl', 'rb') as f:
+    with open('/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/junction_processing_20250929/results/final_junctions.pkl', 'rb') as f:
         junction_dict = pickle.load(f)
     dataset_junction_ids = set(junction_dict.keys())
     print(f"Found {len(dataset_junction_ids)} junctions in the dataset")

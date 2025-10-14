@@ -33,13 +33,13 @@ timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 # ----- Directory and file setup -----
 
 # Output directory
-output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025"
+output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025"
 # Create output directory if it doesn't exist
 os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}", flush=True)
 
 # ATSE file path
-ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/stella_gtf/TMS_atse_file_unanno_also_2025-05-11_06-23-05.txt.gz"
+ATSE_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/HUMAN_FOUNDATION_ATSE_FILE_unanno_also_2025-09-21_05-02-35.txt.gz"
 assert os.path.exists(ATSE_file), f"ATSE file does not exist: {ATSE_file}"
 
 # Metadata file
@@ -57,11 +57,11 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # Splicing input file
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025/aligned_splicing_data_20250623_170756.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025/model_ready_aligned_splicing_data_20251009_023419.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
 # Define which column to use for cell type grouping
-cell_type_column = "broad_cell_type"
+cell_type_column = "medium_cell_type"
 
 # ----- Load and preprocess data -----
 
@@ -415,6 +415,7 @@ def create_long_format_df(psi_adata, atses):
                 "junction_id_index": psi_adata.var["junction_id_index"][j],
                 "junction_count": junction_counts_dense[i, j],
                 "atse_count": atse_counts_dense[i, j],
+                "gene_symbol": psi_adata.var["gene_name"][j], 
                 "psi": psi_values[i, j],
                 "n_cells": n_cells
             })
@@ -430,68 +431,6 @@ def create_long_format_df(psi_adata, atses):
 
 # Create long format DataFrame
 long_df = create_long_format_df(pseudobulk_psi, atses)
-
-# ----- Add gene annotation to the long dataframe -----
-
-def add_gene_symbols(long_df):
-    """
-    Add gene symbols to the long-format DataFrame.
-    
-    Parameters:
-    -----------
-    long_df : DataFrame
-        Long-format DataFrame with gene_id column
-        
-    Returns:
-    --------
-    DataFrame
-        DataFrame with added gene_symbol column
-    """
-    if "gene_id" not in long_df.columns:
-        print("WARNING: gene_id column not found. Gene symbols will not be added.")
-        return long_df
-    
-    try:
-        from mygene import MyGeneInfo
-        
-        print("Using MyGeneInfo to map gene IDs to gene symbols...")
-        # Get unique gene IDs to query
-        unique_gene_ids = [gene_id.split('.')[0] for gene_id in long_df["gene_id"].dropna().unique()]
-        
-        if unique_gene_ids:
-            mg = MyGeneInfo()
-            lookup = mg.querymany(unique_gene_ids, scopes="ensembl.gene", fields="symbol", species="human")
-            
-            # Create mapping dictionary
-            gene_map = {}
-            for entry in lookup:
-                if "query" in entry:
-                    query = entry["query"]
-                    if "symbol" in entry:
-                        gene_map[query] = entry["symbol"]
-                    else:
-                        gene_map[query] = None
-            
-            # Function to map gene ID to symbol
-            def map_gene_id_to_symbol(gene_id):
-                if pd.isna(gene_id):
-                    return None
-                base_id = gene_id.split('.')[0] if '.' in gene_id else gene_id
-                return gene_map.get(base_id, None)
-            
-            # Apply mapping
-            long_df["gene_symbol"] = long_df["gene_id"].apply(map_gene_id_to_symbol)
-            print(f"Added gene symbols for {sum(long_df['gene_symbol'].notna())} entries")
-            
-    except ImportError:
-        print("WARNING: mygene module not available. Gene symbols will not be added.")
-    except Exception as e:
-        print(f"WARNING: Error in gene ID mapping: {e}")
-    
-    return long_df
-
-# Add gene symbols to DataFrame
-long_df = add_gene_symbols(long_df)
 long_df.sort_values(by="event_id", inplace=True)
 
 # Save final version
@@ -501,6 +440,6 @@ long_df.to_csv(final_file, index=False, compression="gzip")
 
 print("\nPseudobulk creation and PSI calculation complete!")
 
-
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/062025
+# conda activate LeafletSC
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025
 # sbatch --mem=64G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"

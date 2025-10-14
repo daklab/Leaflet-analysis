@@ -45,19 +45,18 @@ from gene_processing import (
 )
 
 # === Genome Paths ===
-gtf_hg38 = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf"
-db_file = "/gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode_hg38.db"
-
+gtf_file = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/paper_figures/isoform_gazers/all_samples_sp_collapse_all_chr_no_treatment_hashid_isoform_full.gtf"
+db_file = "/gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/paper_figures/isoform_gazers/long_read_hg38.db"
 WD="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data"
 # Get lengths of genes 
-gene_info_df = pd.read_csv(f"{WD}/gene_info_df_2025-06-22.csv")
+gene_info_df = pd.read_csv(f"{WD}/gene_info_df_2025-09-30.csv")
 
 # === Paths and output directories for anndatas ===
 print(f"Reading in the anndata objects...")
 outdir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data/"
-ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_filtered_2025-06-23.h5ad")
-ab_introns = sc.read_h5ad(f"{outdir}/ab_adata_introns_filtered_2025-06-23.h5ad")
-ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_filtered_2025-06-23.h5ad")
+ab_exons = sc.read_h5ad(f"{outdir}/ab_adata_exons_filtered_2025-10-01.h5ad")
+ab_introns = sc.read_h5ad(f"{outdir}/ab_adata_introns_filtered_2025-10-01.h5ad")
+ts_adata = sc.read_h5ad(f"{outdir}/tabsap_adata_filtered_2025-10-01.h5ad")
 
 # === Make sparse if needed ===
 for adata in [ab_exons, ab_introns, ts_adata]:
