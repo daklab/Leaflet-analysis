@@ -3,7 +3,7 @@
 #SBATCH --mem=64G
 #SBATCH -t 0-03:00 # Runtime in D-HH:MM
 #SBATCH -p cpu,bigmem,dev
-#SBATCH --array=1-26093 # number of metacells in DT_w_RH_cells_anndata_meta.tsv
+#SBATCH --array=1-4920 # number of metacells in DT_w_RH_cells_anndata_meta.tsv
 
 #conda activate python3ENV 
 module load samtools
@@ -13,14 +13,17 @@ CSV_FILE="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024
 ROOT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/" 
 OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI" 
 
+# Make a new directory for the date in OUTPUT_DIR
+DATE=$(date +%Y%m)
+OUTPUT_DIR="$OUTPUT_DIR/$DATE"
+mkdir -p "$OUTPUT_DIR"
+echo "Output directory: $OUTPUT_DIR"
+
 # make subdir for RH with date 
 RH_DIR="$OUTPUT_DIR/RH"
-
 mkdir -p "$RH_DIR"
 echo "Output directory: $RH_DIR"
 
-# Make OUTPUT_DIR if it does not exist
-mkdir -p "$RH_DIR"
 tail -n +2 "$CSV_FILE" | cut -d',' -f5 | sort | uniq > $RH_DIR/RH_cluster_list.txt
 
 # Get the cluster name corresponding to this task ID
@@ -83,7 +86,7 @@ fi
 echo "Finished processing cluster: $cluster"
 
 # cd $ROOT_DIR/slurm 
-# cd 092025
+# cd 10202025
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/01_Metacell_analysis/MetaCellMakePseudobulk_RH.sh
 
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/RH 

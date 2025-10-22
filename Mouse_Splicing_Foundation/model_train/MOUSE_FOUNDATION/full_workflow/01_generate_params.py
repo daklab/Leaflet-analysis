@@ -20,12 +20,12 @@ param_grid = {
     "input_conc": [None],  # 'inf' will be converted to torch.tensor(np.inf)
     "junc_specific_prior": [True, False],
     "delta_fixed": [None],
-    "K": [20],
+    "K": [20, 30, 50],
     "waypoints_use": [True],  # Test both with and without waypoints
     
     # Multi-pass mini-batch parameters
     "batch_size": [4096],  # GPU batch size
-    "num_passes": [5, 20],  # Number of times each cell is seen
+    "num_passes": [5],  # Number of times each cell is seen
     "num_epochs_first": [500],  # Epochs for very first batch
     "num_epochs_later": [500],  # Epochs for subsequent batches
     
@@ -34,11 +34,11 @@ param_grid = {
     "num_samples": [100],
     'gamma': [0.01],  # Learning rate decay
     'min_delta': [100],
-    "lr": [0.01, 0.05],  # Initial learning rate
+    "lr": [0.001, 0.01, 0.1],  # Initial learning rate
     "patience": [5],
     
     # Data filtering
-    "max_junctions": [5],  # Maximum number of junctions per ATSE
+    "max_junctions": [5, 10],  # Maximum number of junctions per ATSE
 }
 
 # Generate all parameter combinations
@@ -101,10 +101,12 @@ for i in range(min(3, len(param_list))):
     print(f"  gamma: {param_list[i]['gamma']}")
     print(f"  estimated_total_batches: {param_list[i]['estimated_total_batches']}")
 
-# Create a summary of training configurations
+# Create a summary of training configurations - INCLUDE ALL RELEVANT PARAMETERS
 training_summary = pd.DataFrame([
     {
         "K": p["K"],
+        "junc_specific_prior": p["junc_specific_prior"],  # ADD THIS
+        "max_junctions": p["max_junctions"],              # ADD THIS
         "waypoints": "Yes" if p["waypoints_use"] else "No",
         "batch_size": p["batch_size"],
         "num_passes": p["num_passes"],

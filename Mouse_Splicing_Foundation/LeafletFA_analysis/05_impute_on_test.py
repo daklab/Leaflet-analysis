@@ -1,299 +1,244 @@
 #!/usr/bin/env python
 """
-LeafletFA Model Training Script
-Trains a factor analysis model on mouse splicing foundation data.
+LeafletFA Model Evaluation Script - Batched Evaluation
+Evaluates trained models on test data using mini-batches to avoid OOM.
 """
 
-import os
-import sys
+import os, sys, glob, pickle, gzip
 import numpy as np
 import pandas as pd
 import torch
-import scanpy as sc
-import seaborn as sns
-import matplotlib.pyplot as plt
 import mudata as mu
-from scipy.sparse import coo_matrix, csr_matrix
-from sklearn.decomposition import TruncatedSVD
-import pickle
-import numpy as np
-from scipy.sparse import csr_matrix
+from scipy import sparse
+from scipy.stats import spearmanr
+from datetime import datetime
 
-# Configure environment
-print("Torch version:", torch.__version__)
-print("CUDA available:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("CUDA device count:", torch.cuda.device_count())
-    print("CUDA device name:", torch.cuda.get_device_name(0))
-
+# Setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-
-torch.set_default_tensor_type("torch.FloatTensor" if device.type == "cpu" else "torch.cuda.FloatTensor")
+print(f"Device: {device}")
+torch.set_default_tensor_type("torch.cuda.FloatTensor" if torch.cuda.is_available() else "torch.FloatTensor")
 torch.manual_seed(0)
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-# Configure plotting
-sns.set_theme()
-sc.set_figure_params(figsize=(7, 7), frameon=True, dpi=80, facecolor='white')
-
-# Add custom module paths
-src_path = "/gpfs/commons/home/kisaev/Leaflet-private/src/"
-if src_path not in sys.path:
-    sys.path.append(src_path)
-
+sys.path.append("/gpfs/commons/home/kisaev/Leaflet-private/src/")
 import BetaDirichletFactor.LeafletFA as LeafletFA
-import BetaDirichletFactor.utils as utils
-import BetaDirichletFactor.waypoints as wayp
 
 def load_model(model_file):
-    """Load LeafletFA model from file with device handling"""
+    """Load model from pickle"""
     model = {}
-
-    # Detect device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Loading model to device: {device}")
-
-    # Patch torch.load to respect map_location
-    def device_load(*args, **kwargs):
-        kwargs.setdefault("map_location", device)
-        return original_torch_load(*args, **kwargs)
-
-    # Save original and patch
-    original_torch_load = torch.load
-    torch.load = device_load
-
-    try:
-        with gzip.open(model_file, "rb") as f:
-            while True:
-                try:
-                    attr_dict = pickle.load(f)
-                    model.update(attr_dict)
-                except EOFError:
-                    break
-    finally:
-        torch.load = original_torch_load  # Restore original
-
+    with gzip.open(model_file, "rb") as f:
+        while True:
+            try:
+                model.update(pickle.load(f))
+            except EOFError:
+                break
     return model
 
-# =============================================================================
-# Configuration
-# =============================================================================
-
-# File paths
-TEST_ADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/MASKED_0.2_test_30_70_ge_splice_combined_20250730_164104.h5mu"
-OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_OUTPUT/082025"
-
-# =============================================================================
-# Data Loading and Preprocessing
-# =============================================================================
-
-print(f"Loading Training MuData from {TEST_ADATA_PATH}...")
-mdata = mu.read_h5mu(TEST_ADATA_PATH)
-ad = mdata["splicing"]
-
-print(f"Found layers in training AnnData: {list(ad.layers.keys())}")
-
-# Reset and prepare cell indices
-ad.obs.reset_index(drop=True, inplace=True)
-ad.obs["cell_id_index"] = ad.obs.index
-
-# Reduce ad to only junctions in ATSEs that have <= 3 junctions in them 
-ad = ad[:, ad.var["num_junctions"] <= 3].copy()
-
-# Reset the junction_id_index to be 0 to num_junctions - 1
-ad.var["junction_id_index"] = np.arange(ad.shape[1])
-print(f"Done reducing adata to junctions in ATSEs that have <= 3 junctions in them")
-print(f"New adata shape: {ad.shape}")
-
-# =============================================================================
-# Make sure that the sparsity pattern of the cell_by_junction_matrix and cell_by_cluster_matrix match 
-# =============================================================================
-
-ad.layers["cell_by_junction_matrix"], ad.layers["cell_by_cluster_matrix"]
-print("Fixing sparsity pattern mismatch...")
-
-# Get the matrices
-junction_matrix = ad.layers["cell_by_junction_matrix"] 
-cluster_matrix = ad.layers["cell_by_cluster_matrix"]
-
-print(f"Before fix:")
-print(f"  Junction matrix: {junction_matrix.nnz} non-zeros")
-print(f"  Cluster matrix: {cluster_matrix.nnz} non-zeros")
-
-# Convert both to COO format to work with indices
-junction_coo = junction_matrix.tocoo()
-cluster_coo = cluster_matrix.tocoo()
-
-# Get the sparsity pattern (locations of non-zeros) from cluster matrix
-cluster_indices = set(zip(cluster_coo.row, cluster_coo.col))
-junction_indices = set(zip(junction_coo.row, junction_coo.col))
-
-# Find missing positions in junction matrix
-missing_positions = cluster_indices - junction_indices
-print(f"Missing positions in junction matrix: {len(missing_positions)}")
-
-if len(missing_positions) > 0:
-    # Create arrays for the missing positions
-    missing_rows = [pos[0] for pos in missing_positions]
-    missing_cols = [pos[1] for pos in missing_positions]
-    missing_values = np.zeros(len(missing_positions), dtype=junction_matrix.dtype)
+def fix_sparsity(ad):
+    """Fix sparsity pattern mismatch"""
+    junc = ad.layers["cell_by_junction_matrix"].tocoo()
+    clust = ad.layers["cell_by_cluster_matrix"].tocoo()
+    missing = set(zip(clust.row, clust.col)) - set(zip(junc.row, junc.col))
     
-    # Combine existing data with missing zeros
-    all_rows = np.concatenate([junction_coo.row, missing_rows])
-    all_cols = np.concatenate([junction_coo.col, missing_cols])
-    all_values = np.concatenate([junction_coo.data, missing_values])
+    if missing:
+        mr, mc = zip(*missing)
+        all_r = np.concatenate([junc.row, mr])
+        all_c = np.concatenate([junc.col, mc])
+        all_v = np.concatenate([junc.data, np.zeros(len(missing))])
+        ad.layers["cell_by_junction_matrix"] = sparse.csr_matrix(
+            (all_v, (all_r, all_c)), shape=junc.shape, dtype=junc.dtype)
+    return ad
+
+def evaluate_batched(model_path, ad, output_dir, batch_size=4096):
+    """Evaluate model using batches"""
+    print(f"\n{'='*80}\nEvaluating: {model_path}\n{'='*80}")
     
-    # Create new junction matrix with explicit zeros
-    new_junction_matrix = csr_matrix(
-        (all_values, (all_rows, all_cols)), 
-        shape=junction_matrix.shape,
-        dtype=junction_matrix.dtype
-    )
+    # Clear GPU
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     
-    # Update the layer
-    ad.layers["cell_by_junction_matrix"] = new_junction_matrix
+    try:
+        # Load model
+        model = load_model(model_path)
+        K = model["psis_loc"].shape[0]
+        print(f"K={K} factors")
+        
+        # Sample PSI
+        psi = 1 / (1 + np.exp(-(model["psis_loc"] + 
+                                 model["psis_scale"] * np.random.randn(*model["psis_loc"].shape))))
+        
+        # Batch setup
+        n_cells = ad.n_obs
+        n_batches = int(np.ceil(n_cells / batch_size))
+        print(f"Processing {n_cells:,} cells in {n_batches} batches of {batch_size:,}")
+        
+        all_imputed = []
+        
+        # Process batches
+        for i in range(n_batches):
+            start, end = i * batch_size, min((i + 1) * batch_size, n_cells)
+            print(f"  Batch {i+1}/{n_batches} (cells {start}-{end})...", end=" ")
+            
+            ad_batch = ad[start:end, :].copy()
+            
+            # Initialize and train
+            batch_model = LeafletFA.LeafletFA(
+                adata=ad_batch, K=K, 
+                fixed_psi=torch.tensor(psi),
+                pi_init=torch.tensor(model["pi"]),
+                alpha_pi_init=torch.tensor(model["alpha_pi"]),
+                junc_specific_prior=model["junc_specific_prior"],
+                waypoints_use=False, input_conc_prior=np.inf,
+                delta_fixed=torch.tensor(model["dir_conc"]),
+                num_epochs=20, print_epochs=5, ELBO_num_particles=10,
+                lr=0.6, gamma=0.005, min_delta=10, num_samples=100,
+                patience=10, output_dir=output_dir, log_wandb=False
+            )
+            
+            batch_model.from_anndata()
+            batch_model.initialize_triton_mask()
+            batch_model.train(num_initializations=1)
+            batch_model.get_all_variables()
+            
+            # Get predictions
+            all_imputed.append(batch_model.assign_post @ psi)
+            print("✓")
+            
+            # Cleanup
+            del batch_model, ad_batch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        # Combine and evaluate
+        print("Combining predictions...")
+        imputed = np.vstack(all_imputed)
+        
+        masked_orig = sparse.csr_matrix(ad.layers["junc_ratio_masked_original"])
+        bin_mask = sparse.csr_matrix(ad.layers["junc_ratio_masked_bin_mask"])
+        rows, cols = bin_mask.nonzero()
+        
+        orig_vals = masked_orig[rows, cols].A1
+        pred_vals = imputed[rows, cols]
+        
+        pearson = np.corrcoef(orig_vals, pred_vals)[0, 1]
+        spearman = spearmanr(orig_vals, pred_vals, nan_policy="omit")[0]
+        
+        print(f"[RESULT] Pearson: {pearson:.4f}, Spearman: {spearman:.4f}\n")
+        
+        return {
+            'model_path': model_path,
+            'pearson': pearson,
+            'spearman': spearman,
+            'num_masked_values': len(orig_vals),
+            'K_used': K,
+            'num_batches': n_batches
+        }
+        
+    except Exception as e:
+        print(f"ERROR: {e}")
+        raise
+    finally:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+def main():
+    # Paths
+    TEST_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/072025/MASKED_0.2_test_30_70_ge_splice_combined_20250730_164104.h5mu"
+    MODEL_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/2025-09-22"
+    OUTPUT_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_OUTPUT/batch_evaluation"
+    BATCH_SIZE = 4096
     
-    print(f"After fix:")
-    print(f"  Junction matrix: {new_junction_matrix.nnz} non-zeros")
-    print(f"  Cluster matrix: {cluster_matrix.nnz} non-zeros")
-    print(f"  ✓ Sparsity patterns now match!")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-else:
-    print("✓ No missing positions found - sparsity patterns already match")
-
-# Verify they now have the same number of non-zeros
-final_junction = ad.layers["cell_by_junction_matrix"]
-final_cluster = ad.layers["cell_by_cluster_matrix"]
-
-if final_junction.nnz == final_cluster.nnz:
-    print(f"✓ Success! Both matrices now have {final_junction.nnz} non-zeros")
-else:
-    print(f"❌ Still mismatched: {final_junction.nnz} vs {final_cluster.nnz}")
+    # Load data
+    print(f"Loading test data...")
+    mdata = mu.read_h5mu(TEST_PATH)
+    ad = mdata["splicing"]
+    ad.obs.reset_index(drop=True, inplace=True)
+    ad.obs["cell_id_index"] = ad.obs.index
+    ad = fix_sparsity(ad)
+    print(f"Data shape: {ad.shape}")
     
-print("✓ Ready for LeafletFA model!")
+    # Load params
+    params_df = pd.read_csv(os.path.join(MODEL_DIR, "parameter_combinations.csv"))
+    print(f"Found {len(params_df)} parameter sets")
+    
+    # Find models
+    run_dirs = sorted(glob.glob(os.path.join(MODEL_DIR, "run_*")))
+    print(f"Found {len(run_dirs)} run directories\n")
+    
+    # Evaluate all
+    results = []
+    for run_dir in run_dirs:
+        run_name = os.path.basename(run_dir)
+        run_idx = int(run_name.split('_')[1])
+        model_file = os.path.join(run_dir, "leafletfa_model.pkl.gz")
+        
+        if not os.path.exists(model_file):
+            print(f"Skipping {run_name}: no model file")
+            continue
+        
+        print(f"{'#'*80}\n{run_name} (index {run_idx})")
+        params = params_df.iloc[run_idx].to_dict() if run_idx < len(params_df) else {}
+        print(f"Params: K={params.get('K')}, passes={params.get('num_passes')}, "
+              f"gamma={params.get('gamma')}, lr={params.get('lr')}")
+        
+        try:
+            result = evaluate_batched(model_file, ad.copy(), OUTPUT_DIR, BATCH_SIZE)
+            result.update({'run_name': run_name, 'run_idx': run_idx})
+            for col in params_df.columns:
+                result[f'param_{col}'] = params.get(col, np.nan)
+            results.append(result)
+            
+            # Save intermediate
+            pd.DataFrame(results).to_csv(
+                os.path.join(OUTPUT_DIR, "evaluation_results_intermediate.csv"), index=False)
+            
+        except Exception as e:
+            print(f"FAILED: {e}")
+            results.append({
+                'model_path': model_file, 'run_name': run_name, 'run_idx': run_idx,
+                'pearson': np.nan, 'spearman': np.nan, 'error': str(e)
+            })
+    
+    # Final results
+    if results:
+        results_df = pd.DataFrame(results)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_file = os.path.join(OUTPUT_DIR, f"evaluation_results_{timestamp}.csv")
+        results_df.to_csv(results_file, index=False)
+        
+        print(f"\n{'='*80}\nEVALUATION SUMMARY\n{'='*80}")
+        valid = results_df.dropna(subset=['pearson'])
+        
+        if len(valid) > 0:
+            sorted_res = valid.sort_values('pearson', ascending=False)
+            print("\nTop 10 models:")
+            print(sorted_res[['run_name', 'pearson', 'spearman', 'param_K', 
+                              'param_num_passes', 'param_gamma', 'param_lr']].head(10))
+            
+            print(f"\nStats:")
+            print(f"  Mean Pearson: {valid['pearson'].mean():.4f} ± {valid['pearson'].std():.4f}")
+            print(f"  Best Pearson: {valid['pearson'].max():.4f} ({valid.loc[valid['pearson'].idxmax(), 'run_name']})")
+        
+        print(f"\nTotal: {len(results)}, Success: {len(valid)}, Failed: {len(results)-len(valid)}")
+        print(f"Results saved to: {results_file}")
+    else:
+        print("\n❌ No results")
 
-# =============================================================================
-# Load in model trained using the 70% training data 
-# =============================================================================
-
-leaflet_model = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_OUTPUT/082025/leafletfa_model_20250821_131921.pkl.gz"
-leaflet_model = load_model(leaflet_model)
-
-psi_learned = 1 / (1 + np.exp(-(leaflet_model["psis_loc"] + leaflet_model["psis_scale"] * np.random.standard_normal(leaflet_model["psis_loc"].shape))))
-
-# =============================================================================
-# ESTIMATE FACTOR ACTIVITIES FROM PSI VALUES
-# =============================================================================
-
-# We will run LeafletFA here but using a fixed PSI matrix 
-# Check what shape and type PSI matrix need to be in 
-# leaflet_model["psi_learned"].shape K by J
-psi_input = psi_learned
-K = 20
-print(f"The shape of the PSI input is: {psi_input.shape}")
-
-#Initialize model (maybe should also use fixed PI here...)
-print("Initializing LeafletFA model...")
-masked_test_leaflet_model = LeafletFA.LeafletFA(
-    adata=ad, # test data with 20% masked values 
-    K=K, 
-    fixed_psi=torch.tensor(psi_input),
-    pi_init=torch.tensor(leaflet_model["pi"]),
-    alpha_pi_init = torch.tensor(leaflet_model["alpha_pi"]),
-    junc_specific_prior=leaflet_model["junc_specific_prior"], 
-    waypoints_use=False, 
-    input_conc_prior=np.inf, # ideally should use the one the original model learned
-    delta_fixed=torch.tensor(leaflet_model["dir_conc"]),
-    num_epochs=20, 
-    print_epochs=5, 
-    ELBO_num_particles=10, 
-    lr=0.6, 
-    gamma=0.005, 
-    min_delta=10,
-    num_samples=100, 
-    patience=10,
-    output_dir=OUTPUT_DIR,
-    log_wandb=False  # Log to wandb
-)
-
-# Print confirm that model has dir_conc 
-print(f"Model initialized with dir_conc: {masked_test_leaflet_model.dir_conc}")
-print(f"Model initialized with pi_init: {masked_test_leaflet_model.pi_init} and alpha_pi_init: {masked_test_leaflet_model.alpha_pi_init}")
-
-# Train model
-print(f"Extracting sparse tensors from anndata object")
-masked_test_leaflet_model.from_anndata()
-
-print(f"Obtaining mask for sparse operations")
-masked_test_leaflet_model.initialize_triton_mask()
-
-print("Training LeafletFA model...")
-masked_test_leaflet_model.train(num_initializations=1)
-
-print("Done training model!")
-
-# =============================================================================
-# Extract learned PHI
-# =============================================================================
-
-print("Training complete, extracting results...")
-masked_test_leaflet_model.get_all_variables()
-
-# Save latent variables
-ad.obsm[f"X_leafletFA_K{K}"] = masked_test_leaflet_model.assign_post
-
-# Make a quick barplot of PI and add to wandb log 
-alpha_pi=masked_test_leaflet_model.alpha_pi
-PI = masked_test_leaflet_model.pi
-PI_df = pd.DataFrame(PI, columns=["PI"])
-
-# Calculate imputed PSI by multiplying PHI by PI 
-imputed_psi = masked_test_leaflet_model.assign_post @ psi_learned
-
-# Add imputed PSI to adata 
-ad.layers["imputed_psi"] = imputed_psi
-
-from scipy import sparse
-
-# ensure CSR for fast row/col lookups
-masked_orig = ad.layers["junc_ratio_masked_original"]
-
-if not sparse.isspmatrix_csr(masked_orig):
-    masked_orig = sparse.csr_matrix(masked_orig)
-
-bin_mask = ad.layers["junc_ratio_masked_bin_mask"]
-if not sparse.isspmatrix_csr(bin_mask):
-    bin_mask = sparse.csr_matrix(bin_mask)
-
-# get masked locations (row, col indices)
-rows, cols = bin_mask.nonzero()
-
-# ground-truth original PSI values (may be zero)
-orig_vals = masked_orig[rows, cols].A1  # .A1 = flatten to 1D
-
-# model predictions (dense output)
-pred_vals = imputed_psi[rows, cols]
-
-import numpy as np
-from scipy.stats import spearmanr
-pearson_m  = np.corrcoef(orig_vals, pred_vals)[0, 1]
-spearman_m = spearmanr(orig_vals, pred_vals, nan_policy="omit")[0]
-print(f"[impute-test] masked‐ATSE PSI corr — Pearson: {pearson_m:.4f}, Spearman: {spearman_m:.4f}")
-
+if __name__ == "__main__":
+    main()
 
 """
-conda activate LeafletSC
-cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Leaflet/leafletFAmodel/scVI_compare
-
-To submit this script:
+Submit with:
 script=/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/LeafletFA_analysis/05_impute_on_test.py
-
-# CPU run (fallback option with high memory)
-sbatch --job-name=leaflet_cpu \
-       --partition=bigmem \
-       --mem=900G \
-       --time=5-00:00:00 \
-       --output=leaflet_cpu_%j.out \
-       --error=leaflet_cpu_%j.err \
+cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_OUTPUT/
+sbatch --job-name=leaflet_eval \
+       --partition=gpu \
+       --gres=gpu:1 \
+       --mem=300G \
+       --time=7-00:00:00 \
+       --output=leaflet_eval_%j.out \
+       --error=leaflet_eval_%j.err \
        --wrap="python $script"
 """
