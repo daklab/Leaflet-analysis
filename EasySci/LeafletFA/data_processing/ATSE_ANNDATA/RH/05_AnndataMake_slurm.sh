@@ -8,7 +8,7 @@
 #SBATCH --partition=cpu,dev,bigmem
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022
 OUTPUT_DIR=${WD}/anndatas
 CHUNK_DIR=${WD}/chunks
 
@@ -25,5 +25,5 @@ python $SCRIPT_PATH \
   --output-dir $OUTPUT_DIR \
   --chunk-id ${SLURM_ARRAY_TASK_ID}
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022
 # sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake_slurm.sh

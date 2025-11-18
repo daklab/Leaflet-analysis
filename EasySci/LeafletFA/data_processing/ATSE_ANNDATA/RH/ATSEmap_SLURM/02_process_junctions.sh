@@ -5,12 +5,10 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=4
 #SBATCH --array=0-99%30
-#SBATCH -p bigmem,cpu
+#SBATCH -p bigmem,cpu,dev
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output/junction_processing_20250917
-
-# Create base directory with today's date
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022
 cd $WD
 
 # Print debug information

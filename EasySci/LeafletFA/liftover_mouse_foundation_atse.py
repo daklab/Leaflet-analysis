@@ -11,7 +11,9 @@ chain_file = "/gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/lif
 lo = LiftOver(chain_file)
 
 # Mouse Foundation ATSE file
-mouse_foundation_atse_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-07-01_00-02-00.txt.gz"
+mouse_foundation_atse_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40.txt.gz"
+mouse_foundation_convertsion_atse_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40_lifted_mm39.txt.gz"
+
 mouse_foundation_genome_version = "mm10"
 # Easysci genome version
 easysci_genome_version = "mm39"
@@ -88,6 +90,9 @@ easysci_atse_df["junction_id"] = (
 
 # Find those where junction_id and mouse_foundation_junction_id are the same!
 easysci_atse_df[easysci_atse_df["junction_id"] == easysci_atse_df["mouse_foundation_junction_id"]]
-easysci_atse_df.to_csv("/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-07-01_00-02-00_lifted_mm39.txt.gz", sep="\t", index=False, compression="gzip")
+print(f"Saved converted ATSE file to {mouse_foundation_convertsion_atse_file}")
+print(f"Number of junctions: {len(easysci_atse_df)}")
+print(easysci_atse_df.head())
+easysci_atse_df.to_csv(mouse_foundation_convertsion_atse_file, sep="\t", index=False, compression="gzip")
 
 

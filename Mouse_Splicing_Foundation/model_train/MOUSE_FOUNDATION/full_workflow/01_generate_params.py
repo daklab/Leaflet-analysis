@@ -18,9 +18,9 @@ print(f"All outputs will be saved in {base_output_dir}")
 # Define parameter grid
 param_grid = {
     "input_conc": [None],  # 'inf' will be converted to torch.tensor(np.inf)
-    "junc_specific_prior": [True, False],
+    "junc_specific_prior": [True],
     "delta_fixed": [None],
-    "K": [20, 30, 50],
+    "K": [20],
     "waypoints_use": [True],  # Test both with and without waypoints
     
     # Multi-pass mini-batch parameters
@@ -34,11 +34,11 @@ param_grid = {
     "num_samples": [100],
     'gamma': [0.01],  # Learning rate decay
     'min_delta': [100],
-    "lr": [0.001, 0.01, 0.1],  # Initial learning rate
+    "lr": [0.01],  # Initial learning rate
     "patience": [5],
     
     # Data filtering
-    "max_junctions": [5, 10],  # Maximum number of junctions per ATSE
+    "max_junctions": [5],  # Maximum number of junctions per ATSE
 }
 
 # Generate all parameter combinations

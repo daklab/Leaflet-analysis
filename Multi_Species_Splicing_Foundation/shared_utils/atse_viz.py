@@ -53,12 +53,13 @@ def extract_unique_transcripts(juncs: pd.DataFrame) -> List[str]:
                 for transcript in value:
                     if transcript and not pd.isna(transcript) and transcript != 'NA':
                         all_transcripts.add(str(transcript))
-    
+    print(f"Unique transcripts: {all_transcripts}")
     return sorted(list(all_transcripts))
 
 def visualize_atse_event(atse_event, atse_df, db, species="human", 
                         output_dir=None, padding=5000, base_width=10, 
-                        trans_height=1, show_usage=False, show_junc_lines=False):
+                        trans_height=1, show_usage=False, show_junc_lines=False,
+                        filter_ensembl_transcripts=True):
     """
     Process and visualize a single ATSE event.
     
@@ -73,6 +74,7 @@ def visualize_atse_event(atse_event, atse_df, db, species="human",
         trans_height (int): Height parameter for transcript display
         show_usage (bool): Whether to show junction usage information
         show_junc_lines (bool): Whether to show junction lines
+        filter_ensembl_transcripts (bool): Whether to filter for ENST/ENSMUST transcripts
         
     Returns:
         dict: A dictionary containing processed data
@@ -100,11 +102,14 @@ def visualize_atse_event(atse_event, atse_df, db, species="human",
             print(f"No transcripts found for ATSE event: {atse_event}")
             return None
         
-        # Ensure unique transcripts start either with ENST or ENSMUST
-        unique_transcripts_keep = [t for t in unique_transcripts if t and t.startswith(('ENST', 'ENSMUST'))]
-        unique_transcripts_remove = [t for t in unique_transcripts if t and not t.startswith(('ENST', 'ENSMUST'))]
-        print(f"Unique transcripts: {unique_transcripts_keep}")
-        print(f"Unique transcripts to remove: {unique_transcripts_remove}")
+        if filter_ensembl_transcripts:
+            # Ensure unique transcripts start either with ENST or ENSMUST
+            unique_transcripts_keep = [t for t in unique_transcripts if t and t.startswith(('ENST', 'ENSMUST'))]
+            unique_transcripts_remove = [t for t in unique_transcripts if t and not t.startswith(('ENST', 'ENSMUST'))]
+            print(f"Unique transcripts: {unique_transcripts_keep}")
+            print(f"Unique transcripts to remove: {unique_transcripts_remove}")
+        else:
+            unique_transcripts_keep = unique_transcripts
 
         # Fetch transcript data from the database
         transcript_data = fetch_transcripts_and_annotations(db, unique_transcripts_keep)
@@ -133,7 +138,7 @@ def visualize_atse_event(atse_event, atse_df, db, species="human",
             gene_name = juncs['gene_name'].iloc[0] if 'gene_name' in juncs.columns else "unknown"
             filename = os.path.join(output_dir, f"{timestamp}_{species}_{gene_name}_{atse_event}.pdf")
         else:
-            filename = f"{species}_{atse_event}.pdf"
+            filename = None
         
         # Plot with the appropriate parameters
         plot_exons_and_junctions(

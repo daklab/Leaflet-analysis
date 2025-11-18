@@ -9,8 +9,14 @@
 conda activate LeafletSC
 
 SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
-JUNCTION_FILES=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/SpliceVI/RH
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/ATSEmap/SpliceVI/RH/output
+JUNCTION_FILES=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/junctions/SpliceVI/202510/RH
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap
+
+# Create base directory with today's date
+# create output directory if it doesn't exist
+if [ ! -d "$WD" ]; then
+    mkdir -p $WD
+fi
 cd $WD
 
 # in WD, make junction_files.txt with all the *_junctions_with_barcodes.bed files found in JUNCTION_FILES
