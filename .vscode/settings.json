@@ -1,5 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./Multi_Species_Splicing_Foundation/shared_utils"
-    ]
-}

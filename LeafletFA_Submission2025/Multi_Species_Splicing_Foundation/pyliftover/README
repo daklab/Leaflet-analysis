@@ -1,0 +1,15 @@
+# Create a directory for chain files
+mkdir -p ~/.pyliftover
+
+# Download the mm10 to hg38 chain file directly
+cd ~/.pyliftover
+wget -O mm10ToHg38.over.chain.gz "http://hgdownload.cse.ucsc.edu/goldenpath/mm10/liftOver/mm10ToHg38.over.chain.gz"
+
+# Also download the reverse direction if needed
+wget -O hg38ToMm10.over.chain.gz "http://hgdownload.cse.ucsc.edu/goldenpath/hg38/liftOver/hg38ToMm10.over.chain.gz"
+
+# Gunzip them
+gunzip mm10ToHg38.over.chain.gz
+gunzip hg38ToMm10.over.chain.gz
+
+echo "Chain files downloaded to ~/.pyliftover/"

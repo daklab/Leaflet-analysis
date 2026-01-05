@@ -15,6 +15,7 @@ __pycache__/
 *.h5ad
 *.tsv.gz
 *.bed 
+*.xlsx
 
 **/Archive/
 Multi_Species_Splicing_Foundation/compare_ATSEs.ipynb
@@ -211,3 +212,76 @@ Multi_Species_Splicing_Foundation/NatureAging_PLOTTING_HUMAN/*.tex
 Multi_Species_Splicing_Foundation/NatureAging_PLOTTING_MOUSE/*.pdf
 Multi_Species_Splicing_Foundation/NatureAging_PLOTTING_MOUSE/*.tex
 Multi_Species_Splicing_Foundation/cross_species_conservation_analysis_2025-06-24/*
+
+# --- IGNORE ALL DATA (The 96GB culprits) ---
+*.bam
+*.bai
+*.fastq
+*.fastq.gz
+*.fq.gz
+*.h5ad
+*.db
+*.gct
+*.tab.gz
+*.tsv.gz
+*.csv.gz
+*.zip
+*.tar.gz
+*.h5ad
+*.bed
+*.bed.gz
+*.gtf 
+*.gtf
+*.gff.gz
+*.gff
+*.gff3.gz
+*.gff3
+*.gff3.gz
+*.gff3
+*.gff3.gz
+*.gz
+
+# Ignore Slurm output logs
+*.out
+slurm-*.out
+
+# Ignore Model data/Pickle files (The heavy stuff)
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# Ignore the entire temp directory in TabulaSenis
+LeafletFA_Submission2025/TabulaSenis/temp/
+
+# --- IGNORE INTERMEDIATE OUTPUTS ---
+*.pdf
+*.png
+*.log
+**/__pycache__/
+**/.snakemake/
+
+# --- FINAL DATA BLOCK (Add to bottom) ---
+*.npy
+*.pkl
+*.pickle
+*.out
+*.bam
+*.bai
+*.fastq
+*.fastq.gz
+*.h5ad
+*.db
+*.gct
+*.tab.gz
+*.tsv.gz
+*.csv.gz
+*.zip
+*.tar.gz
+**/temp/
+**/results/
+
+# Add to the bottom of your .gitignore
+gencode*
+*.chain
+*.over.chain
