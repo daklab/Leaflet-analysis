@@ -57,17 +57,18 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # Splicing input file
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025/model_ready_aligned_splicing_data_20251009_023419.h5ad"
+input_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Human_Splicing_Foundation/RNA_gazers/full_human_adata_with_clean_celltypes.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
 # Define which column to use for cell type grouping
-cell_type_column = "medium_cell_type"
+cell_type_column = "tissue_celltype_aligned"
 
 # ----- Load and preprocess data -----
 
 # Read splicing AnnData
 print("Loading splicing AnnData file...", flush=True)
 splice_adata = ad.read_h5ad(input_file)
+print(splice_adata.obs[cell_type_column].value_counts())
 
 # Reset index and store original index
 splice_adata.obs.reset_index(drop=True, inplace=True)
@@ -442,4 +443,4 @@ print("\nPseudobulk creation and PSI calculation complete!")
 
 # conda activate LeafletSC
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025
-# sbatch --mem=64G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"
+# sbatch --mem=64G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Human_Splicing_Foundation/RNA_gazers/01_make_human_pseudobulk_PSI_matrices.py"

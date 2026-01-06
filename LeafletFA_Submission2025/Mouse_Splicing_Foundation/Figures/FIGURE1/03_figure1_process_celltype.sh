@@ -24,9 +24,9 @@ echo "=========================================="
 TODAY=$(date +%Y%m%d)
 
 # Define paths
-BASE_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-SCRIPT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/Figures/FIGURE1/"
-OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1"
+BASE_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation"
+SCRIPT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1/"
+OUTPUT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"
 TODAY=$(date +%Y%m%d)
 CELLTYPES_FILE="${OUTPUT_DIR}/figure1_${TODAY}/cell_types_to_process.txt"
 
@@ -52,7 +52,7 @@ echo "=========================================="
 echo ""
 
 # Run Python script for this cell type
-python ${SCRIPT_DIR}/figure1_process_celltype.py \
+python ${SCRIPT_DIR}/02_figure1_process_celltype.py \
     --celltype "$CELLTYPE" \
     --today "$TODAY"
 

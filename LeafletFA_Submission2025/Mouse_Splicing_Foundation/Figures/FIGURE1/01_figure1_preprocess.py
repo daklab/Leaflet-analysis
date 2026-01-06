@@ -122,9 +122,7 @@ def preprocess_data(
 
 def main():
     today = datetime.now().strftime("%Y%m%d")
-    BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-    output_dir = "/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/figure_paper"
-    
+    output_dir = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"    
     run_dir = f"{output_dir}/figure1_{today}"
     os.makedirs(run_dir, exist_ok=True)
     os.makedirs(f"{run_dir}/intermediate", exist_ok=True)
@@ -132,7 +130,7 @@ def main():
     print(f"Saving outputs to: {run_dir}")
     
     # File paths
-    SPLICE_INPUT = f"{BASE_DIR}/MODEL_INPUT/102025/model_ready_aligned_splicing_data_20251009_024406.h5ad"
+    SPLICE_INPUT = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Figure1_input_data.h5ad"
     
     print("\n" + "="*60)
     print("PREPROCESSING: Load and filter data")
@@ -153,12 +151,15 @@ def main():
     splice_adata.var["junction_id_index"] = range(splice_adata.shape[1])
     
     # Create tissue-celltype combinations
-    if 'tissue' in splice_adata.obs.columns and 'medium_cell_type' in splice_adata.obs.columns:
+    # First check if tissue_celltype already exists, if not, create it  
+    if 'tissue_celltype' not in splice_adata.obs.columns:
         splice_adata.obs['tissue_celltype'] = (
             splice_adata.obs['tissue'].astype(str) + '_' +
             splice_adata.obs['medium_cell_type'].astype(str)
         )
         print(f"\nCreated 'tissue_celltype' with {splice_adata.obs['tissue_celltype'].nunique()} combinations")
+    else:
+        print(f"\n'tissue_celltype' column already exists with {splice_adata.obs['tissue_celltype'].nunique()} combinations")
     
     splice_adata.var.reset_index(inplace=True)
     
@@ -166,11 +167,11 @@ def main():
     print("\nIdentifying cell types for parallel processing...")
     cell_type_counts = splice_adata.obs.groupby(['tissue_celltype', 'age_group']).size().unstack(fill_value=0)
     valid_celltypes = cell_type_counts[
-        (cell_type_counts.get('young', 0) >= 100) & 
-        (cell_type_counts.get('old', 0) >= 100)
+        (cell_type_counts.get('young', 0) >= 50) & 
+        (cell_type_counts.get('old', 0) >= 50)
     ].index.tolist()
     
-    print(f"Found {len(valid_celltypes)} cell types with >=100 cells in both young and old")
+    print(f"Found {len(valid_celltypes)} cell types with >=50 cells in both young and old")
     
     # Show some examples
     print("\nExample cell types:")

@@ -243,7 +243,7 @@ def main():
     today = args.today
     
     # Paths
-    output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1"
+    output_dir = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"
     run_dir = f"{output_dir}/figure1_{today}"
     intermediate_dir = f"{run_dir}/intermediate"
     
@@ -253,10 +253,11 @@ def main():
     
     # Load preprocessed data
     print("Loading preprocessed data...")
-    splice_adata = ad.read_h5ad("/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1/figure1_20251019/preprocessed_data_20251019.h5ad")
-    event_ids_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1/figure1_20251019/event_ids_20251019.npy"
-    data = np.load(event_ids_file, allow_pickle=True)
-    event_ids = data.tolist()
+    splice_adata = ad.read_h5ad("/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1/figure1_20260105/preprocessed_data_20260105.h5ad")
+    event_ids_file = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1/figure1_20260105/event_ids_20260105.txt"
+    #data = np.load(event_ids_file, allow_pickle=True)
+    data = pd.read_csv(event_ids_file, header=None)
+    event_ids = data[0].tolist()
 
     print(f"Loaded data: {splice_adata.n_obs:,} cells, {splice_adata.n_vars:,} junctions")
     print(f"Processing {len(event_ids):,} event IDs")

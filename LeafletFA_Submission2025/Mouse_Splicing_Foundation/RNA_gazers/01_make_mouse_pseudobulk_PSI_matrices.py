@@ -57,11 +57,11 @@ assert len(atses) > 0, "ATSE file is empty"
 print(f"The number of ATSEs in this dataset is {len(atses['event_id'].unique())}", flush=True)
 
 # Splicing input file
-input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/102025/model_ready_aligned_splicing_data_20251009_024406.h5ad"
+input_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/Figure1_input_data.h5ad"
 assert os.path.exists(input_file), f"Input file does not exist: {input_file}"
 
 # Define which column to use for cell type grouping
-cell_type_column = "medium_cell_type"
+cell_type_column = "tissue_celltype"
 
 # ----- Load and preprocess data -----
 
@@ -124,6 +124,7 @@ valid_celltypes = cell_type_counts[
 
 print(f"Found {len(valid_celltypes)} cell types with >=50 cells in both young and old")
 cell_type_column = "tissue_celltype"
+
 # Show distribution of cell types by dataset
 print("\n=== Distribution of cell types by dataset ===")
 cell_type_dataset_counts = pd.crosstab(
@@ -473,4 +474,4 @@ print("\nPseudobulk creation and PSI calculation complete!")
 
 # conda activate LeafletSC
 # cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/112025
-# sbatch --mem=200G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/RNA_gazers/01_make_mouse_pseudobulk_PSI_matrices.py"
+# sbatch --mem=200G -p dev,cpu --wrap="python /gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/RNA_gazers/01_make_mouse_pseudobulk_PSI_matrices.py"

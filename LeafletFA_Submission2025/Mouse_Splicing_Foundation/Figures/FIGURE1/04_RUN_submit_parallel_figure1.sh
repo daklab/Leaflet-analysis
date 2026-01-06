@@ -4,8 +4,8 @@
 # Setup directories
 conda activate LeafletSC 
 BASE_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-SCRIPT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/Mouse_Splicing_Foundation/Figures/FIGURE1/"
-OUTPUT_DIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1"
+SCRIPT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"
+OUTPUT_DIR="/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"
 TODAY=$(date +%Y%m%d)
 
 cd $OUTPUT_DIR
@@ -21,7 +21,7 @@ sbatch --job-name=fig1_prep \
        --cpus-per-task=4 \
        --output=logs/figure1_prep_%j.out \
        --error=logs/figure1_prep_%j.err \
-       --wrap "python ${SCRIPT_DIR}/figure1_preprocess.py"
+       --wrap "python ${SCRIPT_DIR}/01_figure1_preprocess.py"
 
 # Check if cell types file was created
 CELLTYPES_FILE="${OUTPUT_DIR}/figure1_${TODAY}/cell_types_to_process.txt"
@@ -45,7 +45,7 @@ ARRAY_JOB=$(sbatch --parsable \
        --array=1-${N_CELLTYPES}%50 \
        --output=logs/figure1_ct_%A_%a.out \
        --error=logs/figure1_ct_%A_%a.err \
-       ${SCRIPT_DIR}/figure1_process_celltype.sh)
+       ${SCRIPT_DIR}/03_figure1_process_celltype.sh)
 
 echo "Submitted array job: $ARRAY_JOB"
 
@@ -58,7 +58,7 @@ sbatch --job-name=fig1_merge \
        --cpus-per-task=4 \
        --output=logs/figure1_merge_%j.out \
        --error=logs/figure1_merge_%j.err \
-       --wrap "python ${SCRIPT_DIR}/figure1_merge_results.py"
+       --wrap "python ${SCRIPT_DIR}/05_figure1_merge_results.py"
 
 echo "Pipeline submitted successfully!"
 echo "Monitor with: squeue -u $USER | grep fig1"

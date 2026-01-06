@@ -15,7 +15,7 @@ echo "Starting junction processing on: $(date)"
 echo "Date suffix: $TODAY"
 
 # Path to the script
-SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/split_process_merge_slurm_junctions.py
+SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/General_Utils/split_process_merge_slurm_junctions.py
 
 # Path to the junction files
 JUNCTION_FILES_AB=/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/junctions # allen brain nuclei
