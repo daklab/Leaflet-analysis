@@ -25,7 +25,7 @@ from tqdm import tqdm
 import mygene
 
 # Add the directory containing the shared utils to the Python path
-sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
+sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Multi_Species_Splicing_Foundation/shared_utils")
 
 # Import utility functions
 from gene_processing import (

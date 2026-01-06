@@ -135,8 +135,8 @@ def make_plot_input_from_junction_df(junction_df, adata, groupby_col="tissue_cel
 
 def main():
     today = datetime.now().strftime("%Y%m%d")
-    output_dir = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/FIGURES/FIGURE1"
-    run_dir = f"{output_dir}/figure1_20251019"
+    output_dir = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1"
+    run_dir = f"{output_dir}/figure1_20260105"
     intermediate_dir = f"{run_dir}/intermediate"
     
     print(f"\n{'='*60}")
@@ -177,7 +177,7 @@ def main():
     
     # Load preprocessed data for plotting
     print("\nLoading preprocessed data for plotting...")
-    splice_adata = ad.read_h5ad(f"{run_dir}/preprocessed_data_20251019.h5ad")
+    splice_adata = ad.read_h5ad(f"{run_dir}/preprocessed_data_20260105.h5ad")
     
     # Generate global aging effects plot
     print("\nGenerating global aging effects plot...")

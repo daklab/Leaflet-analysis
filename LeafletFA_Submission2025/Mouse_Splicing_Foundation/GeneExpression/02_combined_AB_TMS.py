@@ -20,7 +20,7 @@ import anndata as ad
 from scipy.sparse import csr_matrix
 
 # Add the directory containing the shared utils to the Python path
-sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/Multi_Species_Splicing_Foundation/shared_utils")
+sys.path.append("/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Multi_Species_Splicing_Foundation/shared_utils")
 
 # Import utility functions
 from gene_processing import (
@@ -50,13 +50,7 @@ def load_dataset():
     try:
         # Try with today's date first
         ge_adata_path = GE_ADATA_PATH
-        
-        # Fall back to hardcoded date if today's files don't exist
-        if not os.path.exists(ge_adata_path):
-            print(f"   Could not find file with current date: {ge_adata_path}")
-            ge_adata_path = f"{WD}/tms_ab_exons_combo_ge_adata_2025-05-12.h5ad"
-            print(f"   Trying alternative path: {ge_adata_path}")
-        
+                
         print(f"   Loading combined gene expression data from: {ge_adata_path}")
         ge_adata = ad.read_h5ad(ge_adata_path)
         
