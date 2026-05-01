@@ -17,10 +17,15 @@ from junction_parser import JunctionReader
 from genome_utils import JunctionAnalyzer, GenomeDB 
 from event_detection import ATSEAnalyzer 
 
+# Set METACELL_SUFFIX and PROC_DATE via environment variables
+metacell_suffix = os.environ.get("METACELL_SUFFIX", "")
+proc_date = os.environ.get("PROC_DATE", "20260318")
+base_dir = f"/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI{metacell_suffix}"
+
 gtf_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode.vM27.basic.annotation.gtf"
 fasta_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/GRCm39.primary_assembly.genome.fa"
-combined_junctions_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022/results"
-output_path = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap"
+combined_junctions_file = f"{base_dir}/ATSEmap/junction_processing_{proc_date}/results"
+output_path = f"{base_dir}/ATSEmap"
 db_file = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode_vM27.db"
 
 min_intron = 50
@@ -47,7 +52,7 @@ reader = JunctionReader(batch_size=batch_size,
 filtered_junctions = reader.SJ_QC(combined_junctions)
 
 # Initialize genome database 
-genome_db = GenomeDB(db_name="vM27", gtf_file=gtf_file, fasta_file=fasta_file)
+genome_db = GenomeDB(db_name=db_file, gtf_file=gtf_file, fasta_file=fasta_file)
 
 # Initialize junction analyzer
 analyzer = JunctionAnalyzer(fasta_file=fasta_file, db=genome_db.get_db(), tolerance=100)
@@ -84,7 +89,9 @@ output_file = os.path.join(output_path, atse_file)
 atse_analyzer.save_atse_file(ATSE_lablled, filtered_junctions, output_file)
 
 ## to submit:
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap
 # conda activate LeafletSC
-# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/04_ATSEmapping.py
-# sbatch --mem=200G --time=12:00:00 -J EasySciRHATSE -p bigmem,cpu,dev --wrap="python $script_path" 
+# script_path=/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/04_ATSEmapping.py
+# METACELL_SUFFIX=_500  PROC_DATE=20260318 sbatch --mem=200G --time=12:00:00 -J ATSE_500  -p bigmem,cpu,dev --wrap="python $script_path"
+# METACELL_SUFFIX=_1000 PROC_DATE=20260318 sbatch --mem=200G --time=12:00:00 -J ATSE_1000 -p bigmem,cpu,dev --wrap="python $script_path"
+# METACELL_SUFFIX=_2000 PROC_DATE=20260318 sbatch --mem=200G --time=12:00:00 -J ATSE_2000 -p bigmem,cpu,dev --wrap="python $script_path"
+# METACELL_SUFFIX=_4000 PROC_DATE=20260318 sbatch --mem=200G --time=12:00:00 -J ATSE_4000 -p bigmem,cpu,dev --wrap="python $script_path"

@@ -1,0 +1,15 @@
+# Config for DT metacell BAMs -> gene count matrix -> AnnData
+# Paths should match 01_Metacell_analysis/01_MetaCellMakePseudobulk_RH_DT.sh output layout.
+
+# Directory containing DT metacell BAMs: one subdir per metacell with <metacell>.bam inside
+# Example: .../SpliceVI/202602/DT
+dt_bam_dir: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202602/DT"
+
+# GENCODE GTF for gene-level counting (same as snakemakeRH)
+gtf_file: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/genome_files/gencode.vM27.basic.annotation.gtf"
+
+# Output directory for count matrix and AnnData
+output_dir: "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202602/DT_expression"
+
+# Optional: number of threads for featureCounts
+threads: 8

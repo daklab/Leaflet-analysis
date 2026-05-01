@@ -101,8 +101,8 @@ if __name__ == '__main__':
 # To run this script, use the following command:
 
 """  
-SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
-INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022/anndatas
+SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/06_MergeAnndatas.py
+INPUT_DIR=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/20260210/RH/ATSEmap/junction_processing_20260213/anndatas/
 OUTPUT_FILE=$INPUT_DIR/merged_anndata.h5ad
 python $SCRIPT_PATH --input-dir $INPUT_DIR --output-file $OUTPUT_FILE
 """

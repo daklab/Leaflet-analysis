@@ -243,6 +243,7 @@ Multi_Species_Splicing_Foundation/cross_species_conservation_analysis_2025-06-24
 
 # Ignore Slurm output logs
 *.out
+*.err
 slurm-*.out
 
 # Ignore Model data/Pickle files (The heavy stuff)
@@ -284,4 +285,9 @@ LeafletFA_Submission2025/TabulaSenis/temp/
 # Add to the bottom of your .gitignore
 gencode*
 *.chain
+*.over.chain
+# Genome reference databases (SQLite, STAR indices, etc.)
+vM27
+vM*
+*.db
 *.over.chain

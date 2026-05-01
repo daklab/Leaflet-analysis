@@ -7,8 +7,10 @@
 #SBATCH --array=0-99%32
 #SBATCH --partition=cpu,dev,bigmem
 
-SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake.py
-WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022
+SCRIPT_PATH=/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake.py
+export METACELL_SUFFIX=${METACELL_SUFFIX:-""}
+export PROC_DATE=${PROC_DATE:-"20260318"}
+WD=/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI${METACELL_SUFFIX}/ATSEmap/junction_processing_${PROC_DATE}
 OUTPUT_DIR=${WD}/anndatas
 CHUNK_DIR=${WD}/chunks
 
@@ -25,5 +27,5 @@ python $SCRIPT_PATH \
   --output-dir $OUTPUT_DIR \
   --chunk-id ${SLURM_ARRAY_TASK_ID}
 
-# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022
-# sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake_slurm.sh
+# cd /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/20260210/RH/ATSEmap/junction_processing_20260213
+# sbatch /gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/EasySci/LeafletFA/data_processing/ATSE_ANNDATA/RH/05_AnndataMake_slurm.sh

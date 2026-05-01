@@ -7,14 +7,26 @@ import argparse
 import pickle
 
 # Import source code for processing anndata object
-sys.path.append('/gpfs/commons/home/kisaev/Leaflet-private/src/clustering')
+sys.path.append('/gpfs/commons/home/kisaev/LeafletFA/src/archive/clustering')
 from prep_anndata_object_v2 import process_files_and_build_matrices_parallel, create_anndata_object
 
-# Constants
-#metadata = pd.read_csv(metadata_path, sep=",")
-METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/RH_anndata_meta.tsv"  
+# Constants: paths relative to repo root (Leaflet-analysis)
+METADATA_PATH = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/EASYSCI_meta_data.tsv"
+
+# Current junction files have these names:
+# Vascular_leptomeningeal_cells_5xFAD_216_male so need to use appropriate metadata file
+# Old columns were Main_cluster_name,Main_cluster_name_wkmeans,Type,primer 
+# Let's remake the metadata tsv file using the junction file names, and use the name to split into 
+
+metacell_suffix = os.environ.get("METACELL_SUFFIX", "")
+proc_date = os.environ.get("PROC_DATE", "20260318")
+base_dir = f"/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI{metacell_suffix}/ATSEmap"
+
+# Use the mouse foundation ATSE file (lifted to mm39) for consistency across all metacell sizes
 INTRON_CLUSTS_FILE = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40_lifted_mm39.txt.gz"
-WD="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/EasySci2024/LeafletFA/MetaCells/SpliceVI/202510/RH/ATSEmap/junction_processing_20251022"
+print(f"Using ATSE file: {INTRON_CLUSTS_FILE}")
+
+WD = f"{base_dir}/junction_processing_{proc_date}"
 BATCH_SIZE = 10
 MAX_WORKERS = 4
 

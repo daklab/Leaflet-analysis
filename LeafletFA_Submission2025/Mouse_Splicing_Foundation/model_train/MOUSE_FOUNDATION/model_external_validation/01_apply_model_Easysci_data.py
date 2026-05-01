@@ -91,9 +91,11 @@ print(f"Using device: {device}")
 
 # Mouse foundation data 
 BASE_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
-ATSE_ANNDATA_PATH = f"{BASE_DIR}/MODEL_INPUT/052025/MOUSE_SPLICING_FOUNDATION_Anndata_ATSE_counts_with_waypoints_20250513_073829.h5ad"
-ATSE_MOUSE_FOUNDATION_FILE_PATH = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26.txt.gz"
-ATSE_MOUSE_FOUNDATION_FILE_LIFTOVER = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-04-26_19-55-26_lifted_mm39.txt.gz"
+
+# Load main datasets (most recent files - October 2025)
+SPLICE_ADATA_PATH = "/gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/splice_adata_for_figures_mouse_foundation.h5ad" # saved after processing Figure 2...
+ATSE_MOUSE_FOUNDATION_FILE_PATH = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40.txt.gz"
+ATSE_MOUSE_FOUNDATION_FILE_LIFTOVER = f"{BASE_DIR}/ATSE_mapper/ATSE_files/MOUSE_FOUNDATION_ATSE_FILE_unanno_also_2025-10-01_21-36-40_lifted_mm39.txt.gz"
 
 # -------------------------------------------------------------------------------------
 # READ IN ATSE FILES
@@ -108,7 +110,7 @@ atse_easysci_df = pd.read_csv(ATSE_MOUSE_FOUNDATION_FILE_LIFTOVER, sep="\t")
 # -------------------------------------------------------------------------------------
 
 # Read in mouse foundation anndata
-mouse_foundation_adata = ad.read_h5ad(ATSE_ANNDATA_PATH)
+mouse_foundation_adata = ad.read_h5ad(SPLICE_ADATA_PATH)
 print(f"The number of cells in the dataset is {mouse_foundation_adata.shape[0]}")
 print(f"The number of junctions in the dataset is {mouse_foundation_adata.shape[1]}")
 
