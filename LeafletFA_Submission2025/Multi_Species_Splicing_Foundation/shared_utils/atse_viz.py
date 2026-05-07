@@ -10,22 +10,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Set
 
-# Add LeafletFA-utils to path
-module_path = "/gpfs/commons/home/kisaev/LeafletFA-utils"
-if module_path not in sys.path:
-    sys.path.append(module_path)
-    print(f"Added {module_path} to sys.path")
-
-# Import visualization functions
-try:
-    from leafletfa_utils.atsemapper.main import run_atsemapper # type: ignore
-    from leafletfa_utils.atseviz.main import * # type: ignore
-    print("Visualization imports successful!")
-    
-except ImportError as e:
-    print(f"Warning: Could not import visualization functions: {e}")
-    print("Visualization functions will not be available")
-    sys.exit(1)
+from atsemapper.atseviz.main import *
 
 def extract_unique_transcripts(juncs: pd.DataFrame) -> List[str]:
     """
