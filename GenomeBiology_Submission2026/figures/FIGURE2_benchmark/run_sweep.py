@@ -106,7 +106,8 @@ print("metrics defined: score_fit() -> psi_r, agree, ari, auroc ; crude_threshol
 # ====== notebook cell 18 ======
 # ── the ONE fit everything else is compared against ──────────────────────────
 from leafletfa import LeafletFA
-from leafletfa.chunked import fit_chunked   # the SINGLE chunked implementation — see leafletfa/chunked.py
+from leafletfa.chunked import fit_chunked                     # the SINGLE chunked implementation
+from leafletfa.waypoints import add_waypoint_initializations  # BUILDS the waypoint psi/phi inits
 
 REF = dict(K=5, likelihood="bb", lr=0.05, junc_prior=True, waypoints=False,
            batching="full", seed=0)
@@ -122,6 +123,14 @@ def fit_once(sim, K, likelihood, lr, junc_prior, waypoints, batching, seed, epoc
                   ELBO_num_particles=5, num_samples=50, lr=lr, gamma=0.5,
                   log_wandb=False, loss_plot=False)
     t0 = time.time()
+
+    # waypoints_use=True only READS adata.varm[f"psi_init_{K}_waypoints"] and RAISES if absent.
+    # Nothing in the package used to write it, so the whole waypoint arm of this sweep silently
+    # failed (all 3 fits: "PSI and PHI initializations for 5 waypoints not found"). Build them.
+    if waypoints:
+        sim = sim.copy()
+        add_waypoint_initializations(sim, K=K, n_pca=10, n_dim=10, metacell_size=50, seed=42)
+
     if batching == "full":
         m = LeafletFA(adata=sim, num_epochs=epochs, **common)
         with contextlib.redirect_stdout(io.StringIO()):
@@ -161,7 +170,12 @@ print(f"  bb_conc                      {m_ref.bb_conc}")
 # ── THE SWEEP ────────────────────────────────────────────────────────────────
 # Cached to CSV: delete SWEEP_CSV to force a re-run. ~39 fits, ~2 h on an L40S.
 SWEEP_CSV = "sweep_results.csv"
-SEEDS     = [0, 1, 2]
+# FIVE seeds, not three. Measured: the pooled seed sd of psi_r is 0.25 -- with n=3 the standard
+# error of a config's mean is 0.145, so two configs must differ by ~0.41 in psi_r before the
+# difference is even detectable. At n=3 EVERY axis except the learning rate was buried in seed
+# noise. n=5 also makes best-of-N-by-ELBO selection (which is what you actually deploy, and which
+# we verified is safe: regret 0.001) stable rather than lucky.
+SEEDS     = [0, 1, 2, 3, 4]
 
 configs = []
 def add(tag, **kw):
@@ -169,16 +183,49 @@ def add(tag, **kw):
     for sd in SEEDS:
         configs.append(dict(axis=tag, **{**cfg, "seed": sd}))
 
-# Block A — lr x likelihood, FULLY CROSSED (they interact)
+# ── A. lr x LIKELIHOOD — crossed. The Binomial is a much sharper likelihood than the
+#    Beta-Binomial, so an lr tuned on one is not valid for the other.
 for lk in ["bb", "binom"]:
     for lr in [0.005, 0.01, 0.02, 0.05]:
         add("lr x likelihood", likelihood=lk, lr=lr)
 
-# Block B — one axis at a time from the reference
-for K in [10, 20]:            add("K", K=K)                       # K=5 is the reference
-add("psi prior",  junc_prior=False)                               # True is the reference
-add("init",       waypoints=True)                                 # random is the reference
-add("batching",   batching="chunked")                             # full is the reference
+# ── B. lr x WAYPOINTS — crossed. THE MECHANISTIC TEST.
+#    The model starts ON a symmetric saddle (every cell's phi at the prior median, all K programs at
+#    nearly the same psi). Escape is driven by gradient noise, and its rate scales with lr -- which is
+#    why lr=0.005 sits near chance. But WAYPOINT INIT STARTS YOU OFF THE SADDLE ENTIRELY: it seeds
+#    each program at a distinct, data-supported anchor. So the prediction is explicit:
+#
+#        waypoints should RESCUE low lr, and should COLLAPSE THE SEED VARIANCE.
+#
+#    If that holds, it confirms the saddle mechanism and turns "waypoints converge faster" into a
+#    quantitative claim. If it does NOT hold, the saddle story is wrong. Either way this is the cell
+#    that decides it -- and waypoints were previously tested only at the one lr where everything
+#    already works, which could not have told us anything.
+for wp in [True, False]:
+    for lr in [0.005, 0.01, 0.02, 0.05]:
+        add("lr x waypoints", waypoints=wp, lr=lr)
+
+# ── C. WAYPOINTS x BATCHING — crossed. Their COMBINATION IS THE ATLAS PRODUCTION CONFIG
+#    (the mouse runs use waypoint init AND chunked training). Running "waypoints, full-batch" and
+#    "random, chunked" as separate one-axis arms never touches the cell you actually ship.
+for wp in [True, False]:
+    for bt in ["full", "chunked"]:
+        add("waypoints x batching", waypoints=wp, batching=bt)
+
+# ── D. PSI PRIOR x WAYPOINTS — crossed. The junction-specific prior shares a_j/b_j across all K
+#    factors, so it SHRINKS THE PROGRAMS TOWARD EACH OTHER -- toward the saddle. Waypoints push them
+#    APART. Waypoints may therefore be exactly what has been MASKING the shrinkage all along, which
+#    would explain why the prior looks harmless in the paper's configuration.
+for jp in [True, False]:
+    for wp in [True, False]:
+        add("psi prior x waypoints", junc_prior=jp, waypoints=wp)
+
+# ── E. PSI PRIOR x K — crossed. More programs = more for the shared Beta(a_j, b_j) to pull together,
+#    so the shrinkage should get WORSE as K grows. The atlas runs K = 10/20/50; testing the prior only
+#    at K=5 cannot see this.
+for jp in [True, False]:
+    for K in [5, 10, 20]:
+        add("psi prior x K", junc_prior=jp, K=K)
 
 # de-duplicate: the reference appears in Block A already
 seen, uniq = set(), []
