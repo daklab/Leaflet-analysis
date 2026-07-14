@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-"""Figure-2 sweep, headless. Streams progress; appends each fit to sweep_results.csv.
-
-Extracted verbatim from simulation_explore.ipynb cells [1, 16, 18, 20] so the two cannot diverge.
-"""
+"""Figure-2 sweep, headless. Streams progress; appends each fit to sweep_results.csv."""
 import matplotlib; matplotlib.use('Agg')
 display = lambda *a, **k: None
 
-# ============ notebook cell 1 ============
+# ====== notebook cell 1 ======
 import json
 
 import anndata as ad
@@ -34,7 +31,7 @@ print("params:", {k: params[k] for k in ["tissue", "K", "emission", "frac_differ
 print("\ncells per program:", np.bincount(a.obs['true_program']))
 print("junction roles:", a.var['junction_role'].value_counts().to_dict())
 
-# ============ notebook cell 16 ============
+# ====== notebook cell 16 ======
 # ── METRICS: defined once, used by every fit ─────────────────────────────────
 import io, contextlib, itertools, os, time
 import numpy as np, pandas as pd, torch
@@ -106,9 +103,10 @@ def crude_threshold_calibration(T, effect, ok, alpha=0.05, delta=0.05):
 
 print("metrics defined: score_fit() -> psi_r, agree, ari, auroc ; crude_threshold_calibration() [NOT the FDR procedure -- see 6.3]")
 
-# ============ notebook cell 18 ============
+# ====== notebook cell 18 ======
 # ── the ONE fit everything else is compared against ──────────────────────────
 from leafletfa import LeafletFA
+from leafletfa.chunked import fit_chunked   # the SINGLE chunked implementation — see leafletfa/chunked.py
 
 REF = dict(K=5, likelihood="bb", lr=0.05, junc_prior=True, waypoints=False,
            batching="full", seed=0)
@@ -129,49 +127,18 @@ def fit_once(sim, K, likelihood, lr, junc_prior, waypoints, batching, seed, epoc
         with contextlib.redirect_stdout(io.StringIO()):
             m.from_anndata(); m.train(num_initializations=1, seeds=[seed]); m.get_all_variables()
     else:
-        # CHUNKED = the PRODUCTION scheme, mirrored exactly from run_training.py. Getting this wrong
-        # makes the whole batching comparison meaningless, so spell out what production does:
+        # CHUNKED: call the PACKAGED implementation. Do NOT hand-roll this loop here.
         #
-        #   * psi / pi / alpha_pi are carried chunk -> chunk (globals, warm-started)
-        #   * PHI IS CARRIED PER CELL. After every chunk, each cell's phi is written back to
-        #     all_cell_assignments[idx] (run_training.py:490), and the next time a chunk contains
-        #     that cell its phi is warm-started from that store (run_training.py:378-380). phi is
-        #     therefore CONTINUOUSLY REFINED every time a cell is seen, across all passes.
-        #   * THE FINAL PHI **IS** THAT ACCUMULATED STORE -- `assign_post = all_cell_assignments`
-        #     (run_training.py:663). There is NO final frozen-psi E-step over all cells. An earlier
-        #     version of this function invented one, and dropped the phi carry-over entirely, so it
-        #     was not testing the production scheme at all.
-        #   * obs_scale = N/B rescales the LOCAL terms, without which q(psi) reflects B cells, not N.
-        N, B, PASSES = sim.n_obs, 2000, 6
-        rng = np.random.default_rng(seed)
-        psi_w = pi_w = alpha_w = None
-        all_phi = np.zeros((N, K), dtype=np.float32)          # <- the per-cell phi store
-        phi_key = f"phi_init_{K}_waypoints"
-        for _pass in range(PASSES):
-            perm = rng.permutation(N)
-            for i in range(0, N, B):
-                idx = np.sort(perm[i:i + B])
-                ba  = sim[idx].copy()
-                # warm-start phi for cells this chunk has seen before (production behaviour)
-                if all_phi[idx].sum() > 0:
-                    ba.obsm[phi_key] = all_phi[idx]
-                m = LeafletFA(adata=ba, num_epochs=max(60, epochs // 20), obs_scale=N / len(idx),
-                              pi_init=None if pi_w is None else torch.tensor(pi_w),
-                              alpha_pi_init=None if alpha_w is None else torch.tensor(alpha_w),
-                              **common)
-                with contextlib.redirect_stdout(io.StringIO()):
-                    m.from_anndata()
-                    m.train(num_initializations=1, seeds=[seed],
-                            psi_init=None if psi_w is None else torch.tensor(psi_w),
-                            phi_init=None if all_phi[idx].sum() == 0 else torch.tensor(all_phi[idx]))
-                    m.get_all_variables()
-                psi_w   = to_np(m.psi)
-                pi_w    = to_np(m.pi)
-                alpha_w = np.asarray(to_np(m.alpha_pi), dtype=np.float32).reshape(())
-                all_phi[idx] = to_np(m.assign_post)           # <- write phi BACK, per cell
-        # the final model IS the last chunk's globals + the ACCUMULATED per-cell phi
-        m.assign_post = all_phi
-        m.psi = psi_w
+        # This notebook used to re-implement the chunked scheme by hand, and it drifted: it dropped
+        # the per-cell phi carry-over and invented a final frozen-psi E-step that production never
+        # runs. So full-batch-vs-chunked -- the result that justifies chunking for the ENTIRE atlas
+        # -- was comparing against a scheme nobody uses. leafletfa.chunked.fit_chunked() now exists
+        # precisely so the benchmark and production cannot diverge. It carries phi per cell, keeps
+        # the accumulated store as the final phi, and applies obs_scale = N/B.
+        m = fit_chunked(sim, K=K, batch_size=2000, num_passes=6, seed=seed,
+                        num_epochs_first=max(60, epochs // 10),
+                        num_epochs_later=max(60, epochs // 20),
+                        lr=lr, **{k: v for k, v in common.items() if k not in ("lr", "K")})
     return m, time.time() - t0
 
 T = truth_of(sim)
@@ -190,7 +157,7 @@ print(f"  [crude threshold, NOT the FDR procedure -- see 6.3] called={cal['n_cal
 print(f"  psi_contrast                 {m_ref.health['psi_contrast']:.4f}  (~0.003 = collapse)")
 print(f"  bb_conc                      {m_ref.bb_conc}")
 
-# ============ notebook cell 20 ============
+# ====== notebook cell 20 ======
 # ── THE SWEEP ────────────────────────────────────────────────────────────────
 # Cached to CSV: delete SWEEP_CSV to force a re-run. ~39 fits, ~2 h on an L40S.
 SWEEP_CSV = "sweep_results.csv"
