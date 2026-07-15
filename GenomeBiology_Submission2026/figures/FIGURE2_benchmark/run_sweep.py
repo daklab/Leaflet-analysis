@@ -36,7 +36,7 @@ print("junction roles:", a.var['junction_role'].value_counts().to_dict())
 import io, contextlib, itertools, os, time
 import numpy as np, pandas as pd, torch
 from scipy.optimize import linear_sum_assignment
-from sklearn.metrics import roc_auc_score, adjusted_rand_score
+from sklearn.metrics import roc_auc_score, adjusted_rand_score, silhouette_score
 
 # `sim` is the SIGNAL simulation -- cell 1 loaded it as `a`. Everything below fits and scores on it.
 sim = a
@@ -76,12 +76,21 @@ def score_fit(T, psi_hat, phi_hat):
     # PHI: did the cells get their right program?  ("cell-type recovery")
     agree = float((phi_hat[:, r].argmax(1) == tphi[:, c].argmax(1)).mean())
     ari   = float(adjusted_rand_score(tphi.argmax(1), phi_hat.argmax(1)))   # permutation-invariant
+    # SILHOUETTE: how well the inferred phi EMBEDDING separates cells by their TRUE program. ARI
+    # scores the hard argmax assignment; silhouette scores the geometry of the continuous phi space
+    # (are cells of the same true program close and other programs far?). Range [-1, 1]; ~0 = no
+    # separation. Labelled by the TRUE program so it measures recovery, not just internal tightness.
+    true_lab = tphi.argmax(1)
+    try:
+        sil = float(silhouette_score(phi_hat, true_lab)) if len(np.unique(true_lab)) > 1 else np.nan
+    except Exception:
+        sil = np.nan
 
     # DS: can the model tell differential from null cassettes?
     d     = ph.max(0) - ph.min(0)                       # cross-program spread per cassette = effect size
     ok    = np.isfinite(d)
     auroc = float(roc_auc_score(T["is_diff"][ok], d[ok]))
-    return dict(psi_r=psi_r, agree=agree, ari=ari, auroc=auroc,
+    return dict(psi_r=psi_r, agree=agree, ari=ari, sil=sil, auroc=auroc,
                 chance_agree=1.0 / Kt, effect=d, effect_ok=ok)
 
 def crude_threshold_calibration(T, effect, ok, alpha=0.05, delta=0.05):
@@ -151,7 +160,30 @@ def fit_once(sim, K, likelihood, lr, junc_prior, waypoints, batching, seed, epoc
     return m, time.time() - t0
 
 T = truth_of(sim)
-m_ref, secs = fit_once(sim, **REF)
+
+# CACHE the reference fit + its posterior samples, so re-rendering the notebook needs NO refit
+# (hence no GPU). Delete ref_fit.pkl.gz to force a re-fit.
+import os, gzip, pickle
+_REF_CACHE = "ref_fit.pkl.gz"
+if os.path.exists(_REF_CACHE):
+    with gzip.open(_REF_CACHE, "rb") as _f:
+        _rf = pickle.load(_f)
+    class _Cached:  # a tiny stand-in exposing the attributes the plots read
+        pass
+    m_ref = _Cached()
+    for _k, _v in _rf["attrs"].items(): setattr(m_ref, _k, _v)
+    m_ref.all_samples = _rf["all_samples"]
+    m_ref.health = _rf["health"]; secs = 0.0
+    print("loaded reference fit from cache")
+else:
+    m_ref, secs = fit_once(sim, **REF)
+    with gzip.open(_REF_CACHE, "wb") as _f:
+        pickle.dump(dict(
+            attrs=dict(psi=to_np(m_ref.psi), assign_post=to_np(m_ref.assign_post),
+                       pi=to_np(m_ref.pi), bb_conc=m_ref.bb_conc, best_elbo=float(m_ref.best_elbo)),
+            all_samples={"psi": to_np(m_ref.all_samples["psi"])},
+            health=m_ref.health), _f)
+    print("fit reference and cached it")
 s = score_fit(T, to_np(m_ref.psi), to_np(m_ref.assign_post))
 cal = crude_threshold_calibration(T, s["effect"], s["effect_ok"])
 
@@ -166,7 +198,7 @@ print(f"  [crude threshold, NOT the FDR procedure -- see 6.3] called={cal['n_cal
 print(f"  psi_contrast                 {m_ref.health['psi_contrast']:.4f}  (~0.003 = collapse)")
 print(f"  bb_conc                      {m_ref.bb_conc}")
 
-# ====== notebook cell 20 ======
+# ====== notebook cell 22 ======
 # ── THE SWEEP ────────────────────────────────────────────────────────────────
 # Cached to CSV: delete SWEEP_CSV to force a re-run. ~39 fits, ~2 h on an L40S.
 SWEEP_CSV = "sweep_results.csv"
@@ -260,7 +292,7 @@ if todo:
             cal = crude_threshold_calibration(T, s["effect"], s["effect_ok"])
             cc  = m.bb_conc
             rows.append(dict(axis=axis, **cfg,
-                psi_r=s["psi_r"], agree=s["agree"], ari=s["ari"], auroc=s["auroc"],
+                psi_r=s["psi_r"], agree=s["agree"], ari=s["ari"], sil=s["sil"], auroc=s["auroc"],
                 chance_agree=s["chance_agree"], crude_fdp=cal["fdp"], crude_power=cal["power"],
                 n_called=cal["n_called"], psi_contrast=m.health["psi_contrast"],
                 bb_conc=(np.nan if isinstance(cc, str) else float(np.asarray(cc))),

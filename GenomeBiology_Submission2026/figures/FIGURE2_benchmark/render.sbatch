@@ -1,10 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=sim_render
-#SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --partition=cpu
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
-#SBATCH --time=02:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=/gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/FIGURE2_benchmark/render.log
 cd /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/FIGURE2_benchmark
 /gpfs/commons/home/kisaev/miniconda3/envs/LeafletSC/bin/jupyter nbconvert \
