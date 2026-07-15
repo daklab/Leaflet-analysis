@@ -295,9 +295,42 @@ If that holds, the saddle mechanism is confirmed and *"waypoints converge faster
 claim. If it fails, the saddle story is wrong. **Waypoints were previously tested only at the one `lr`
 where everything already works — which could not have told us anything.**
 
+**Measured (100 fits, 5 seeds/config):** the prediction holds decisively.
+
+| `lr` | random init (mean ± sd) | waypoint init (mean ± sd) |
+|---|---|---|
+| 0.005 | +0.452 ± **0.334** | +0.874 ± **0.006** |
+| 0.01 | +0.625 ± 0.325 | +0.982 ± 0.001 |
+| 0.02 | +0.768 ± 0.241 | +0.995 ± 0.000 |
+| 0.05 | +0.862 ± 0.149 | +0.997 ± 0.000 |
+
+Mean seed sd of `psi_r`: **random 0.262 → waypoints 0.002 (a ~130× reduction).** Worst single run:
+**random +0.103 → waypoints +0.865.** The learning rate matters *only* because it sets escape velocity from
+the symmetric start; waypoints start you off the saddle, so `lr` stops mattering and recovery becomes
+near-deterministic. This is the direct answer to the SVI-local-optima objection: **not "we needed waypoints
+to work at all", but "programs are recovered either way; waypoints make it reproducible".**
+
 **C. `waypoints × batching`.** Their **combination is the atlas production configuration** (the mouse runs
 use waypoint init *and* chunked training). Testing "waypoints, full-batch" and "random, chunked" as
-separate one-axis arms never touches the cell we actually ship. It is also where an interaction is
+separate one-axis arms never touches the cell we actually ship.
+
+**Measured:**
+
+| init | batching | `psi_r` | ARI |
+|---|---|---|---|
+| random | full | +0.862 | 0.862 |
+| random | chunked | +0.906 | 0.941 |
+| waypoints | full | +0.997 | 1.000 |
+| **waypoints** | **chunked** | **+0.956** | **0.998** ← atlas production |
+
+The production config is excellent. *(A first version of this table showed waypoints+chunked at 0.724/0.494
+— the worst cell — which read as "the atlas config is broken". It was a benchmark bug, not a production one:
+`train()` re-reads the waypoint init from `adata.varm` when `waypoints_use=True` and ignores the `psi_init`
+argument, so the packaged `fit_chunked` was silently discarding the chunk-to-chunk warm start on every chunk.
+`run_training.py` routes the carried ψ through `varm` and was never affected; `fit_chunked` now does the same.
+It is a cautionary example of §2.1's rule — a benchmark that re-implements production will drift.)*
+
+It is also where an interaction is
 plausible: chunking re-seeds ψ from the previous chunk on every chunk, which may already be doing the
 re-anchoring that waypoints exist to provide.
 
