@@ -143,6 +143,14 @@ def main():
         p = dict(
             input_conc=input_conc, junc_specific_prior=junc_prior, delta_fixed=None,
             K=K, waypoints_use=waypoints, seed=seed, arm=tag,
+            # MEASURED: psi reaches its final distance from init in PASS 1 and then does not move.
+            # run_14 psi_mac_vs_init across 20 passes: 0.469 0.482 0.488 0.486 0.476 0.499 ... 0.470
+            # -- flat at 0.478 +- 0.015 with no trend, while pass-to-pass movement stays ~0.12. That
+            # is DIFFUSION, not convergence: psi wanders on a shell without getting further from its
+            # start. Independent seeds agree 0.86 and independent inits agree 0.95, so the wandering
+            # is in directions that do not change the recovered programs. The per-cell ELBO likewise
+            # bottoms out at pass 2 (7062) and drifts slightly UP to pass 20 (7963).
+            # => passes beyond ~2-3 buy nothing. 8 keeps margin at 2.5x less GPU than 20.
             batch_size=batch_sizes[0], num_passes=num_passes[0],
             num_epochs_first=150, num_epochs_later=60,
             ELBO_num_particles=5, num_samples=100,

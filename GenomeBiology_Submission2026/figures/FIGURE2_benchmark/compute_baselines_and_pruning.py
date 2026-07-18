@@ -40,14 +40,30 @@ Xzero=np.where(covered, np.clip(np.nan_to_num(R),0,1), 0.0)          # naive: un
 colmean=np.array([Xzero[covered[:,j],j].mean() if covered[:,j].any() else 0 for j in range(R.shape[1])])
 Xmean=np.where(covered, np.clip(np.nan_to_num(R),0,1), colmean[None,:])  # fair: uncovered -> junction mean
 
+# ERROR BARS: replicate over SIMULATION SEEDS (the meaningful source of variance -- different
+# simulated datasets), not just NMF's random_state. A single fit per (method, K) gave the
+# non-monotonic LeafletFA ARI (1.00 / 0.77 / 0.98 across K) that is almost certainly seed noise.
+SEEDS = (0, 1, 2)
 rows=[]
-for K in (5,10,20):
-    for tag,X in (("NMF (0-impute)",Xzero),("NMF (mean-impute)",Xmean)):
-        t=time.time(); m=NMF(n_components=K,init="nndsvda",random_state=0,max_iter=300)
-        W=m.fit_transform(X); H=m.components_
-        pr,ari=score(H,W)
-        rows.append(dict(method=tag,K=K,psi_r=pr,ari=ari,secs=round(time.time()-t)))
-        print(rows[-1],flush=True)
+for seed in SEEDS:
+    f = SIM if seed == 0 else SIM.replace("seed0", f"seed{seed}")
+    if not os.path.exists(f):
+        print(f"  (no sim for seed {seed}: {os.path.basename(f)}) -- skipping", flush=True); continue
+    _sim = ad.read_h5ad(f)
+    _R=_sim.layers["junc_ratio"]; _R=np.asarray(_R.todense() if sp.issparse(_R) else _R,dtype=np.float64)
+    _C=_sim.layers["cell_by_cluster_matrix"]; _C=np.asarray(_C.todense() if sp.issparse(_C) else _C)
+    _cov=(_C>0)
+    _Xz=np.where(_cov, np.clip(np.nan_to_num(_R),0,1), 0.0)
+    _cm=np.array([_Xz[_cov[:,j],j].mean() if _cov[:,j].any() else 0 for j in range(_R.shape[1])])
+    _Xm=np.where(_cov, np.clip(np.nan_to_num(_R),0,1), _cm[None,:])
+    global tp, tphi, skp, ordr, Kt
+    for K in (5,10,20):
+        for tag,X in (("NMF (0-impute)",_Xz),("NMF (mean-impute)",_Xm)):
+            t=time.time(); m=NMF(n_components=K,init="nndsvda",random_state=seed,max_iter=300)
+            W=m.fit_transform(X); H=m.components_
+            pr,ari=score(H,W)
+            rows.append(dict(method=tag,K=K,seed=seed,psi_r=pr,ari=ari,secs=round(time.time()-t)))
+            print(rows[-1],flush=True)
 pd.DataFrame(rows).to_csv("baselines.csv",index=False); print("wrote baselines.csv",flush=True)
 
 # ---- LeafletFA pi per factor, for the pruning story ---------------------------------------

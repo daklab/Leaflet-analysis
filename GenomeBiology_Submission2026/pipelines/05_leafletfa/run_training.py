@@ -195,6 +195,9 @@ global_pi = None
 global_alpha_pi = None
 global_dir_conc = params.get("delta_fixed", None)
 global_bb_conc = None
+global_carry = {}   # every other global, carried chunk-to-chunk (see capture below)
+_GLOBAL_FIRST = {}  # first-pass value of each global, for drift tracking
+_GLOBAL_PREV  = {}  # previous-pass value of each global
 global_a = None
 global_b = None
 global_a_shape = None
@@ -417,6 +420,7 @@ for pass_idx in range(NUM_PASSES):
                 delta_fixed=params.get("delta_fixed", None),
                 pi_init=torch.tensor(global_pi, dtype=torch.float32) if global_pi is not None else None,
                 alpha_pi_init=torch.tensor(global_alpha_pi, dtype=torch.float32) if global_alpha_pi is not None else None,
+                global_init=global_carry or None,   # bb_conc, a, b, a_shape/a_rate/b_shape/b_rate
                 obs_scale=batch_obs_scale,
                 num_epochs=NUM_EPOCHS_LATER,
                 print_epochs=5,
@@ -484,6 +488,26 @@ for pass_idx in range(NUM_PASSES):
             global_dir_conc = _dc.item() if isinstance(_dc, torch.Tensor) else float(_dc)
         if hasattr(leaflet_model, 'bb_conc'):
             global_bb_conc = leaflet_model.bb_conc
+        # CARRY EVERY GLOBAL chunk-to-chunk. Previously only psi/phi/pi/alpha_pi were carried, so
+        # bb_conc, a, b and the four Beta hyperparameters were re-initialised from their PRIORS on
+        # every one of ~240 chunks and given only num_epochs_later steps on ONE batch to move --
+        # they never accumulated evidence over the full dataset. The tell on the mouse atlas: saved
+        # bb_conc was bit-identical across waypoint/random and junction/global-prior arms whenever
+        # the seed matched (0.337/2.053/1.373 for seeds 0/1/2 at K=10) while psi genuinely differed,
+        # i.e. it never moved off its seed-determined init. That also means bb_conc could NOT be
+        # used as a convergence diagnostic. Seeded via LeafletFA(global_init=...) on the next chunk.
+        # CARRY ONLY bb_conc -- measured. Carrying the per-junction a/b compounds instead of
+        # accumulating: on a 6,000-cell atlas subset it drove the psi prior to Beta(204,6) (mean
+        # 0.97), pushed 42% of psi above 0.9, halved psi_contrast (0.115 -> 0.059) and collapsed phi
+        # commitment (0.47 -> 0.14). a/b/dir_conc remain LAST-CHUNK estimates; fix that post hoc with
+        # psi frozen, not by carrying.
+        for _g in ("bb_conc",):
+            _v = getattr(leaflet_model, "dir_conc_post", None) if _g == "dir_conc" \
+                 else getattr(leaflet_model, _g, None)
+            if _v is None or isinstance(_v, str):      # "infinity" when conc is FIXED, not latent
+                continue
+            global_carry[_g] = (_v.detach().cpu().numpy()
+                                if isinstance(_v, torch.Tensor) else np.asarray(_v))
         if hasattr(leaflet_model, 'psis_loc') and leaflet_model.psis_loc is not None:
             global_psi_loc = leaflet_model.psis_loc
             # This is now FED BACK into the next chunk (see train(psi_scale_init=...) above), not
@@ -578,6 +602,53 @@ for pass_idx in range(NUM_PASSES):
         psi_f = global_psi  # (K, J)
 
         psi_log = {"pass": pass_idx + 1}
+        # ── GLOBAL DRIFT TRACKING ────────────────────────────────────────────────────────────
+        # Catches the failure mode that hid bb_conc for months: a global that is never carried
+        # across chunks silently sits at its seed-determined initialisation while everything else
+        # learns. Invisible in the loss and in psi_contrast.
+        #
+        # NB read from the global_* accumulators (captured at the end of each chunk), NOT from
+        # leaflet_model -- that name is not in scope here, which is exactly how the first version of
+        # this block failed silently inside its own try/except.
+        try:
+            # EVERY latent, in one table -- including psi and phi, the two that matter most.
+            _now = {"psi": global_psi, "phi": all_cell_assignments,
+                    "pi": global_pi, "alpha_pi": global_alpha_pi,
+                    "bb_conc": global_bb_conc, "dir_conc": global_dir_conc,
+                    "a": global_a, "b": global_b,
+                    "a_shape": global_a_shape, "a_rate": global_a_rate,
+                    "b_shape": global_b_shape, "b_rate": global_b_rate}
+            for _g, _v in _now.items():
+                if _v is None or isinstance(_v, str):
+                    continue
+                _v = _v.detach().cpu().numpy() if isinstance(_v, torch.Tensor) else np.asarray(_v)
+                _v = np.asarray(_v, dtype=float).ravel()
+                if _v.size == 0 or not np.isfinite(_v).all():
+                    continue
+                _scale = float(np.max(np.abs(_v))) + 1e-12
+                _first = _GLOBAL_FIRST.setdefault(_g, _v.copy())
+                _prev  = _GLOBAL_PREV.get(_g, _v)
+                d_first = float(np.max(np.abs(_v - _first)) / _scale)
+                d_prev  = float(np.max(np.abs(_v - _prev))  / _scale)
+                psi_log[f"drift_from_first_{_g}"] = d_first
+                psi_log[f"drift_from_prev_{_g}"]  = d_prev
+                psi_log[f"value_{_g}"] = float(_v.mean())
+                _GLOBAL_PREV[_g] = _v.copy()
+                _flag = "  <-- STUCK AT INIT?" if (pass_idx >= 2 and d_first < 1e-8) else ""
+                _extra = ""
+                if _g == "psi":     # the DS effect size lives here
+                    _p = np.asarray(global_psi, dtype=float)
+                    _extra = f"  psi_contrast={_p.std(axis=0).mean():.4f}"
+                elif _g == "phi":   # do cells still commit, or has phi gone uniform?
+                    _f = np.asarray(all_cell_assignments, dtype=float)
+                    _f = _f / (_f.sum(1, keepdims=True) + 1e-12)
+                    _extra = f"  per-cell max={np.median(_f.max(1)):.3f} (uniform={1.0/_f.shape[1]:.3f})"
+                print(f"  [global] {_g:<9} mean={_v.mean():>12.4f}  "
+                      f"drift_vs_pass1={d_first:.3e}  vs_prev={d_prev:.3e}{_extra}{_flag}", flush=True)
+        except Exception as _e:
+            print(f"  [global] drift tracking failed: {type(_e).__name__}: {_e}", flush=True)
+
+
 
         # --- program separation (psi contrast) ---
         # Spread across the K programs at each junction, averaged over junctions. This is the

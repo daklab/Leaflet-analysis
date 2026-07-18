@@ -1,0 +1,115 @@
+species: mouse
+dataset_label: mouse_smartseq2
+
+# ── Working directories ────────────────────────────────────────────────────────
+wd: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION
+code_dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
+
+# ── Genome / annotation ────────────────────────────────────────────────────────
+gtf_file: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf
+db_file:  /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/gencode.vM19.db
+fasta_file: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/fasta/genome.fa
+
+# ── Raw junction file sources ──────────────────────────────────────────────────
+sources:
+  allen_brain:
+    junction_dir: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/junctions
+    junction_pattern: "*_junctions_with_barcodes.bed"
+    metadata_csv: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/metadata.csv
+    sra_table:    /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/SRA/SraRunTable.txt
+    gse_metadata: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/GSE185862_metadata_ssv4.csv.gz
+    sample_group: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/GSE185862_sample_group_mapping.csv.gz
+    sra_s3_links: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/sra_s3_links.txt
+    ge_exons:     /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/GeneExpression/expression_matrix_exons.csv
+    ge_introns:   /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/GeneExpression/expression_matrix_introns.csv
+    cell_id_cleaner: allen_brain_mouse
+    age: "2m"  # all Allen Brain cells are treated as young adult
+  tabula_muris_senis:
+    junction_filelist: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/Leaflet/ATSEmap/output/junction_files.txt
+    metadata_csv: /gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data/AWS/metadata/tabula-muris-senis-full-metadata.csv
+    ge_h5ad:     /gpfs/commons/projects/knowles_singlecell_splicing/TabulaSenis/data/AWS/processed_for_scanpy/tabulamurissenisfacsofficialrawobj.h5ad
+    cell_id_cleaner: tms_mouse
+
+# ── ATSEmapper parameters ──────────────────────────────────────────────────────
+atsemapper:
+  min_intron: 50
+  max_intron: 500000
+  min_junc_reads: 100
+  min_num_cells: 10
+  batch_size: 32
+  num_workers: 10
+  annotation_status: unanno_also  # include unannotated junctions
+
+# ── Junction processing (SLURM split/process/merge) ───────────────────────────
+junction_processing:
+  n_chunks: 100
+  slurm_mem_process: 32G
+  slurm_mem_merge: 64G
+  slurm_partition: cpu,dev,bigmem
+
+# ── AnnData creation ──────────────────────────────────────────────────────────
+anndata:
+  sequencing_type: smart_seq
+  max_workers: 4
+  batch_size: 10
+  # how many (cell, junction) pairs to sample into the audit trail per chunk
+  audit_sample_n: 200
+
+# ── Metadata filters ─────────────────────────────────────────────────────────
+metadata:
+  # 21m has only 728 cells — too few for statistical analysis; drop from all downstream steps
+  exclude_ages: ["21m"]
+
+# ── Gene expression processing ────────────────────────────────────────────────
+gene_expression:
+  output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/processed_data
+  species: mouse  # used for mygene queries
+  ge_h5ad: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/processed_data/tms_ab_exons_combo_ge_adata_2026-05-24.h5ad
+
+# ── Cell type mapping ─────────────────────────────────────────────────────────
+cell_type_map: cell_type_maps/mouse_celltype_map.json
+
+# ── Combined cell metadata (from metadata_prep.py) ────────────────────────────
+# cell_id, age, cell_ontology_class, mouse.id, sex, subtissue, tissue
+# tissue column for AB cells = exp_component_name (used to align GE→splice)
+metadata_csv: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/metadata_mouse_metadata_combined.csv
+
+# ── Cell QC filters (applied during alignment) ────────────────────────────────
+cell_qc:
+  min_junctions:       5      # drop cells with fewer detected junctions
+  max_junctions_nmads: 5.0   # drop cells > median + 5*MAD junctions (doublets)
+  min_genes:           200    # drop cells with fewer detected GE genes
+  max_genes_nmads:     5.0   # drop cells > median + 5*MAD genes (doublets)
+
+# ── LeafletFA model ───────────────────────────────────────────────────────────
+leafletfa:
+  n_factors: [10, 20, 50]      # K=5 dropped: too few for an atlas of 159 cell types
+  reference_k: 20              # the K the ablations are run at
+  num_inits: 3                 # seeds per (K, lr, init arm). BOTH arms get all 3 --
+                               # giving random 3 restarts and waypoints 1 would rig the
+                               # comparison in favour of the conclusion we want.
+  learning_rate: 0.05          # (fallback only; param_grid_learning_rates below is what is used)
+  model_output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/LEAFLETFA_MODELS
+  param_grid_max_junctions: [null]   # all junctions, no ATSE size filter
+  param_grid_num_passes: 8
+  param_grid_batch_sizes: [8192]
+  # 1e-4 and 1e-3 are both below escape velocity: phi and psi both start at the symmetric point
+  # (every cell's phi at the same prior median, all K programs at nearly the same psi) and at
+  # lr<=1e-3 the symmetry never breaks, no matter how many epochs run. Measured on the Figure 2
+  # simulation. Check psi_contrast (logged per pass) on any run trained before 2026-07-12.
+  # lr INTERACTS WITH THE LIKELIHOOD: Binomial (conc=inf) is a much sharper likelihood, so an lr
+  # swept on one is not valid for the other. Swept WITH the Beta-Binomial, against ground truth:
+  #     lr=0.005 -> psi_r 0.52    lr=0.01 -> 0.85    lr=0.02 -> 0.97    lr=0.05 -> 0.98
+  #     lr=0.001 (the OLD default) -> CHANCE, at any number of epochs.
+  # 0.02 and 0.05 are both strong; keep both so the atlas can pick on held-out data.
+  param_grid_learning_rates: [0.05]     # starting with 0.05 only (0.02 also scored ~0.97;
+                                        # add it back if 0.05 disappoints on held-out data)
+  param_grid_waypoints_use: [True, False]
+  # BETA-BINOMIAL ONLY. Measured on the Figure-2 simulation, on data where the BINOMIAL is the
+  # CORRECT model:
+  #     model=Binomial,      lr=0.05 -> psi_r 0.758, agreement 45.1%, AUROC 0.914
+  #     model=Beta-Binomial, lr=0.05 -> psi_r 0.984, agreement 99.9%, AUROC 0.998
+  # The Beta-Binomial WINS EVEN WHEN THE TRUTH IS BINOMIAL -- its concentration parameter absorbs
+  # residual misfit and makes the objective easier to descend. Never train with "inf".
+  # (The Binomial arm survives only as a calibration ABLATION in 01_generate_params.py.)
+  param_grid_input_conc: [null]
