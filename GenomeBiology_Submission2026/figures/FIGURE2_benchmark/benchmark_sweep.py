@@ -17,6 +17,11 @@ from sklearn.metrics import (roc_auc_score, adjusted_rand_score, silhouette_scor
 from sklearn.decomposition import NMF
 from leafletfa import LeafletFA
 
+# FAIL-FAST CUDA guard: a previous run silently fell back to CPU (0% GPU, 98% CPU) and ground one
+# fit for an hour. Refuse to run on CPU -- fail immediately so SLURM can requeue on a real GPU.
+assert torch.cuda.is_available(), "CUDA not visible on this node -- refusing to run on CPU. Requeue."
+print(f"CUDA OK: {torch.cuda.get_device_name(0)}", flush=True)
+
 SIMDIR="/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION"
 CSV="benchmark_results.csv"
 DELTA=0.10                                   # DS-calling operating threshold on |delta psi|
@@ -67,9 +72,15 @@ def fit_lfa(sim, likelihood, junc_prior, seed):
 def fit_nmf(sim):
     R=sim.layers["junc_ratio"]; R=np.asarray(R.todense() if sp.issparse(R) else R,float)
     C=sim.layers["cell_by_cluster_matrix"]; C=np.asarray(C.todense() if sp.issparse(C) else C)
-    cov=(C>0); cm=np.array([np.clip(np.nan_to_num(R),0,1)[cov[:,j],j].mean() if cov[:,j].any() else 0
-                            for j in range(R.shape[1])])
-    X=np.where(cov,np.clip(np.nan_to_num(R),0,1),cm[None,:])
+    cov=(C>0)
+    # HOIST the clip out of the loop. It used to sit INSIDE the list comprehension, so a full
+    # 6,986 x 12,804 matrix was rebuilt once per junction -- 12,804 times, ~1.1e12 redundant ops.
+    # That hung the benchmark for 48 min at 99% CPU / 0% GPU with zero progress.
+    Rc = np.clip(np.nan_to_num(R), 0, 1)
+    # column means over COVERED entries only, vectorised (no Python loop over junctions)
+    cnt = cov.sum(0)
+    cm  = np.where(cnt > 0, (Rc * cov).sum(0) / np.maximum(cnt, 1), 0.0)
+    X   = np.where(cov, Rc, cm[None, :])
     m=NMF(n_components=5,init="nndsvda",random_state=0,max_iter=300)
     W=m.fit_transform(X); H=m.components_
     return H, W
@@ -77,7 +88,7 @@ def fit_nmf(sim):
 done=set()
 if os.path.exists(CSV):
     for _,row in pd.read_csv(CSV).iterrows():
-        done.add((row["frac"],row["seed"],row["model"],row.get("likelihood","-"),row.get("junc_prior","-")))
+        done.add((row["frac"],row["seed"],row["model"],str(row.get("likelihood","-")),str(row.get("junc_prior","-"))))
 
 for frac in (0.1,0.5,0.9):
     for seed in (0,1,2):
@@ -87,7 +98,7 @@ for frac in (0.1,0.5,0.9):
         # LeafletFA configs
         for lk in ("bb","binom"):
             for jp in (False,True):
-                key=(frac,seed,"LeafletFA",lk,jp)
+                key=(frac,seed,"LeafletFA",str(lk),str(jp))
                 if key in done: continue
                 psi,phi=fit_lfa(sim,lk,jp,seed); r=metrics(T,psi,phi)
                 pd.DataFrame([dict(frac=frac,seed=seed,model="LeafletFA",likelihood=lk,junc_prior=jp,
@@ -100,7 +111,7 @@ for frac in (0.1,0.5,0.9):
                     np.savez("representative_fit.npz", effect=r["effect"], is_diff=r["is_diff"],
                              phi=phi, true_prog=T["phi"].argmax(1))
         # NMF baseline
-        key=(frac,seed,"NMF","mean-impute","-")
+        key=(frac,seed,"NMF","mean-impute",str(False))
         if key not in done:
             H,W=fit_nmf(sim); r=metrics(T,H,W)
             pd.DataFrame([dict(frac=frac,seed=seed,model="NMF",likelihood="mean-impute",junc_prior=False,
