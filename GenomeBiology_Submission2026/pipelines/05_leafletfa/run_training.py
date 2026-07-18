@@ -198,6 +198,7 @@ global_bb_conc = None
 global_carry = {}   # every other global, carried chunk-to-chunk (see capture below)
 _GLOBAL_FIRST = {}  # first-pass value of each global, for drift tracking
 _GLOBAL_PREV  = {}  # previous-pass value of each global
+_CHUNK_TRACE  = []  # per-chunk snapshot of every global -> chunk-to-chunk spread
 global_a = None
 global_b = None
 global_a_shape = None
@@ -488,6 +489,26 @@ for pass_idx in range(NUM_PASSES):
             global_dir_conc = _dc.item() if isinstance(_dc, torch.Tensor) else float(_dc)
         if hasattr(leaflet_model, 'bb_conc'):
             global_bb_conc = leaflet_model.bb_conc
+        # ── PER-CHUNK SNAPSHOT ───────────────────────────────────────────────────────────────
+        # The per-PASS drift log fires once per 12 chunks, so it cannot distinguish "this global is
+        # converging" from "this global swings wildly between chunks and the pass-end value is just
+        # wherever the last chunk left it". Record every chunk so chunk-to-chunk spread is measurable
+        # -- that is the direct evidence for whether a/b/dir_conc are chunk-local noise.
+        try:
+            _snap = {"pass": pass_idx + 1, "chunk": batch_counter}
+            for _g, _v in (("bb_conc", global_bb_conc), ("a", global_a), ("b", global_b),
+                           ("a_shape", global_a_shape), ("a_rate", global_a_rate),
+                           ("b_shape", global_b_shape), ("b_rate", global_b_rate),
+                           ("dir_conc", global_dir_conc), ("alpha_pi", global_alpha_pi)):
+                if _v is None or isinstance(_v, str):
+                    continue
+                _v = _v.detach().cpu().numpy() if isinstance(_v, torch.Tensor) else np.asarray(_v)
+                _snap[_g] = float(np.asarray(_v, dtype=float).ravel().mean())
+            if global_psi is not None:
+                _snap["psi_contrast"] = float(np.asarray(global_psi, dtype=float).std(axis=0).mean())
+            _CHUNK_TRACE.append(_snap)
+        except Exception as _e:
+            print(f"  [chunk-trace] failed: {type(_e).__name__}: {_e}", flush=True)
         # CARRY EVERY GLOBAL chunk-to-chunk. Previously only psi/phi/pi/alpha_pi were carried, so
         # bb_conc, a, b and the four Beta hyperparameters were re-initialised from their PRIORS on
         # every one of ~240 chunks and given only num_epochs_later steps on ONE batch to move --
@@ -647,6 +668,25 @@ for pass_idx in range(NUM_PASSES):
                       f"drift_vs_pass1={d_first:.3e}  vs_prev={d_prev:.3e}{_extra}{_flag}", flush=True)
         except Exception as _e:
             print(f"  [global] drift tracking failed: {type(_e).__name__}: {_e}", flush=True)
+
+        # CHUNK-TO-CHUNK SPREAD within this pass: coefficient of variation across the pass's chunks.
+        # A global that is genuinely estimated from the data should be stable chunk to chunk; one
+        # that is refit from scratch on whichever cells landed in the chunk will swing.
+        try:
+            _tp = [r for r in _CHUNK_TRACE if r.get("pass") == pass_idx + 1]
+            if len(_tp) > 1:
+                for _g in ("bb_conc", "a", "b", "a_shape", "a_rate", "b_shape", "b_rate",
+                           "dir_conc", "alpha_pi", "psi_contrast"):
+                    _vals = np.array([r[_g] for r in _tp if _g in r], dtype=float)
+                    if _vals.size < 2 or not np.isfinite(_vals).all():
+                        continue
+                    _cv = float(np.std(_vals) / (abs(np.mean(_vals)) + 1e-12))
+                    psi_log[f"chunk_cv_{_g}"] = _cv
+                    _tag = "  <-- CHUNK-LOCAL (cv>0.5)" if _cv > 0.5 else ""
+                    print(f"  [chunk-cv] {_g:<12} mean={_vals.mean():>10.4f} "
+                          f"cv_across_{len(_vals)}_chunks={_cv:.3f}{_tag}", flush=True)
+        except Exception as _e:
+            print(f"  [chunk-cv] failed: {type(_e).__name__}: {_e}", flush=True)
 
 
 

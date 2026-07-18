@@ -201,6 +201,23 @@ def main():
     for wp in (True, False):
         param_list.append(make(K_REF, wp, 0, "inf", True, "ablation_binomial"))
 
+    # ABLATION -- dir_conc (delta), at K_REF, ALL SEEDS so it gets error bars.
+    #
+    # delta scales Dirichlet(delta * pi), so with pi ~ 1/K the per-component concentration is
+    # delta/K:  <1 => sparse phi (cells use few programs);  ~1 => flat;  >1 => uniform phi.
+    # Two reasons to test rather than fix it:
+    #   1. It is LEARNED per chunk but never carried, and measured chunk-to-chunk it is the most
+    #      unstable global we have (pass-to-pass drift up to 5.7x its own magnitude).
+    #   2. THE PERPLEXITY TRAP: at delta ~ 1 and K = 20, delta/K = 0.05 already implies a median phi
+    #      perplexity of ~2.5 -- and the paper reports 2.46. So the headline perplexity could be a
+    #      restatement of the prior rather than a finding. Testing delta is how we tell the two
+    #      apart: if phi perplexity tracks delta/K regardless of the data, the prior is driving it.
+    for _delta in (1.0, float(K_REF)):
+        for sd in SEEDS:
+            _p = make(K_REF, True, sd, BB, True, f"ablation_delta{_delta:g}")
+            _p["delta_fixed"] = _delta
+            param_list.append(_p)
+
     param_file = os.path.join(out_dir, "parameter_combinations.json")
     with open(param_file, "w") as f:
         json.dump(param_list, f, indent=2)
