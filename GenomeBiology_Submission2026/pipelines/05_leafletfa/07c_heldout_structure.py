@@ -40,7 +40,12 @@ import pandas as pd
 import anndata as ad
 import scanpy as sc
 from scipy.sparse import csr_matrix
-from sklearn.metrics import silhouette_score, adjusted_rand_score
+from sklearn.metrics import silhouette_score as _sil_full, adjusted_rand_score
+def silhouette_score(X, labels, seed=0):
+    # subsample: full silhouette is O(n^2) and OOMs at 40k-92k cells
+    n = len(labels)
+    ss = min(10000, n)
+    return float(_sil_full(X, labels, sample_size=ss, random_state=seed))
 
 import torch
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -259,6 +264,8 @@ def main():
     print(f"[07c] held-out phi {phi_test.shape}; running Leiden + silhouette", flush=True)
     rows, _ = structure_metrics(phi_test, labels, "heldout_inferred", base, seed=0)
     all_rows += rows
+    pd.DataFrame(all_rows).to_csv(out_csv, index=False)   # SAVE the primary result before the
+    print(f"[07c] held-out structure written to {out_csv}", flush=True)  # heavier train step
 
     # TRAINING phi (from the saved model) for the memorization contrast, if labels are available
     tr_phi = np.asarray(m.get("assign_post")) if m.get("assign_post") is not None else None

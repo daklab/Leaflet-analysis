@@ -77,13 +77,21 @@ def fit_nmf(sim):
     # 6,986 x 12,804 matrix was rebuilt once per junction -- 12,804 times, ~1.1e12 redundant ops.
     # That hung the benchmark for 48 min at 99% CPU / 0% GPU with zero progress.
     Rc = np.clip(np.nan_to_num(R), 0, 1)
-    # column means over COVERED entries only, vectorised (no Python loop over junctions)
     cnt = cov.sum(0)
     cm  = np.where(cnt > 0, (Rc * cov).sum(0) / np.maximum(cnt, 1), 0.0)
-    X   = np.where(cov, Rc, cm[None, :])
-    m=NMF(n_components=5,init="nndsvda",random_state=0,max_iter=300)
-    W=m.fit_transform(X); H=m.components_
-    return H, W
+    # TWO imputations of the uncovered (NaN) entries -- NMF has no missing-data model, so the
+    # choice matters and is part of the point:
+    #   0-impute    : uncovered -> 0. The naive default; tells NMF every uncovered junction is
+    #                 fully skipped, which is FALSE (uncovered != PSI 0). Handicaps NMF.
+    #   mean-impute : uncovered -> junction mean over covered cells. The fairer baseline.
+    # LeafletFA models coverage explicitly and never imputes. Beating BOTH is the claim.
+    out = {}
+    for tag, X in (("0-impute", np.where(cov, Rc, 0.0)),
+                   ("mean-impute", np.where(cov, Rc, cm[None, :]))):
+        m = NMF(n_components=5, init="nndsvda", random_state=0, max_iter=300)
+        W = m.fit_transform(X); H = m.components_
+        out[tag] = (H, W)
+    return out
 
 done=set()
 if os.path.exists(CSV):
@@ -111,11 +119,14 @@ for frac in (0.1,0.5,0.9):
                     np.savez("representative_fit.npz", effect=r["effect"], is_diff=r["is_diff"],
                              phi=phi, true_prog=T["phi"].argmax(1))
         # NMF baseline
-        key=(frac,seed,"NMF","mean-impute",str(False))
-        if key not in done:
-            H,W=fit_nmf(sim); r=metrics(T,H,W)
-            pd.DataFrame([dict(frac=frac,seed=seed,model="NMF",likelihood="mean-impute",junc_prior=False,
+        nmf_out = None
+        for _imp in ("0-impute", "mean-impute"):
+            key=(frac,seed,"NMF",_imp,str(False))
+            if key in done: continue
+            if nmf_out is None: nmf_out = fit_nmf(sim)
+            H,W = nmf_out[_imp]; r=metrics(T,H,W)
+            pd.DataFrame([dict(frac=frac,seed=seed,model="NMF",likelihood=_imp,junc_prior=False,
                 **{k:v for k,v in r.items() if k not in ("effect","is_diff")})]).to_csv(
                 CSV,mode="a",header=not os.path.exists(CSV),index=False)
-            print(f"frac{frac} s{seed} NMF: sil={r['sil']:.3f} ap={r['ap']:.3f}",flush=True)
+            print(f"frac{frac} s{seed} NMF {_imp}: sil={r['sil']:.3f} ap={r['ap']:.3f}",flush=True)
 print("*** BENCHMARK DONE ***")
