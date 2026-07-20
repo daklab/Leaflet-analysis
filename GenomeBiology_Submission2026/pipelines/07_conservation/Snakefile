@@ -1,0 +1,130 @@
+"""
+GSE138734 bulk total-RNA → junctions pipeline (FIGURE5 conservation).
+
+Adapted from LeafletFA_Submission2025/AllenInst/lein-cortex-gru/snakemake/Snakefile.
+Each SRR sample is treated as one pseudocell: the sample ID is stamped as the CB
+tag so that ATSEmapper downstream sees one "cell" per tissue sample.
+
+Output per sample:
+    results_dir/{sample}_junctions_with_barcodes.bed   ← fed to ATSEmapper Step 1
+
+Run via run_snakemake.sh (see that script for the sbatch call).
+"""
+
+import os
+import csv
+
+configfile: "config_gse138734.yaml"
+
+
+def get_sample_ids():
+    """Read SRR accessions from the manifest written by 00_download_gse138734.py."""
+    manifest = config["manifest"]
+    if not os.path.exists(manifest):
+        raise FileNotFoundError(
+            f"Manifest not found: {manifest}\n"
+            "Run 00_download_gse138734.py first."
+        )
+    with open(manifest) as f:
+        rows = list(csv.DictReader(f))
+    ids = [r["srr"] for r in rows]
+    print(f"Loaded {len(ids)} samples from manifest: {manifest}")
+    return ids
+
+
+SAMPLES = get_sample_ids()
+
+
+rule all:
+    input:
+        expand(os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"), sample=SAMPLES),
+        expand(os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv"), sample=SAMPLES),
+
+
+rule run_star:
+    input:
+        r1=os.path.join(config["raw_dir"], "{sample}", "{sample}_R1.fastq.gz"),
+        r2=os.path.join(config["raw_dir"], "{sample}", "{sample}_R2.fastq.gz"),
+    output:
+        bam=os.path.join(config["bam_dir"], "{sample}", "Aligned.sortedByCoord.out.bam"),
+    params:
+        star_index=config["star_index_dir"],
+        prefix=os.path.join(config["bam_dir"], "{sample}/"),
+    threads: 8
+    shell:
+        """
+        STAR --genomeDir {params.star_index} \
+             --readFilesIn {input.r1} {input.r2} \
+             --readFilesCommand zcat \
+             --runMode alignReads \
+             --outSAMattributes XS \
+             --outSAMstrandField intronMotif \
+             --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
+             --outSAMtype BAM SortedByCoordinate \
+             --twopassMode Basic \
+             --runThreadN {threads} \
+             --limitBAMsortRAM 32000000000 \
+             --outFileNamePrefix {params.prefix}
+        """
+
+
+rule add_cb_tag:
+    """Stamp the SRR accession as CB tag so ATSEmapper sees one pseudocell per sample."""
+    input:
+        bam=rules.run_star.output.bam,
+    output:
+        bam=os.path.join(config["bam_dir"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam"),
+    params:
+        sample=lambda wc: wc.sample,
+    shell:
+        """
+        samtools view -h {input.bam} \
+            | awk -v cb={params.sample} 'BEGIN {{OFS="\t"}} /^@/ {{print; next}} {{print $0 "\tCB:Z:" cb}}' \
+            | samtools view -bS - > {output.bam}
+        """
+
+
+rule index_bam:
+    input:
+        bam=rules.add_cb_tag.output.bam,
+    output:
+        bai=os.path.join(config["bam_dir"], "{sample}", "Aligned.sortedByCoord.out.bam.CB.bam.bai"),
+    shell:
+        "samtools index {input.bam}"
+
+
+rule extract_junctions:
+    input:
+        bam=rules.add_cb_tag.output.bam,
+        bai=rules.index_bam.output.bai,
+    output:
+        juncs=os.path.join(config["results_dir"], "{sample}_junctions.bed"),
+        barcodes=os.path.join(config["results_dir"], "{sample}_barcodes.txt"),
+        juncs_with_barcodes=os.path.join(config["results_dir"], "{sample}_junctions_with_barcodes.bed"),
+    params:
+        regtools=config["regtools_path"],
+    shell:
+        """
+        {params.regtools} junctions extract \
+            -a 6 -m 50 -M 500000 \
+            -s XS \
+            -b {output.barcodes} \
+            {input.bam} \
+            -o {output.juncs}
+        paste --delimiters='\t' {output.juncs} {output.barcodes} > {output.juncs_with_barcodes}
+        """
+
+
+rule splicing_summary:
+    input:
+        bam=rules.add_cb_tag.output.bam,
+        juncs=rules.extract_junctions.output.juncs,
+    output:
+        summary=os.path.join(config["results_dir"], "{sample}_splicing_summary.tsv"),
+    shell:
+        """
+        total=$(samtools view -c -F 4 {input.bam})
+        spliced=$(awk '{{sum += $5}} END {{print (sum=="" ? 0 : sum)}}' {input.juncs})
+        echo -e "sample\ttotal_reads\tspliced_reads" > {output.summary}
+        echo -e "{wildcards.sample}\t$total\t$spliced" >> {output.summary}
+        """

@@ -108,11 +108,18 @@ print(f"Starting run at: {today}")
 today_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
 wandb.init(
-    project=f"LeafletFA-MouseFoundation_{today_date}",
+    # ONE project for all atlas 70%-split training arrays. The date used to be in the project
+    # name, which split every array into its own workspace and made cross-array comparison
+    # impossible. The date now lives in `group`, so arrays stay separated WITHIN one project.
+    project="LeafletFA-mouse-atlas-70pct-train",
     config=params,
     name=f"run_{param_id}",
     dir=output_dir,
-    group="MouseFoundation",
+    group=f"array_{today_date}",
+    tags=[f"K{params.get('K')}",
+          f"seed{params.get('seed')}",
+          ("waypoints" if params.get("waypoints_use") else "random"),
+          ("juncprior" if params.get("junc_specific_prior") else "globalprior")],
     notes=f"Parameter set {param_id}, K={params['K']}, waypoints={params['waypoints_use']}, multi-pass minibatch"
 )
 

@@ -1,0 +1,70 @@
+species: human
+dataset_label: human_smartseq2
+
+# ── Working directories ────────────────────────────────────────────────────────
+wd: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION
+code_dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
+
+# ── Genome / annotation ────────────────────────────────────────────────────────
+# TODO: fill in human long-read GTF when available
+gtf_file: /gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/2025_human_longread/all_samples_sp_collapse_GRCh38/all_samples_sp_collapse_all_chr_full.gtf
+db_file:  /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/genomes/lr_GRCh38.db
+fasta_file: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSapiens/genome_files/GRCh38/fasta/genome.fa
+
+# ── Raw junction file sources ──────────────────────────────────────────────────
+sources:
+  allen_brain_human:
+    # Human MTG (Middle Temporal Gyrus) dataset
+    junction_dir: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/human_mtg/junctions
+    junction_pattern: "*_junctions_with_barcodes.bed"
+    metadata_csv: /gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/human_mtg/METADATA/metadata.csv
+    cell_id_cleaner: allen_brain_human
+    age: "adult"
+  tabula_sapiens:
+    # Tabula Sapiens V2
+    junction_filelist: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSapiens/Leaflet/ATSEmap/output/junction_files.txt
+    metadata_csv: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSapiens/metadata/tabula_sapiens_metadata.csv
+    ge_h5ad: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSapiens/processed/tabsap_adata_2025-04-15.h5ad
+    bam_keep_list: /gpfs/commons/home/kisaev/Leaflet-analysis/LeafletFA_Submission2025/Human_Splicing_Foundation/metadata/bam_files_to_keep.txt
+    cell_id_cleaner: tabula_sapiens
+
+# ── ATSEmapper parameters ──────────────────────────────────────────────────────
+atsemapper:
+  min_intron: 50
+  max_intron: 500000
+  min_junc_reads: 100
+  min_num_cells: 10
+  batch_size: 32
+  num_workers: 10
+  annotation_status: unanno_also
+
+# ── Junction processing (SLURM split/process/merge) ───────────────────────────
+junction_processing:
+  n_chunks: 100
+  slurm_mem_process: 32G
+  slurm_mem_merge: 64G
+  slurm_partition: cpu,dev,bigmem
+
+# ── AnnData creation ──────────────────────────────────────────────────────────
+anndata:
+  sequencing_type: smart_seq
+  max_workers: 4
+  batch_size: 10
+  audit_sample_n: 200
+
+# ── Gene expression processing ────────────────────────────────────────────────
+gene_expression:
+  output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
+  species: human
+
+# ── Cell type mapping ─────────────────────────────────────────────────────────
+cell_type_map: cell_type_maps/human_celltype_map.json
+
+# ── LeafletFA model ───────────────────────────────────────────────────────────
+leafletfa:
+  n_factors: 20
+  learning_rate: 0.001
+  batch_size: 128
+  max_epochs: 500
+  min_atse_coverage: 0.05
+  model_output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/LEAFLETFA_MODELS

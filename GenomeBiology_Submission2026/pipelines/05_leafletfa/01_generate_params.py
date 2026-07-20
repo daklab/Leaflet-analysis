@@ -197,9 +197,15 @@ def main():
                     for sd in SEEDS:
                         param_list.append(make(K, wp, sd, BB, jp, f"core_{itag}_{ptag}", lr=lr))
 
-    # ABLATION -- likelihood: Binomial instead of Beta-Binomial, at K_REF, both init arms
+    # ABLATION -- likelihood: Binomial instead of Beta-Binomial, at K_REF, both init arms.
+    # ALL SEEDS, like everything else. A single seed per config cannot be compared against the core
+    # grid at all: seed variance on this model is large (psi_r 0.63-0.98 measured at a FIXED config),
+    # so a 1-seed ablation has no error bar and any apparent likelihood effect could be seed noise.
+    # Every config in this grid gets 3 seeds, and selection is best-ELBO within a config (validated:
+    # regret 0.001, rho -0.77 between ELBO and psi recovery).
     for wp in (True, False):
-        param_list.append(make(K_REF, wp, 0, "inf", True, "ablation_binomial"))
+        for sd in SEEDS:
+            param_list.append(make(K_REF, wp, sd, "inf", True, "ablation_binomial"))
 
     # ABLATION -- dir_conc (delta), at K_REF, ALL SEEDS so it gets error bars.
     #

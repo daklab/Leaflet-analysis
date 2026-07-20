@@ -1,0 +1,95 @@
+species: human
+dataset_label: human_allen_brain
+
+# ── Working directories ────────────────────────────────────────────────────────
+wd: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION
+code_dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
+
+# ── Genome / annotation (Gencode v45, GRCh38) ─────────────────────────────────
+gtf_file:   /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf
+db_file:    /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencodev45.db
+fasta_file: /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa
+
+# ── Raw junction file source (Allen Brain human cortex, lein-human-cortex) ───
+# 50,625 per-cell BED files; junction extraction via regtools already done
+sources:
+  allen_brain_human:
+    junction_dir:     /gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/Leaflet
+    junction_pattern: "*_junctions_with_barcodes.bed"
+    cell_id_cleaner:  allen_brain_human
+    metadata_csv:     /gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/INFO/metadata.csv
+
+# ── Combined cell metadata (output of 00_prepare_human_ab_metadata.py) ────────
+# columns: cell_id, exp_component_name, donor, sex, age, dataset, tissue,
+#          cortical_layer, cell_type_ontology_class, broad_cell_type, tissue_cell_type
+# cell_id = sample_name (matches splice obs_names)
+# exp_component_name = GE h5ad obs_names bridge key
+metadata_csv: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/metadata_human_allen_brain_combined.csv
+
+# ── Cell type map ─────────────────────────────────────────────────────────────
+cell_type_map: cell_type_maps/human_allen_brain_celltype_map.json
+
+# ── ATSEmapper parameters ─────────────────────────────────────────────────────
+# ATSE file already produced: ATSE_mapper/ATSE_files/HUMAN_FOUNDATION_ATSE_FILE_unanno_also_2025-09-21_05-02-35.txt.gz
+# (generated from AB + TS junction data; suitable for AB-only training)
+atsemapper:
+  min_intron: 50
+  max_intron: 500000
+  min_junc_reads: 100
+  min_num_cells: 10
+  batch_size: 32
+  num_workers: 10
+  annotation_status: unanno_also
+
+# ── Junction processing ────────────────────────────────────────────────────────
+junction_processing:
+  n_chunks: 100
+  slurm_mem_process: 32G
+  slurm_mem_merge: 64G
+  slurm_partition: cpu,dev,bigmem
+
+# ── AnnData creation ──────────────────────────────────────────────────────────
+anndata:
+  sequencing_type: smart_seq
+  max_workers: 4
+  batch_size: 10
+  audit_sample_n: 200
+
+# ── Gene expression ───────────────────────────────────────────────────────────
+gene_expression:
+  output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/processed_data
+  species: human
+  # Raw GE h5ad: obs_names=sample_name, layer='counts' (raw integer counts)
+  ge_h5ad: /gpfs/commons/datasets/controlled/BRAIN_NeMO/lein-human-cortex/GeneExpression/adata_2025-01-07_HVG_only_False.h5ad
+
+# ── Existing pre-processed files (starting point for new training) ────────────
+precomputed:
+  # Combined (AB + TS) aligned splice h5ad — 76,986 cells × 123,383 junctions
+  # Filter to dataset == 'allen_brain' to get ~45,496 cells before junction filtering
+  splice_h5ad: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025/model_ready_aligned_splicing_data_20251009_023419.h5ad
+  ge_h5ad:     /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/MODEL_INPUT/102025/model_ready_gene_expression_data_20251009_023419.h5ad
+  # ATSE mapping
+  atse_file:   /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/HUMAN_FOUNDATION_ATSE_FILE_unanno_also_2025-09-21_05-02-35.txt.gz
+
+# ── Metadata filters ──────────────────────────────────────────────────────────
+metadata:
+  include_datasets: ["allen_brain"]   # filter combined h5ad to AB cells only
+
+# ── Cell QC filters ───────────────────────────────────────────────────────────
+cell_qc:
+  min_junctions:       5
+  max_junctions_nmads: 5.0
+  min_genes:           200
+  max_genes_nmads:     5.0
+
+# ── LeafletFA model ───────────────────────────────────────────────────────────
+leafletfa:
+  n_factors: [10, 20, 50]
+  learning_rate: 0.001
+  max_epochs: 500
+  model_output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/HUMAN_SPLICING_FOUNDATION/LEAFLETFA_MODELS
+  param_grid_max_junctions: [null]
+  param_grid_num_passes: 5
+  param_grid_batch_sizes: [8192]
+  param_grid_learning_rates: [0.0001, 0.001]
+  param_grid_input_conc: [null, "inf"]  # null=Beta-Binomial, "inf"=Binomial

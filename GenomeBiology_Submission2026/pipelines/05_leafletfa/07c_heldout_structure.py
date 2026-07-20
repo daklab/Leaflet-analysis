@@ -26,6 +26,25 @@ phi is the frozen-psi test-time E-step on the held-out 30% cells (same machinery
 reflects the representation the released model gives on cells it never trained on. The SAME analysis
 is run on training phi for the memorization contrast.
 
+WHICH CELLS / WHICH COVERAGE
+----------------------------
+Every metric is emitted for several `phi_source` values, so train and held-out are BOTH reported:
+  heldout_inferred    30% held-out cells, frozen-psi E-step   <- THE PRIMARY RESULT
+  heldout_nmfm/nmf0   same held-out cells, rank-K NMF baseline (see below)
+  train_assign_post   training phi from the saved model, for the memorization contrast only
+Held-out phi is inferred from FULL-COVERAGE counts: the `*_original` layers
+(junc_ratio_original, cell_by_cluster_matrix_original), NOT the downsampled ones. That is why the
+input must be a RESAMPLED_* file -- only those carry the `_original` layers -- even though no
+downsampled counts are used here. The coverage-robustness axis lives in 04e, not 07c.
+
+NMF BASELINE
+------------
+Rank-K NMF is fit on the same full-coverage held-out matrix and its cell loadings W (row-normalised
+to the simplex, like phi) are pushed through the IDENTICAL Leiden/silhouette/ARI pipeline. NMF is
+also a label-free rank-K factor model, so it is the fair "is phi better than vanilla matrix
+factorization?" comparator -- the structure analogue of the NMF baseline in 04e. Reported in both
+0-impute (nmf0) and mean-impute (nmfm) flavours since NMF has no missing-data model.
+
 NOTE: aging is NOT here. It belongs on the full-data model (Figure 4 case study, Tabula Muris Senis),
 not on a 70%/K-sweep held-out set.
 
@@ -41,6 +60,7 @@ import anndata as ad
 import scanpy as sc
 from scipy.sparse import csr_matrix
 from sklearn.metrics import silhouette_score as _sil_full, adjusted_rand_score
+from sklearn.decomposition import NMF
 def silhouette_score(X, labels, seed=0):
     # subsample: full silhouette is O(n^2) and OOMs at 40k-92k cells
     n = len(labels)
@@ -49,6 +69,14 @@ def silhouette_score(X, labels, seed=0):
 
 import torch
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# FAIL FAST on silent CPU fallback. Some GPU nodes (ne1dg7-[001-011]) present no usable CUDA
+# device, and torch then quietly returns "cpu" -- the job runs at ~1% speed and burns its whole
+# walltime before anyone notices. Exit loudly instead. Set LEAFLET_ALLOW_CPU=1 to override.
+if DEVICE.type != "cuda" and os.environ.get("LEAFLET_ALLOW_CPU") != "1":
+    sys.exit(f"FATAL: no CUDA device visible (node={os.environ.get('SLURMD_NODENAME','?')}). "
+             f"This job would silently run on CPU. Resubmit excluding the bad nodes, or set "
+             f"LEAFLET_ALLOW_CPU=1 to run on CPU deliberately.")
+print(f"[device] {DEVICE}  node={os.environ.get('SLURMD_NODENAME','?')}", flush=True)
 if DEVICE.type == "cuda":
     torch.set_default_dtype(torch.float32)
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -131,14 +159,75 @@ def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_
     model.get_all_variables()
     phi = model.assign_post
     if isinstance(phi, torch.Tensor): phi = phi.detach().cpu().numpy()
+    # CONVERGENCE: did the E-step converge, or just hit the epoch cap? min_delta is ABSOLUTE
+    # (1e-3) against a large ELBO, so early stopping is near-inert and the budget itself becomes
+    # the binding constraint on every downstream number. Record it so this is never a guess.
+    h = getattr(model, "health", None) or {}
+    _E_STEP_CONV.append((int(h.get("epochs_ran", -1)), bool(h.get("stopped_early", False)), epochs))
     if DEVICE.type == "cuda": torch.cuda.empty_cache()
     return np.array(phi, dtype=np.float32)
 
 
+_E_STEP_CONV = []   # (epochs_ran, stopped_early, cap) per chunk
+
+
+def report_e_step_convergence(tag=""):
+    """Print whether the phi E-step converged or was truncated by the epoch cap."""
+    if not _E_STEP_CONV:
+        return
+    ran  = [r for r, _, _ in _E_STEP_CONV]
+    early = sum(1 for _, e, _ in _E_STEP_CONV if e)
+    cap  = _E_STEP_CONV[0][2]
+    n    = len(_E_STEP_CONV)
+    at_cap = sum(1 for r in ran if r >= cap)
+    print(f"\n--- E-step convergence {tag} ---", flush=True)
+    print(f"  chunks: {n}   epoch cap: {cap}", flush=True)
+    print(f"  epochs ran: min={min(ran)} median={int(np.median(ran))} max={max(ran)}", flush=True)
+    print(f"  early-stopped: {early}/{n}    hit the cap: {at_cap}/{n}", flush=True)
+    if at_cap > n * 0.5:
+        print(f"  !! WARNING: {at_cap}/{n} chunks hit the epoch cap without converging. phi is "
+              f"TRUNCATED, not converged -- the budget is a live knob on every metric below. "
+              f"Raise epochs (or set min_delta_rel) and confirm the numbers are stable.", flush=True)
+
+
+def fit_nmf_W(jr, cov, K, max_iter=300, random_state=0):
+    """Rank-K NMF cell loadings on the SAME full-coverage test matrix -- the factor-model baseline.
+
+    NMF learns K programs and a per-cell loading W, structurally the same object as phi, but without
+    the Beta-Binomial likelihood, the coverage model, or any labels. Running the IDENTICAL
+    Leiden/silhouette/ARI pipeline on W vs phi asks: does LeafletFA's latent space have more
+    biological structure than vanilla matrix factorization at the same K? Matches the NMF baseline
+    in 04e and figures/FIGURE2_benchmark/benchmark_sweep.py.
+
+    W is row-normalised to the simplex so it is on the same footing as phi (which sums to 1 per
+    cell) -- otherwise silhouette/neighbours would be driven by per-cell magnitude, not composition.
+
+    Two fill conventions, since NMF has no missing-data model:
+      nmf0  uncovered -> 0    (asserts uncovered == PSI 0, which is false; handicaps NMF)
+      nmfm  uncovered -> per-junction mean over covered cells (the fairer baseline)
+    Returns {"nmf0": (N,K), "nmfm": (N,K)} float32.
+    """
+    Rc  = np.clip(np.nan_to_num(jr), 0.0, 1.0).astype(np.float32)
+    cnt = cov.sum(0)
+    cm  = np.where(cnt > 0, (Rc * cov).sum(0) / np.maximum(cnt, 1), 0.0).astype(np.float32)
+    out = {}
+    for tag, fill in (("nmf0", None), ("nmfm", cm)):
+        X = np.where(cov, Rc, 0.0 if fill is None else fill[None, :]).astype(np.float32)
+        m = NMF(n_components=K, init="nndsvda", random_state=random_state, max_iter=max_iter)
+        W = m.fit_transform(X).astype(np.float32)
+        del X, m
+        out[tag] = (W / (W.sum(1, keepdims=True) + 1e-12)).astype(np.float32)
+        print(f"[NMF] {tag}: W {out[tag].shape}", flush=True)
+    del Rc
+    return out
+
+
 def infer_phi_fullcov(test_h5mu, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
-                      chunk, epochs, patience, rng):
+                      chunk, epochs, patience, rng, fit_nmf=True):
     """Infer phi for held-out test cells from FULL-COVERAGE counts.
-    junc_orig reconstructed = round(junc_ratio_original * atse_original)."""
+    junc_orig reconstructed = round(junc_ratio_original * atse_original).
+
+    Also fits the rank-K NMF baseline on the same full-coverage matrix (returned as nmf_W)."""
     with h5py.File(test_h5mu, "r") as f:
         s = f["mod/splicing"]; N = int(s["obs/_index"].shape[0])
         jr_ori = np.array(s["layers/junc_ratio_original"], dtype=np.float32)
@@ -153,6 +242,12 @@ def infer_phi_fullcov(test_h5mu, psi_tensor, K, dir_conc, junc_prior, pi, alpha_
                 else:
                     labels[col] = np.array(g[:])
     atse_d = atse.toarray()
+    # NMF baseline on the SAME full-coverage matrix, fitted here while jr_ori is still resident
+    # (it is a dense N x J array; loading it twice would double peak memory). Coverage = the cell
+    # has reads on that ATSE, which is exactly when junc_ratio is defined.
+    nmf_W = {}
+    if fit_nmf:
+        nmf_W = fit_nmf_W(jr_ori, atse_d > 0, K)
     junc_orig = np.rint(jr_ori * atse_d).astype(np.float32)   # full-coverage junction counts
     del jr_ori
     junc_sp = csr_matrix(junc_orig); atse_sp = csr_matrix(atse_d)
@@ -169,7 +264,7 @@ def infer_phi_fullcov(test_h5mu, psi_tensor, K, dir_conc, junc_prior, pi, alpha_
                        dir_conc, junc_prior, pi, alpha_pi, bb_conc, epochs, patience,
                        sample_pi_phi_init(pi, K, n, rng)))
         print(f"    phi {start}-{end}", flush=True)
-    return np.vstack(all_phi), labels
+    return np.vstack(all_phi), labels, nmf_W
 
 
 # ── metrics ───────────────────────────────────────────────────────────────────
@@ -259,11 +354,20 @@ def main():
     all_rows = []
 
     # HELD-OUT: frozen-psi E-step on the 30% test cells, then unsupervised structure
-    phi_test, labels = infer_phi_fullcov(test_h5mu, psi, K, dir_conc, junc_prior,
-                                         pi, alpha_pi, bb_conc, chunk, epochs, patience, rng)
+    phi_test, labels, nmf_W = infer_phi_fullcov(test_h5mu, psi, K, dir_conc, junc_prior,
+                                                pi, alpha_pi, bb_conc, chunk, epochs, patience, rng)
+    report_e_step_convergence("(held-out phi)")
     print(f"[07c] held-out phi {phi_test.shape}; running Leiden + silhouette", flush=True)
     rows, _ = structure_metrics(phi_test, labels, "heldout_inferred", base, seed=0)
     all_rows += rows
+
+    # BASELINE: identical structure pipeline on rank-K NMF loadings from the same test cells.
+    # Label-free factor model at the same K -- the fair "is phi better than vanilla MF?" comparator.
+    for tag, W in nmf_W.items():
+        print(f"[07c] held-out NMF {tag} {W.shape}; running Leiden + silhouette", flush=True)
+        rows, _ = structure_metrics(W, labels, f"heldout_{tag}", base, seed=0)
+        all_rows += rows
+
     pd.DataFrame(all_rows).to_csv(out_csv, index=False)   # SAVE the primary result before the
     print(f"[07c] held-out structure written to {out_csv}", flush=True)  # heavier train step
 
@@ -294,6 +398,25 @@ def main():
         if key in piv.index and {"heldout_inferred", "train_assign_post"} <= set(piv.columns):
             h, t = piv.loc[key, "heldout_inferred"], piv.loc[key, "train_assign_post"]
             print(f"\n  {key}:  held-out {h:.3f}  vs  train {t:.3f}  (gap {t-h:+.3f})", flush=True)
+
+    # LeafletFA vs the rank-K NMF baseline, on the SAME held-out cells (both label-free)
+    print("\n=== phi vs rank-K NMF baseline (held-out, label-free) ===", flush=True)
+    for key in ("silhouette_by_broad_cell_type", "ari_leiden_vs_broad_cell_type",
+                "silhouette_by_leiden", "leiden_purity_broad_ct", "n_leiden_clusters"):
+        if key not in piv.index:
+            continue
+        parts = []
+        for src, lbl in (("heldout_inferred", "phi"), ("heldout_nmfm", "nmf-mean"),
+                         ("heldout_nmf0", "nmf-0")):
+            if src in piv.columns and pd.notna(piv.loc[key, src]):
+                parts.append(f"{lbl}={piv.loc[key, src]:.3f}")
+        if parts:
+            margin = ""
+            if {"heldout_inferred", "heldout_nmfm"} <= set(piv.columns):
+                d = piv.loc[key, "heldout_inferred"] - piv.loc[key, "heldout_nmfm"]
+                if pd.notna(d):
+                    margin = f"   [phi - nmf-mean = {d:+.3f}]"
+            print(f"  {key:32s} " + "  ".join(parts) + margin, flush=True)
     print(f"\nwrote {out_csv}", flush=True)
 
 

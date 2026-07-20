@@ -291,3 +291,13 @@ vM27
 vM*
 *.db
 *.over.chain
+# ── Claude Code / assistant artifacts ──────────────────────────────────────
+.claude/
+.claude*/
+CLAUDE.md
+.anthropic/
+
+# ── Python junk ────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

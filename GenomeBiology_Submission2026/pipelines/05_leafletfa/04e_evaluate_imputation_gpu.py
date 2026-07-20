@@ -15,9 +15,18 @@ mirroring the working LeafletFA_Submission2025/.../05_impute_on_test.py:
   - ELBO_num_particles=10, num_samples=100 (less noisy VI)
   - batch_size 4096
 
-Methods compared: LeafletFA lf (phi@psi), lf_bb (BB posterior w/ counts),
-MeanBayes, naive mean. Metrics: per-junction Pearson + Spearman (cell ranking),
-MAE (+ mae_naive for the delta-vs-naive baseline), global Pearson.
+Methods compared:
+  lf     LeafletFA phi@psi (factor model, label-free)
+  lf_bb  LeafletFA BB posterior mean w/ observed counts (factor model, label-free)
+  nmf0   rank-K NMF, uncovered->0     (factor model, label-free -- fair head-to-head vs lf)
+  nmfm   rank-K NMF, uncovered->mean  (factor model, label-free -- fair head-to-head vs lf)
+  mb     MeanBayes global per-junction Beta-shrinkage mean (label-free floor)
+  naive  per-junction mean over observed cells             (label-free floor)
+  mb_ct  MeanBayes stratified by broad_cell_type -- USES CELL-TYPE LABELS, so it is an
+         advantaged reference ceiling, NOT a fair competitor to the label-free methods.
+NMF matches the LeafletFA run's rank K and mirrors figures/FIGURE2_benchmark/benchmark_sweep.py
+so Fig 2 (sim) and Fig 3 (real) report the identical NMF baseline.
+Metrics: per-junction Pearson + Spearman (cell ranking), MAE, global Pearson, calibration slope.
 
 Usage:
     python 04e_evaluate_imputation_gpu.py <run_dir> <train_h5ad> <resampled_dir> <output_csv>
@@ -37,13 +46,21 @@ import pandas as pd
 import anndata as ad
 from scipy.sparse import csr_matrix, coo_matrix, issparse
 from scipy.stats import pearsonr, rankdata
-from sklearn.decomposition import TruncatedSVD
+from sklearn.decomposition import TruncatedSVD, NMF
 from sklearn.neighbors import NearestNeighbors
 
 import torch
 
 # GPU setup (mirrors 05_impute_on_test.py). Falls back to CPU cleanly.
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# FAIL FAST on silent CPU fallback. Some GPU nodes (ne1dg7-[001-011]) present no usable CUDA
+# device, and torch then quietly returns "cpu" -- the job runs at ~1% speed and burns its whole
+# walltime before anyone notices. Exit loudly instead. Set LEAFLET_ALLOW_CPU=1 to override.
+if DEVICE.type != "cuda" and os.environ.get("LEAFLET_ALLOW_CPU") != "1":
+    sys.exit(f"FATAL: no CUDA device visible (node={os.environ.get('SLURMD_NODENAME','?')}). "
+             f"This job would silently run on CPU. Resubmit excluding the bad nodes, or set "
+             f"LEAFLET_ALLOW_CPU=1 to run on CPU deliberately.")
+print(f"[device] {DEVICE}  node={os.environ.get('SLURMD_NODENAME','?')}", flush=True)
 if DEVICE.type == "cuda":
     torch.set_default_dtype(torch.float32)
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -422,9 +439,72 @@ def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_specific_prior,
     phi = model.assign_post
     if isinstance(phi, torch.Tensor):
         phi = phi.detach().cpu().numpy()
+    # CONVERGENCE: did the E-step converge, or just run out of epochs? min_delta is ABSOLUTE
+    # (1e-3) against a large ELBO, so early stopping is near-inert and the cap itself becomes the
+    # binding constraint on every imputation number below. Record it rather than assume.
+    h = getattr(model, "health", None) or {}
+    _E_STEP_CONV.append((int(h.get("epochs_ran", -1)), bool(h.get("stopped_early", False)), num_epochs))
     if DEVICE.type == "cuda":
         torch.cuda.empty_cache()
     return np.array(phi, dtype=np.float32)
+
+
+_E_STEP_CONV = []   # (epochs_ran, stopped_early, cap) per chunk
+
+
+def report_e_step_convergence(tag=""):
+    """Print whether the phi E-step converged or was truncated by the epoch cap."""
+    if not _E_STEP_CONV:
+        return
+    ran   = [r for r, _, _ in _E_STEP_CONV]
+    early = sum(1 for _, e, _ in _E_STEP_CONV if e)
+    cap   = _E_STEP_CONV[0][2]
+    n     = len(_E_STEP_CONV)
+    at_cap = sum(1 for r in ran if r >= cap)
+    print(f"\n--- E-step convergence {tag} ---", flush=True)
+    print(f"  chunks: {n}   epoch cap: {cap}", flush=True)
+    print(f"  epochs ran: min={min(ran)} median={int(np.median(ran))} max={max(ran)}", flush=True)
+    print(f"  early-stopped: {early}/{n}    hit the cap: {at_cap}/{n}", flush=True)
+    if at_cap > n * 0.5:
+        print(f"  !! WARNING: {at_cap}/{n} chunks hit the epoch cap without converging. phi is "
+              f"TRUNCATED, not converged -- the epoch budget is a live knob on every metric "
+              f"below. Raise epochs (or set min_delta_rel) and confirm the numbers are stable.",
+              flush=True)
+
+
+# ── NMF baseline (rank-K matrix factorization, the fair head-to-head) ─────────
+
+def fit_nmf_impute(jr_hvj, pm_hvj, K, max_iter=300, random_state=0):
+    """Rank-K NMF imputation baseline — the label-free factor-model competitor to LeafletFA.
+
+    NMF learns K programs and reconstructs the full (cell x junction) PSI matrix, exactly like
+    LeafletFA's phi@psi, but WITHOUT the Beta-Binomial likelihood, the coverage model, or any
+    cell-type labels. Beating NMF at the SAME rank K is the "our structure is better than vanilla
+    matrix factorization" claim. Mirrors figures/FIGURE2_benchmark/benchmark_sweep.py:fit_nmf so
+    Fig 2 (sim) and Fig 3 (real) report the identical baseline.
+
+    NMF has no missing-data model, so uncovered entries must be filled before factorizing. Two
+    conventions, both reported (the choice is part of the point):
+      nmf0  (0-impute)    : uncovered -> 0. The naive default; asserts uncovered == PSI 0, which is
+                            FALSE (no coverage != junction skipped). Handicaps NMF.
+      nmfm  (mean-impute) : uncovered -> per-junction mean over covered cells. The fairer baseline.
+
+    Returns (imp_nmf0, imp_nmfm), each (N x n_hvj) float32 reconstructions clipped to [0, 1].
+    """
+    cov = pm_hvj.toarray().astype(bool)                       # (N x n_hvj) 1=observed
+    Rc  = np.clip(np.nan_to_num(jr_hvj.toarray().astype(np.float32)), 0.0, 1.0)
+    cnt = cov.sum(0)
+    cm  = np.where(cnt > 0, (Rc * cov).sum(0) / np.maximum(cnt, 1), 0.0).astype(np.float32)
+    out = []
+    for tag, X in (("nmf0", np.where(cov, Rc, 0.0).astype(np.float32)),
+                   ("nmfm", np.where(cov, Rc, cm[None, :]).astype(np.float32))):
+        m = NMF(n_components=K, init="nndsvda", random_state=random_state, max_iter=max_iter)
+        W = m.fit_transform(X); H = m.components_
+        recon = np.clip((W @ H).astype(np.float32), 0.0, 1.0)
+        out.append(recon)
+        del W, H, X, m
+    del cov, Rc
+    return out[0], out[1]
 
 
 # ── per-junction metric ───────────────────────────────────────────────────────
@@ -637,6 +717,7 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         all_phi.append(phi_chunk)
         print(f"    chunk {ci+1}: {start}–{end}  phi={phi_chunk.shape}", flush=True)
 
+    report_e_step_convergence("(test phi)")
     all_phi = np.vstack(all_phi)                   # (N × K)
     imp_lf  = (all_phi @ psi_hvj).astype(np.float32)  # (N × n_hvj)
     print(f"  LeafletFA imp shape: {imp_lf.shape}")
@@ -695,17 +776,50 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     imp_naive = np.broadcast_to(mean_j[np.newaxis, :], (N, n_hvj)).astype(np.float32)
     del pm_dense, jr_dense
 
+    # ── Step 3b: NMF baseline — rank-K matrix factorization (fair head-to-head) ──
+    # Same rank K as the LeafletFA run so it isolates "does our factorization beat vanilla NMF".
+    # Label-free (unlike mb_ct). Both 0-impute (nmf0) and mean-impute (nmfm) reported.
+    K_run = int(psi_hvj.shape[0])
+    print(f"\n  [NMF] Fitting rank-{K_run} NMF (0-impute + mean-impute) on {n_hvj} junctions...")
+    imp_nmf0, imp_nmfm = fit_nmf_impute(jr_hvj, pm_hvj, K_run)
+    print(f"  NMF imp shapes: nmf0={imp_nmf0.shape}  nmfm={imp_nmfm.shape}")
+
     # ── Step 4: Per-junction Pearson — global + per-dataset ──────────────────
     print(f"\n  Computing per-junction Pearson ({n_hvj} junctions)...")
 
-    def compute_metrics_for_mask(cell_mask, label_suffix=""):
-        """Compute all metrics for a boolean cell subset."""
-        cm    = cov_mask[cell_mask]      # (n_subset × n_hvj) coverage mask
+    # ENTRY SETS -- which (cell, junction) pairs the metrics are computed over.
+    #
+    # "all_covered" is every pair covered in the ORIGINAL full-depth data. But MeanBayes returns
+    # observed entries UNCHANGED (np.where(mask, psi, post_mean)), and at 10% reads removed 91.6%
+    # of these pairs are still covered after downsampling -- so on this entry set mb/mb_ct mostly
+    # echo back a lightly-thinned copy of the truth rather than imputing anything. lf (= phi@psi)
+    # by contrast replaces EVERY entry with a model prediction and can never pass through. The two
+    # are therefore not doing the same task, and cross-group comparisons on this entry set are not
+    # apples-to-apples:
+    #     pure reconstruction (no passthrough) : lf, nmf0, nmfm
+    #     uses the observed value              : lf_bb, mb, mb_ct
+    #
+    # "lost_to_downsampling" restricts to pairs that WERE covered originally but are NOT covered
+    # after downsampling. Nothing can pass through there -- every method must genuinely impute --
+    # so it is the honest head-to-head, and it is the number to lead Figure 3 with.
+    pm_bool  = pm_hvj.toarray().astype(bool)
+    lost_mask = cov_mask & ~pm_bool
+    del pm_bool
+    print(f"\n  Entry sets: all_covered={int(cov_mask.sum()):,}  "
+          f"lost_to_downsampling={int(lost_mask.sum()):,} "
+          f"({100.0*lost_mask.sum()/max(cov_mask.sum(),1):.1f}% of covered)")
+
+    def compute_metrics_for_mask(cell_mask, label_suffix="", entry_mask=None):
+        """Compute all metrics for a boolean cell subset over a given entry set."""
+        em    = cov_mask if entry_mask is None else entry_mask
+        cm    = em[cell_mask]            # (n_subset × n_hvj) entry mask
         lf    = imp_lf[cell_mask]
         lf_bb = imp_lf_bb[cell_mask]
         mb    = imp_mb[cell_mask]
         mb_ct = imp_mb_ct[cell_mask]
         naive = imp_naive[cell_mask]
+        nmf0  = imp_nmf0[cell_mask]
+        nmfm  = imp_nmfm[cell_mask]
         ori   = ori_hvj[cell_mask]
 
         r_lf_p,    r_lf_s    = per_junction_correlations(lf,    ori, cm, min_cells_per_junc)
@@ -713,6 +827,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         r_mb_p,    r_mb_s    = per_junction_correlations(mb,    ori, cm, min_cells_per_junc)
         r_mbct_p,  r_mbct_s  = per_junction_correlations(mb_ct, ori, cm, min_cells_per_junc)
         r_naive_p, r_naive_s = per_junction_correlations(naive, ori, cm, min_cells_per_junc)
+        r_nmf0_p,  r_nmf0_s  = per_junction_correlations(nmf0,  ori, cm, min_cells_per_junc)
+        r_nmfm_p,  r_nmfm_s  = per_junction_correlations(nmfm,  ori, cm, min_cells_per_junc)
 
         m = {}
         m.update(summarise_perjunc(r_lf_p,    r_lf_s,    "lf"))
@@ -720,6 +836,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         m.update(summarise_perjunc(r_mb_p,    r_mb_s,    "mb"))
         m.update(summarise_perjunc(r_mbct_p,  r_mbct_s,  "mb_ct"))
         m.update(summarise_perjunc(r_naive_p, r_naive_s, "naive"))
+        m.update(summarise_perjunc(r_nmf0_p,  r_nmf0_s,  "nmf0"))
+        m.update(summarise_perjunc(r_nmfm_p,  r_nmfm_s,  "nmfm"))
 
         flat_orig  = ori[cm]
         flat_lf    = lf[cm]
@@ -727,22 +845,29 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         flat_mb    = mb[cm]
         flat_mb_ct = mb_ct[cm]
         flat_naive = naive[cm]
+        flat_nmf0  = nmf0[cm]
+        flat_nmfm  = nmfm[cm]
         if len(flat_orig) > 0 and flat_orig.std() > 1e-8:
             m["global_pearson_lf"]    = float(np.corrcoef(flat_orig, flat_lf)[0, 1])
             m["global_pearson_lf_bb"] = float(np.corrcoef(flat_orig, flat_lf_bb)[0, 1])
             m["global_pearson_mb"]    = float(np.corrcoef(flat_orig, flat_mb)[0, 1])
             m["global_pearson_mb_ct"] = float(np.corrcoef(flat_orig, flat_mb_ct)[0, 1])
+            m["global_pearson_nmf0"]  = float(np.corrcoef(flat_orig, flat_nmf0)[0, 1])
+            m["global_pearson_nmfm"]  = float(np.corrcoef(flat_orig, flat_nmfm)[0, 1])
         else:
             m["global_pearson_lf"]    = np.nan
             m["global_pearson_lf_bb"] = np.nan
             m["global_pearson_mb"]    = np.nan
             m["global_pearson_mb_ct"] = np.nan
+            m["global_pearson_nmf0"]  = np.nan
+            m["global_pearson_nmfm"]  = np.nan
 
         # CALIBRATION (Reviewer 1): slope / RMSE / bias / binned curve, in PSI units.
         # Correlation alone hides compression toward the mean; slope > 1 (truth ~ pred) means
         # the model under-disperses its predictions.
         for _lbl, _pred in (("lf", flat_lf), ("lf_bb", flat_lf_bb), ("mb", flat_mb),
-                            ("mb_ct", flat_mb_ct), ("naive", flat_naive)):
+                            ("mb_ct", flat_mb_ct), ("naive", flat_naive),
+                            ("nmf0", flat_nmf0), ("nmfm", flat_nmfm)):
             for _k, _v in calibration(_pred, flat_orig).items():
                 m[f"calib_{_k}_{_lbl}"] = _v
 
@@ -753,8 +878,11 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
             m["mae_lf_bb"] = float(np.abs(flat_orig - flat_lf_bb).mean())
             m["mae_mb"]    = float(np.abs(flat_orig - flat_mb).mean())
             m["mae_mb_ct"] = float(np.abs(flat_orig - flat_mb_ct).mean())
+            m["mae_nmf0"]  = float(np.abs(flat_orig - flat_nmf0).mean())
+            m["mae_nmfm"]  = float(np.abs(flat_orig - flat_nmfm).mean())
         else:
             m["mae_naive"] = m["mae_lf"] = m["mae_lf_bb"] = m["mae_mb"] = m["mae_mb_ct"] = np.nan
+            m["mae_nmf0"]  = m["mae_nmfm"] = np.nan
 
         m["n_cells"] = int(cell_mask.sum())
         return m
@@ -766,19 +894,38 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     m_all = compute_metrics_for_mask(all_mask)
     print(f"  [all pearson]   lf={m_all['median_pearson_lf']:.4f}  lf_bb={m_all['median_pearson_lf_bb']:.4f}  "
           f"mb={m_all['median_pearson_mb']:.4f}  mb_ct={m_all['median_pearson_mb_ct']:.4f}  "
+          f"nmf0={m_all['median_pearson_nmf0']:.4f}  nmfm={m_all['median_pearson_nmfm']:.4f}  "
           f"naive={m_all['median_pearson_naive']:.4f}  n_junc={m_all['n_junc_eval']}")
     print(f"  [all spearman]  lf={m_all['median_spearman_lf']:.4f}  lf_bb={m_all['median_spearman_lf_bb']:.4f}  "
           f"mb={m_all['median_spearman_mb']:.4f}  mb_ct={m_all['median_spearman_mb_ct']:.4f}  "
+          f"nmf0={m_all['median_spearman_nmf0']:.4f}  nmfm={m_all['median_spearman_nmfm']:.4f}  "
           f"naive={m_all['median_spearman_naive']:.4f}")
     print(f"  [CALIBRATION]   lf slope={m_all.get('calib_slope_lf', float('nan')):.3f} "
           f"(1.0=calibrated, >1=compressed)  rmse={m_all.get('calib_rmse_lf', float('nan')):.4f}  "
           f"bias={m_all.get('calib_bias_lf', float('nan')):+.4f}")
     print(f"  [MAE]           naive={m_all['mae_naive']:.4f}  lf={m_all['mae_lf']:.4f}  "
-          f"lf_bb={m_all['mae_lf_bb']:.4f}  mb={m_all['mae_mb']:.4f}  mb_ct={m_all['mae_mb_ct']:.4f}")
-    rows.append({"dataset": "all",
+          f"lf_bb={m_all['mae_lf_bb']:.4f}  mb={m_all['mae_mb']:.4f}  mb_ct={m_all['mae_mb_ct']:.4f}  "
+          f"nmf0={m_all['mae_nmf0']:.4f}  nmfm={m_all['mae_nmfm']:.4f}")
+    rows.append({"dataset": "all", "entry_set": "all_covered",
                  "psi_hvj_mean_std":   psi_hvj_mean_std,
                  "psi_hvj_median_std": psi_hvj_median_std,
                  **m_all})
+
+    # THE HONEST HEAD-TO-HEAD: only entries lost to downsampling, where no method can pass through
+    if lost_mask.sum() > 0:
+        m_lost = compute_metrics_for_mask(all_mask, entry_mask=lost_mask)
+        print(f"\n  === LOST-ENTRY imputation (no passthrough possible) ===")
+        print(f"  [pearson]  lf={m_lost['median_pearson_lf']:.4f}  lf_bb={m_lost['median_pearson_lf_bb']:.4f}  "
+              f"nmfm={m_lost['median_pearson_nmfm']:.4f}  nmf0={m_lost['median_pearson_nmf0']:.4f}  "
+              f"mb={m_lost['median_pearson_mb']:.4f}  mb_ct={m_lost['median_pearson_mb_ct']:.4f}  "
+              f"naive={m_lost['median_pearson_naive']:.4f}")
+        print(f"  [MAE]      lf={m_lost['mae_lf']:.4f}  lf_bb={m_lost['mae_lf_bb']:.4f}  "
+              f"nmfm={m_lost['mae_nmfm']:.4f}  mb_ct={m_lost['mae_mb_ct']:.4f}  "
+              f"naive={m_lost['mae_naive']:.4f}")
+        rows.append({"dataset": "all", "entry_set": "lost_to_downsampling",
+                     "psi_hvj_mean_std":   psi_hvj_mean_std,
+                     "psi_hvj_median_std": psi_hvj_median_std,
+                     **m_lost})
 
     # Per dataset
     for ds in np.unique(dataset_labels):
@@ -787,7 +934,7 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         print(f"  [{ds}]  lf={m_ds['median_pearson_lf']:.4f}  lf_bb={m_ds['median_pearson_lf_bb']:.4f}  "
               f"mb={m_ds['median_pearson_mb']:.4f}  naive={m_ds['median_pearson_naive']:.4f}  "
               f"n_cells={m_ds['n_cells']}  n_junc={m_ds['n_junc_eval']}")
-        rows.append({"dataset": ds,
+        rows.append({"dataset": ds, "entry_set": "all_covered",
                      "psi_hvj_mean_std":   psi_hvj_mean_std,
                      "psi_hvj_median_std": psi_hvj_median_std,
                      **m_ds})
@@ -943,7 +1090,8 @@ def main():
     df = pd.DataFrame(results)
     df.to_csv(output_csv, index=False)
     print(f"\nResults → {output_csv}")
-    cols = ["downsampling_pct", "dataset", "median_pearson_lf", "median_pearson_mb",
+    cols = ["downsampling_pct", "dataset", "median_pearson_lf", "median_pearson_nmfm",
+            "median_pearson_nmf0", "median_pearson_mb", "median_pearson_mb_ct",
             "median_pearson_naive", "n_junc_eval", "n_cells"]
     print(df[cols].to_string(index=False))
 

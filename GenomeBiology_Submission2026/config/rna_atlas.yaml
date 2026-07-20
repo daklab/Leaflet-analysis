@@ -1,0 +1,75 @@
+species: human
+dataset_label: rna_atlas
+
+# ── Working directories ────────────────────────────────────────────────────────
+# ATSE_mapper/junction_processing_* and ATSE_files/ are written under this wd.
+wd: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734
+code_dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
+
+# ── Genome / annotation (Gencode v45, GRCh38) ─────────────────────────────────
+# SAME reference files as config/human_allen_brain.yaml. The RNA atlas was
+# STAR-aligned to the human_allen_brain index (BRAIN_NeMO/human-reference/star,
+# GRCh38 primary assembly, Gencode v45), so atlas junction coordinates are
+# already in this exact coordinate system — no liftover needed.
+gtf_file:   /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf
+db_file:    /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencodev45.db
+fasta_file: /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa
+
+# ── Raw junction file source (RNA atlas GSE138734, one BED per SRR/pseudocell) ─
+# PRIMARY CELL TYPES ONLY. The junctions/ dir holds 2,901 files (2,228 sample_type
+# == "cell type" + 673 "tissue" bulk mixed tissues). We restrict to the 2,228
+# primary cell-type samples via an explicit filelist, excluding bulk mixed tissues
+# (and cancer/normal cell lines, which were already excluded at download).
+# Filelist built from fastqs/manifest.csv where sample_type == "cell type".
+# Regenerate with: filter manifest.csv to sample_type=='cell type' → junction paths.
+sources:
+  rna_atlas:
+    junction_filelist: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/junctions_celltype_only.txt
+    # NOTE: no SRR cell_id_cleaner is registered yet. Not needed for ATSE calling
+    # (Steps 01–02); a cleaner must be added under
+    # pipelines/04_align/cell_id_cleaners/ before the align/anndata stage.
+    cell_id_cleaner:  rna_atlas
+
+# ── ATSEmapper parameters ─────────────────────────────────────────────────────
+# Matched to human_allen_brain.yaml for consistency across the two human resources.
+atsemapper:
+  min_intron: 50
+  max_intron: 500000
+  min_junc_reads: 100
+  min_num_cells: 10
+  batch_size: 32
+  num_workers: 10
+  annotation_status: unanno_also
+
+# ── Junction processing ────────────────────────────────────────────────────────
+junction_processing:
+  n_chunks: 100
+  slurm_mem_process: 32G
+  slurm_mem_merge: 64G
+  slurm_partition: cpu,dev,bigmem
+
+# ── AnnData creation ──────────────────────────────────────────────────────────
+anndata:
+  sequencing_type: smart_seq
+  max_workers: 4
+  batch_size: 10
+
+# ── LeafletFA model (batched-vs-unbatched equivalence test) ────────────────────
+# Single value on every grid axis so the ONLY things that vary are the hardcoded
+# junc_specific_prior [True,False] and batch_size [full, mini]. That yields 4 param
+# sets; param_ids 0 (batch=2228 full) and 1 (batch=512 mini), both junc_specific_prior
+# =True, are the equivalence pair. waypoints_use=True makes init deterministic (computed
+# once on the FULL dataset) so any full-vs-mini difference is from batching, not init.
+leafletfa:
+  model_output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/LEAFLETFA_MODELS
+  n_factors: 30                          # single K for the test (adjustable)
+  param_grid_learning_rates: [0.05]   # swept vs ground truth: psi_r 0.99 / 100% agreement.
+                                     # 0.01 -> 0.85 / 53%.  0.001 -> 0.05 / CHANCE.
+                                     # See LeafletFA/METHODS.md 11.4b.
+  param_grid_batch_sizes: [2228, 512]    # 2228 = full (>= N cells → 1 batch/pass) vs 512 minibatch
+  param_grid_num_passes: 10
+  param_grid_max_junctions: [10]         # matches SC training convention (drop ATSEs >10 junc)
+  param_grid_input_conc: [null]          # null = Beta-Binomial (learns concentration)
+  param_grid_waypoints_use: [true]       # deterministic init → clean full-vs-mini comparison
+  num_inits: 1
+  audit_sample_n: 200

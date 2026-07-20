@@ -1,0 +1,23 @@
+{
+  "VIP":            "INHIBITORY NEURON",
+  "SST":            "INHIBITORY NEURON",
+  "PVALB":          "INHIBITORY NEURON",
+  "LAMP5":          "INHIBITORY NEURON",
+  "PAX6":           "INHIBITORY NEURON",
+
+  "IT":             "EXCITATORY NEURON",
+  "L4 IT":          "EXCITATORY NEURON",
+  "L5 ET":          "EXCITATORY NEURON",
+  "L5/6 IT Car3":   "EXCITATORY NEURON",
+  "L5/6 NP":        "EXCITATORY NEURON",
+  "L6 CT":          "EXCITATORY NEURON",
+  "L6b":            "EXCITATORY NEURON",
+
+  "Astrocyte":      "ASTROCYTE",
+  "Oligodendrocyte":"OLIGODENDROCYTE",
+  "OPC":            "OPC",
+  "Microglia":      "MICROGLIA",
+  "Endothelial":    "ENDOTHELIAL",
+  "Pericyte":       "PERICYTE",
+  "VLMC":           "VLMC"
+}

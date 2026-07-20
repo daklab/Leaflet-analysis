@@ -1,0 +1,22 @@
+# GSE138734 — human multi-tissue total-RNA atlas (FIGURE5 conservation)
+# Ribo-Zero Gold libraries, paired-end, RF-stranded (fr-firststrand).
+# STAR uses --outSAMstrandField intronMotif; regtools uses -s XS to follow that tag.
+
+# Manifest written by 00_download_gse138734.py after filtering for total-RNA samples
+manifest: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/fastqs/manifest.csv
+
+# Raw FASTQs: {raw_dir}/{SRR}/{SRR}_R1.fastq.gz  {SRR}_R2.fastq.gz
+raw_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/fastqs
+
+# STAR-aligned BAMs
+bam_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/bams
+
+# regtools junction output (*_junctions_with_barcodes.bed fed to ATSEmapper)
+results_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/RNA_ATLAS/GSE138734/junctions
+
+# Reuse existing GRCh38 v45 index (same as human_allen_brain pipeline)
+star_index_dir: /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/star
+genome_fasta: /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/GRCh38.primary_assembly.genome.fa
+gtf_file: /gpfs/commons/datasets/controlled/BRAIN_NeMO/human-reference/gencode/gencode.v45.primary_assembly.annotation.gtf
+
+regtools_path: /gpfs/commons/home/kisaev/regtools/build/regtools

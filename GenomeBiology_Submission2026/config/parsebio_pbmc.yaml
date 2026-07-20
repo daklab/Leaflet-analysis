@@ -1,0 +1,65 @@
+species: human
+dataset_label: parsebio_pbmc
+
+# ── Working directories ────────────────────────────────────────────────────────
+wd: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC
+code_dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
+
+# ── Genome / annotation ────────────────────────────────────────────────────────
+# Reuse human GTF/FASTA — Parse Bio data is human PBMC
+gtf_file: /gpfs/commons/groups/knowles_lab/Megan/encode_pacbio/2025_human_longread/all_samples_sp_collapse_GRCh38/all_samples_sp_collapse_all_chr_full.gtf
+db_file:  /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC/ATSE_mapper/genomes/lr_GRCh38.db
+fasta_file: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSapiens/genome_files/GRCh38/fasta/genome.fa
+
+# ── Raw junction file sources ──────────────────────────────────────────────────
+# TODO: fill in once Parse Bio PBMC data is downloaded + aligned
+sources:
+  parsebio_pbmc:
+    junction_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC/junctions
+    junction_pattern: "*.SJ.out.tab"  # STAR split-reads output — different format from Smart-seq2
+    metadata_csv: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC/metadata/parsebio_pbmc_metadata.csv
+    cell_id_cleaner: parsebio  # TODO: implement parsebio cell_id_cleaner
+
+# ── ATSEmapper parameters ──────────────────────────────────────────────────────
+# NOTE: Parse Bio is sparser; use lower thresholds
+atsemapper:
+  min_intron: 50
+  max_intron: 500000
+  min_junc_reads: 10   # lower than SS2 — sparse protocol
+  min_num_cells: 5
+  batch_size: 32
+  num_workers: 10
+  annotation_status: anno_only  # start conservative with sparse data
+
+# ── Junction processing ────────────────────────────────────────────────────────
+junction_processing:
+  n_chunks: 50   # fewer cells than SS2 atlas
+  slurm_mem_process: 32G
+  slurm_mem_merge: 64G
+  slurm_partition: cpu,dev,bigmem
+
+# ── AnnData creation ──────────────────────────────────────────────────────────
+anndata:
+  sequencing_type: parse_bio   # different read structure
+  max_workers: 4
+  batch_size: 10
+  audit_sample_n: 200
+
+# ── Gene expression ───────────────────────────────────────────────────────────
+gene_expression:
+  output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC/processed_data
+  species: human
+
+# ── Cell type mapping ─────────────────────────────────────────────────────────
+cell_type_map: cell_type_maps/human_celltype_map.json  # reuse human map for PBMC types
+
+# ── LeafletFA — transfer from mouse SS2 prior ─────────────────────────────────
+leafletfa:
+  n_factors: 20
+  learning_rate: 0.001
+  batch_size: 128
+  max_epochs: 200  # fine-tuning, not training from scratch
+  min_atse_coverage: 0.01  # lower bar for sparse data
+  # Path to pre-trained mouse SS2 model to use as prior
+  transfer_model: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/LEAFLETFA_MODELS/best_model
+  model_output_dir: /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/PARSEBIO_PBMC/LEAFLETFA_MODELS

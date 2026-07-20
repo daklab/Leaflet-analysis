@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Figure-2 sweep, headless. Streams progress; appends each fit to sweep_results.csv."""
+"""Figure-2 sweep, headless."""
 import matplotlib; matplotlib.use('Agg')
 display = lambda *a, **k: None
 
-# ====== notebook cell 1 ======
+# ====== cell 1 ======
 import json
 
 import anndata as ad
@@ -31,12 +31,13 @@ print("params:", {k: params[k] for k in ["tissue", "K", "emission", "frac_differ
 print("\ncells per program:", np.bincount(a.obs['true_program']))
 print("junction roles:", a.var['junction_role'].value_counts().to_dict())
 
-# ====== notebook cell 16 ======
+# ====== cell 16 ======
 # ── METRICS: defined once, used by every fit ─────────────────────────────────
 import io, contextlib, itertools, os, time
 import numpy as np, pandas as pd, torch
 from scipy.optimize import linear_sum_assignment
-from sklearn.metrics import roc_auc_score, adjusted_rand_score, silhouette_score
+from sklearn.metrics import roc_auc_score, adjusted_rand_score, silhouette_score, average_precision_score
+from scipy.stats import spearmanr
 
 # `sim` is the SIGNAL simulation -- cell 1 loaded it as `a`. Everything below fits and scores on it.
 sim = a
@@ -54,8 +55,10 @@ def truth_of(sim):
     ordr = cev[skp]
     tp   = np.asarray(sim.uns["true_psi_skip"])[:, np.sort(np.unique(ordr))]   # (K_true, n_ATSE)
     isd  = np.array([sim.var["is_differential"].values[cev == i][0] for i in range(len(ev))])
+    # true per-event effect size (max-min skip usage across programs), aligned to events
+    true_delta = np.asarray(sim.uns["atse_delta_psi"]) if "atse_delta_psi" in sim.uns else None
     return dict(psi=tp, phi=np.asarray(sim.obsm["true_phi"]), skip_idx=skp, order=ordr,
-                is_diff=isd, K_true=tp.shape[0])
+                is_diff=isd, K_true=tp.shape[0], true_delta=true_delta)
 
 def score_fit(T, psi_hat, phi_hat):
     """Score one fit against ground truth T. Works when K_fit != K_true."""
@@ -87,11 +90,22 @@ def score_fit(T, psi_hat, phi_hat):
         sil = np.nan
 
     # DS: can the model tell differential from null cassettes?
-    d     = ph.max(0) - ph.min(0)                       # cross-program spread per cassette = effect size
+    d     = ph.max(0) - ph.min(0)                       # ESTIMATED effect size per cassette (delta psi)
     ok    = np.isfinite(d)
     auroc = float(roc_auc_score(T["is_diff"][ok], d[ok]))
-    return dict(psi_r=psi_r, agree=agree, ari=ari, sil=sil, auroc=auroc,
-                chance_agree=1.0 / Kt, effect=d, effect_ok=ok)
+    # AVERAGE PRECISION (area under precision-recall) -- the figure scores DS as a PR problem, not ROC,
+    # because positives are the minority (10-90% DS) and PR is the honest metric under imbalance.
+    ap    = float(average_precision_score(T["is_diff"][ok], d[ok]))
+    # SPEARMAN of estimated vs SIMULATED effect size, over the DIFFERENTIAL events -- does the model
+    # recover the SIZE of the change, not just its presence? (panel D)
+    spearman_delta = np.nan
+    if T.get("true_delta") is not None:
+        td = T["true_delta"]
+        m2 = ok & np.isfinite(td) & T["is_diff"]        # rank-correlate where there IS a true effect
+        if m2.sum() > 2:
+            spearman_delta = float(spearmanr(td[m2], d[m2]).correlation)
+    return dict(psi_r=psi_r, agree=agree, ari=ari, sil=sil, auroc=auroc, ap=ap,
+                spearman_delta=spearman_delta, chance_agree=1.0 / Kt, effect=d, effect_ok=ok)
 
 def crude_threshold_calibration(T, effect, ok, alpha=0.05, delta=0.05):
     """A CRUDE point-estimate threshold: call every cassette whose effect exceeds `delta`.
@@ -112,7 +126,7 @@ def crude_threshold_calibration(T, effect, ok, alpha=0.05, delta=0.05):
 
 print("metrics defined: score_fit() -> psi_r, agree, ari, auroc ; crude_threshold_calibration() [NOT the FDR procedure -- see 6.3]")
 
-# ====== notebook cell 18 ======
+# ====== cell 18 ======
 # ── the ONE fit everything else is compared against ──────────────────────────
 from leafletfa import LeafletFA
 from leafletfa.chunked import fit_chunked                     # the SINGLE chunked implementation
@@ -198,7 +212,7 @@ print(f"  [crude threshold, NOT the FDR procedure -- see 6.3] called={cal['n_cal
 print(f"  psi_contrast                 {m_ref.health['psi_contrast']:.4f}  (~0.003 = collapse)")
 print(f"  bb_conc                      {m_ref.bb_conc}")
 
-# ====== notebook cell 22 ======
+# ====== cell 22 ======
 # ── THE SWEEP ────────────────────────────────────────────────────────────────
 # Cached to CSV: delete SWEEP_CSV to force a re-run. ~39 fits, ~2 h on an L40S.
 SWEEP_CSV = "sweep_results.csv"
@@ -292,7 +306,7 @@ if todo:
             cal = crude_threshold_calibration(T, s["effect"], s["effect_ok"])
             cc  = m.bb_conc
             rows.append(dict(axis=axis, **cfg,
-                psi_r=s["psi_r"], agree=s["agree"], ari=s["ari"], sil=s["sil"], auroc=s["auroc"],
+                psi_r=s["psi_r"], agree=s["agree"], ari=s["ari"], sil=s["sil"], auroc=s["auroc"], ap=s["ap"], spearman_delta=s["spearman_delta"],
                 chance_agree=s["chance_agree"], crude_fdp=cal["fdp"], crude_power=cal["power"],
                 n_called=cal["n_called"], psi_contrast=m.health["psi_contrast"],
                 bb_conc=(np.nan if isinstance(cc, str) else float(np.asarray(cc))),
