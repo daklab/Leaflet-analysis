@@ -30,6 +30,12 @@ model = {
     "a": np.asarray(d["a"], np.float32), "b": np.asarray(d["b"], np.float32),
     "K": int(r["K"]),
 }
+if "psis_loc" in d.files and "psis_scale" in d.files:
+    model["psis_loc"] = np.asarray(d["psis_loc"], np.float32)
+    model["psis_scale"] = np.asarray(d["psis_scale"], np.float32)
+    print("  (psis_loc/scale present -> 04e will SAMPLE psi)", flush=True)
+else:
+    print("  (no psis_loc/scale -> 04e uses psi point estimate)", flush=True)
 with gzip.open(os.path.join(out_dir, "leafletfa_model.pkl.gz"), "wb") as f:
     pickle.dump(model, f)
 

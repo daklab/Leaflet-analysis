@@ -145,8 +145,10 @@ def main():
         "bb_conc": float(np.mean(g.get("bb_conc", np.nan))),
         "dir_conc": float(np.mean(g.get("dir_conc", np.nan))),
     }
+    _ploc, _psc = m.psi_loc_scale()   # q(psi) logit-space loc/scale -> lets 04e SAMPLE psi
+    _extra = {} if _ploc is None else {"psis_loc": _ploc, "psis_scale": _psc}
     np.savez_compressed(os.path.join(out_dir, "fit.npz"), psi=psi, phi=phi,
-                        losses=np.asarray(losses), **{k: v for k, v in g.items()})
+                        losses=np.asarray(losses), **{k: v for k, v in g.items()}, **_extra)
     json.dump(res, open(os.path.join(out_dir, "result.json"), "w"), indent=2)
 
     # THE loss curve -- now a single continuous ELBO, not 96 stitched per-chunk segments.
