@@ -136,7 +136,7 @@ def as_conc_prior(bb_conc):
 
 
 def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
-                    epochs, patience, phi_init):
+                    epochs, patience, phi_init, lr=0.01, gamma=0.05):
     delta = torch.tensor(float(dir_conc)) if dir_conc is not None else None
     model = LeafletFA(
         adata=chunk_adata, K=K, fixed_psi=psi_tensor, waypoints_use=False,
@@ -156,7 +156,7 @@ def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_
         # min_delta_rel is scale-free and is what the training array already uses.
         num_epochs=epochs, print_epochs=epochs + 1, patience=patience,
         min_delta=0.001, min_delta_rel=1e-5,
-        ELBO_num_particles=10, num_samples=100, lr=0.01, gamma=0.05,
+        ELBO_num_particles=10, num_samples=100, lr=lr, gamma=gamma,
         log_wandb=False, loss_plot=False, output_dir=None,
         enable_cpu_optimization=(DEVICE.type == "cpu"))
     model.from_anndata()
