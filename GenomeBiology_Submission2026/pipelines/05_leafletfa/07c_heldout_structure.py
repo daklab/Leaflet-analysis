@@ -136,7 +136,7 @@ def as_conc_prior(bb_conc):
 
 
 def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
-                    epochs, patience, phi_init, lr=0.01, gamma=0.05):
+                    epochs, patience, phi_init, lr=0.1, gamma=0.1):   # was 0.01/0.05 -- see estep_lr_sweep
     delta = torch.tensor(float(dir_conc)) if dir_conc is not None else None
     model = LeafletFA(
         adata=chunk_adata, K=K, fixed_psi=psi_tensor, waypoints_use=False,

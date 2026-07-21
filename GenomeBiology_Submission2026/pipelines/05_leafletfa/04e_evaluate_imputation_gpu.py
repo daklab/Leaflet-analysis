@@ -423,8 +423,12 @@ def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_specific_prior,
         min_delta_rel       = 1e-5,
         ELBO_num_particles  = num_particles,
         num_samples         = num_samples,
-        lr                  = 0.01,
-        gamma               = 0.05,
+        # E-step lr 0.01->0.1, gamma 0.05->0.1: the LR sweep (estep_lr_sweep) showed lr=0.01 needs
+        # ~1500 epochs to converge phi while lr=0.1 converges by ~300 (corr 0.999 vs the settled phi,
+        # perplexity 3.25 == training 3.4), with no instability. The near-convex per-cell problem was
+        # just crawling under too-low a learning rate. Phi now actually converges within budget.
+        lr                  = 0.1,
+        gamma               = 0.1,
         log_wandb           = False,
         loss_plot           = False,
         output_dir          = None,
