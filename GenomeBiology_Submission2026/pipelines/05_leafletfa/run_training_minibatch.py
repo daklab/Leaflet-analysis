@@ -54,6 +54,25 @@ def load_counts(train_h5ad, n_cells=0, n_junc=0):
     return junc, clus
 
 
+def load_cell_labels(train_h5ad, n_cells=0):
+    """broad_cell_type per cell, for colouring the phi UMAP. Returns None if unavailable."""
+    try:
+        with h5py.File(train_h5ad, "r") as h:
+            col = next((c for c in ("broad_cell_type", "cell_type", "cell_ontology_class")
+                        if c in h["obs"]), None)
+            if col is None:
+                return None
+            g = h[f"obs/{col}"]
+            if isinstance(g, h5py.Group):        # categorical: codes + categories
+                cats = [c.decode() if isinstance(c, bytes) else c for c in g["categories"][:]]
+                codes = g["codes"][:] if not n_cells else g["codes"][:n_cells]
+                return np.array([cats[c] if c >= 0 else "NA" for c in codes])
+            arr = g[:] if not n_cells else g[:n_cells]
+            return np.array([x.decode() if isinstance(x, bytes) else x for x in arr])
+    except Exception:
+        return None
+
+
 def main():
     task_id = int(sys.argv[1])
     model_dir = sys.argv[2]
@@ -141,6 +160,38 @@ def main():
     ax[1].set_ylim(0, 1); ax[1].legend(); ax[1].set_title("psi location vs data")
     fig.tight_layout(); fig.savefig(os.path.join(out_dir, "loss_curve.png"), dpi=110)
 
+    # PHI UMAP coloured by cell type -- brought back from the chunked runner. Purely diagnostic:
+    # does the splicing latent space carry cell-type structure? Wrapped so a UMAP failure can NEVER
+    # kill a training run (the model is already saved above).
+    umap_png = None
+    try:
+        import scanpy as sc, anndata as ad
+        labels = load_cell_labels(train_h5ad, n_cells)
+        a = ad.AnnData(phi.astype(np.float32))
+        a.obsm["X_phi"] = a.X.copy()
+        sc.pp.neighbors(a, use_rep="X_phi", n_neighbors=30, random_state=42)
+        sc.tl.umap(a, random_state=42)
+        um = a.obsm["X_umap"]
+        figu, axu = plt.subplots(figsize=(7, 7))
+        if labels is not None and len(labels) == phi.shape[0]:
+            uniq = sorted(set(labels))
+            cmap = plt.colormaps.get_cmap("tab20" if len(uniq) > 10 else "tab10")
+            for i, ct in enumerate(uniq):
+                mk = labels == ct
+                axu.scatter(um[mk, 0], um[mk, 1], s=3, alpha=0.4,
+                            color=cmap(i / max(len(uniq) - 1, 1)), label=str(ct))
+            axu.legend(markerscale=3, fontsize=5, ncol=2, loc="best")
+        else:
+            axu.scatter(um[:, 0], um[:, 1], s=3, alpha=0.4)
+        axu.set_xlabel("UMAP 1"); axu.set_ylabel("UMAP 2")
+        axu.set_title(f"phi UMAP | task {task_id}, K={K}, {phi.shape[0]:,} cells")
+        figu.tight_layout()
+        umap_png = os.path.join(out_dir, "phi_umap.png")
+        figu.savefig(umap_png, dpi=110)
+        print(f"  phi UMAP -> {umap_png}", flush=True)
+    except Exception as e:
+        print(f"  phi UMAP skipped: {e}", flush=True)
+
     print("\n================ RESULT ================", flush=True)
     for k in ("observed_rate", "psi_mean", "psi_location_err", "pred_mean", "psi_contrast",
               "phi_perplexity", "n_finite_steps", "total_steps", "seconds"):
@@ -157,6 +208,8 @@ def main():
                 wandb.log({"neg_elbo": float(l)}, step=i)
         wandb.log({k: v for k, v in res.items() if isinstance(v, (int, float))})
         wandb.log({"loss_curve": wandb.Image(os.path.join(out_dir, "loss_curve.png"))})
+        if umap_png:
+            wandb.log({"phi_umap": wandb.Image(umap_png)})
         wandb.finish()
     print(f"\nwrote {out_dir}/", flush=True)
 
