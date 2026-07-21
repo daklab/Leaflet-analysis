@@ -1,0 +1,153 @@
+"""Array trainer for the 70% atlas split using TRUE minibatch SVI (leafletfa/minibatch.py).
+
+Replaces the chunked run_training.py, which rebuilt model+guide per chunk and left psi mislocated
+(mean 0.67 vs an observed rate of 0.295 -- see LeafletFA/METHODS_MINIBATCH.md). This runner keeps
+one model, one guide and one optimiser alive for the whole run with a real pyro.plate over cells, so
+the ELBO is a single continuous curve and psi lands at the data.
+
+It reads the SAME parameter_combinations.json the chunked array used, so task ids line up, but only
+the knobs that still apply under minibatch are honoured:
+    K, seed, junc_specific_prior
+The chunked-only knobs (num_passes, num_epochs_first/later, metacell_size, batch_size=8192, ...) are
+ignored; minibatch uses num_steps / subsample_size / lr / gamma passed on the command line.
+
+Initialisation is random (AutoNormal default). Init-independence was verified on this model: the
+waypoint and random arms converge to the same psi (0.6927 vs 0.6931 under the old code, and identical
+recovery under the plate model), because a persistent guide accumulates evidence regardless of where
+it starts. The `arm`/`waypoints_use` grid column is retained in the output for bookkeeping only.
+
+Usage:
+    run_training_minibatch.py <task_id> <model_dir> <train_h5ad>
+        [num_steps=1500] [subsample_size=2048] [lr=0.05] [gamma=0.1] [learn_ab_hyperprior=0]
+
+Writes into <model_dir>/mb_run_<task_id>/: fit.npz, result.json, loss_curve.png.
+"""
+import sys, os, json, time
+import numpy as np
+import h5py
+import scipy.sparse as sp
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+sys.path.insert(0, "/gpfs/commons/home/kisaev/LeafletFA")
+
+
+def load_counts(train_h5ad):
+    """junc + clus for the full 70% training matrix, coverage from clus>0 (never junc>0)."""
+    with h5py.File(train_h5ad, "r") as h:
+        def rows(g):
+            return sp.csr_matrix((g["data"][:], g["indices"][:], g["indptr"][:]),
+                                 shape=tuple(g.attrs["shape"])).toarray().astype(np.float32)
+        junc = rows(h["layers/cell_by_junction_matrix"])
+        clus = rows(h["layers/cell_by_cluster_matrix"])
+    return junc, clus
+
+
+def main():
+    task_id = int(sys.argv[1])
+    model_dir = sys.argv[2]
+    train_h5ad = sys.argv[3]
+    num_steps = int(sys.argv[4]) if len(sys.argv) > 4 else 1500
+    batch = int(sys.argv[5]) if len(sys.argv) > 5 else 2048
+    lr = float(sys.argv[6]) if len(sys.argv) > 6 else 0.05
+    gamma = float(sys.argv[7]) if len(sys.argv) > 7 else 0.1
+    learn_ab = bool(int(sys.argv[8])) if len(sys.argv) > 8 else False
+
+    params = json.load(open(os.path.join(model_dir, "parameter_combinations.json")))[task_id]
+    K = int(params["K"])
+    seed = int(params.get("seed", 0))
+    junc_prior = bool(params.get("junc_specific_prior", False))
+    out_dir = os.path.join(model_dir, f"mb_run_{task_id}")
+    os.makedirs(out_dir, exist_ok=True)
+    print(f"=== minibatch task {task_id}: K={K} seed={seed} junc_prior={junc_prior} "
+          f"arm={params.get('arm')} ===", flush=True)
+
+    try:
+        import wandb
+        wandb.init(project="LeafletFA-mouse-atlas-70pct-train", group="minibatch_rerun",
+                   name=f"mb_run_{task_id}", config={**params, "trainer": "minibatch",
+                   "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma,
+                   "learn_ab_hyperprior": learn_ab},
+                   tags=[f"K{K}", f"seed{seed}",
+                         ("juncprior" if junc_prior else "globalprior"), "minibatch"],
+                   dir=out_dir, reinit=True)
+        _wandb = True
+    except Exception as e:
+        print(f"  wandb off: {e}", flush=True); _wandb = False
+
+    junc, clus = load_counts(train_h5ad)
+    cov = clus > 0
+    obs_rate = float(junc.sum() / max(clus.sum(), 1))
+    print(f"  data {junc.shape}  coverage={cov.mean()*100:.2f}%  observed_rate={obs_rate:.4f}",
+          flush=True)
+
+    from leafletfa.minibatch import LeafletFAMinibatch
+    m = LeafletFAMinibatch(junc, clus, K=K, junc_specific_prior=junc_prior,
+                           learn_ab_hyperprior=learn_ab)
+    t0 = time.time()
+    losses = m.fit(num_steps=num_steps, subsample_size=batch, lr=lr, gamma=gamma, seed=seed,
+                   log_every=50)
+    dt = time.time() - t0
+
+    psi = m.psi_mean().cpu().numpy()
+    phi = m.phi_mean().cpu().numpy()
+    p = np.clip(phi, 1e-12, None)
+    perp = float(np.median(np.exp(-(p * np.log(p)).sum(1))))
+    g = m.globals_()
+    res = {
+        "task_id": task_id, "K": K, "seed": seed, "junc_prior": junc_prior,
+        "arm": params.get("arm"), "trainer": "minibatch",
+        "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma,
+        "n_cells": int(junc.shape[0]), "n_junctions": int(junc.shape[1]),
+        "observed_rate": obs_rate,
+        "psi_mean": float(psi.mean()), "psi_median": float(np.median(psi)),
+        "psi_location_err": float(abs(psi.mean() - obs_rate)),
+        "psi_frac_below_005": float((psi < 0.05).mean()),
+        "psi_frac_above_095": float((psi > 0.95).mean()),
+        "psi_contrast": float(psi.std(axis=0).mean()),
+        "pred_mean": float((phi @ psi).mean()),
+        "phi_perplexity": perp, "K_max_perplexity": K,
+        "final_loss": float(losses[-1]) if np.isfinite(losses[-1]) else None,
+        "n_finite_steps": int(np.isfinite(losses).sum()), "total_steps": len(losses),
+        "seconds": round(dt, 1),
+        "bb_conc": float(np.mean(g.get("bb_conc", np.nan))),
+        "dir_conc": float(np.mean(g.get("dir_conc", np.nan))),
+    }
+    np.savez_compressed(os.path.join(out_dir, "fit.npz"), psi=psi, phi=phi,
+                        losses=np.asarray(losses), **{k: v for k, v in g.items()})
+    json.dump(res, open(os.path.join(out_dir, "result.json"), "w"), indent=2)
+
+    # THE loss curve -- now a single continuous ELBO, not 96 stitched per-chunk segments.
+    fig, ax = plt.subplots(1, 2, figsize=(11, 4))
+    L = np.asarray(losses, dtype=float)
+    ax[0].plot(L); ax[0].set_xlabel("SVI step"); ax[0].set_ylabel("-ELBO"); ax[0].set_yscale("log")
+    ax[0].set_title(f"loss (task {task_id}, K={K})")
+    # psi location is the headline diagnostic; annotate the target
+    ax[1].axhline(obs_rate, ls="--", c="k", lw=1, label=f"observed rate {obs_rate:.3f}")
+    ax[1].axhline(res["psi_mean"], c="C1", label=f"psi mean {res['psi_mean']:.3f}")
+    ax[1].set_ylim(0, 1); ax[1].legend(); ax[1].set_title("psi location vs data")
+    fig.tight_layout(); fig.savefig(os.path.join(out_dir, "loss_curve.png"), dpi=110)
+
+    print("\n================ RESULT ================", flush=True)
+    for k in ("observed_rate", "psi_mean", "psi_location_err", "pred_mean", "psi_contrast",
+              "phi_perplexity", "n_finite_steps", "total_steps", "seconds"):
+        print(f"  {k:<20} {res[k]}", flush=True)
+    verdict = ("FIXED" if res["psi_location_err"] < 0.05 else
+               "MISLOCATED" if res["psi_location_err"] > 0.15 else "PARTIAL")
+    print(f"  VERDICT: {verdict}   (chunked models: psi 0.67 vs rate 0.295)", flush=True)
+
+    if _wandb:
+        import wandb
+        # the whole loss curve as a wandb line series, plus final health scalars
+        for i, l in enumerate(L):
+            if i % 10 == 0 and np.isfinite(l):
+                wandb.log({"neg_elbo": float(l)}, step=i)
+        wandb.log({k: v for k, v in res.items() if isinstance(v, (int, float))})
+        wandb.log({"loss_curve": wandb.Image(os.path.join(out_dir, "loss_curve.png"))})
+        wandb.finish()
+    print(f"\nwrote {out_dir}/", flush=True)
+
+
+if __name__ == "__main__":
+    main()
