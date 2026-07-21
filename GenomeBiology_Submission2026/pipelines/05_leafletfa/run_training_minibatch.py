@@ -33,14 +33,24 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, "/gpfs/commons/home/kisaev/LeafletFA")
 
 
-def load_counts(train_h5ad):
-    """junc + clus for the full 70% training matrix, coverage from clus>0 (never junc>0)."""
+def load_counts(train_h5ad, n_cells=0, n_junc=0):
+    """junc + clus for the 70% training matrix, coverage from clus>0 (never junc>0).
+
+    n_cells / n_junc > 0 take a subset (for CPU smoke tests): the first n_cells cells and the
+    best-covered n_junc junctions, so the subset is informative rather than arbitrary.
+    """
     with h5py.File(train_h5ad, "r") as h:
-        def rows(g):
-            return sp.csr_matrix((g["data"][:], g["indices"][:], g["indptr"][:]),
-                                 shape=tuple(g.attrs["shape"])).toarray().astype(np.float32)
-        junc = rows(h["layers/cell_by_junction_matrix"])
-        clus = rows(h["layers/cell_by_cluster_matrix"])
+        def rows(g, n):
+            ip = g["indptr"][:n + 1] if n else g["indptr"][:]
+            a, b = int(ip[0]), int(ip[-1])
+            return sp.csr_matrix((g["data"][a:b], g["indices"][a:b], ip - ip[0]),
+                                 shape=((n if n else len(ip) - 1),
+                                        int(g.attrs["shape"][1]))).toarray().astype(np.float32)
+        junc = rows(h["layers/cell_by_junction_matrix"], n_cells)
+        clus = rows(h["layers/cell_by_cluster_matrix"], n_cells)
+    if n_junc and n_junc < junc.shape[1]:
+        keep = np.argsort(-(clus > 0).sum(0))[:n_junc]; keep.sort()
+        junc, clus = junc[:, keep], clus[:, keep]
     return junc, clus
 
 
@@ -53,6 +63,8 @@ def main():
     lr = float(sys.argv[6]) if len(sys.argv) > 6 else 0.05
     gamma = float(sys.argv[7]) if len(sys.argv) > 7 else 0.1
     learn_ab = bool(int(sys.argv[8])) if len(sys.argv) > 8 else False
+    n_cells  = int(sys.argv[9]) if len(sys.argv) > 9 else 0    # subset: smoke only
+    n_junc   = int(sys.argv[10]) if len(sys.argv) > 10 else 0
 
     params = json.load(open(os.path.join(model_dir, "parameter_combinations.json")))[task_id]
     K = int(params["K"])
@@ -76,7 +88,7 @@ def main():
     except Exception as e:
         print(f"  wandb off: {e}", flush=True); _wandb = False
 
-    junc, clus = load_counts(train_h5ad)
+    junc, clus = load_counts(train_h5ad, n_cells, n_junc)
     cov = clus > 0
     obs_rate = float(junc.sum() / max(clus.sum(), 1))
     print(f"  data {junc.shape}  coverage={cov.mean()*100:.2f}%  observed_rate={obs_rate:.4f}",
