@@ -620,7 +620,7 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                        dir_conc, bb_conc, junc_specific_prior, pi_init, alpha_pi_init,
                        chunk_size, num_epochs, patience, min_atse, min_cells_per_junc,
                        svd=None, nn_index=None, train_phi=None, junc_means=None,
-                       phi_init_mode="atlas", rng=None):
+                       phi_init_mode="atlas", rng=None, train_h5ad=None):
 
     J_all = psi.shape[1]
     psi_hvj = psi[:, hvj_idx]       # (K × n_hvj)
@@ -1102,7 +1102,7 @@ def main():
             chunk_size, num_epochs, patience, min_atse, min_cells_per_junc,
             svd=svd_phi, nn_index=nn_index_phi,
             train_phi=train_phi_arr, junc_means=junc_means_phi,
-            phi_init_mode=phi_init_mode, rng=rng
+            phi_init_mode=phi_init_mode, rng=rng, train_h5ad=train_h5ad
         )
 
         base = {
