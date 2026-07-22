@@ -89,6 +89,9 @@ def main():
     K = int(params["K"])
     seed = int(params.get("seed", 0))
     junc_prior = bool(params.get("junc_specific_prior", False))
+    # binomial ablation: the grid's ablation_binomial arm meant input_conc=inf (Binomial, no
+    # overdispersion). Honour it now that LeafletFAMinibatch supports likelihood="binomial".
+    likelihood = "binomial" if "binomial" in str(params.get("arm", "")) else "betabinomial"
     out_dir = os.path.join(model_dir, f"mb_run_{task_id}")
     os.makedirs(out_dir, exist_ok=True)
     print(f"=== minibatch task {task_id}: K={K} seed={seed} junc_prior={junc_prior} "
@@ -115,7 +118,7 @@ def main():
 
     from leafletfa.minibatch import LeafletFAMinibatch
     m = LeafletFAMinibatch(junc, clus, K=K, junc_specific_prior=junc_prior,
-                           learn_ab_hyperprior=learn_ab)
+                           learn_ab_hyperprior=learn_ab, likelihood=likelihood)
     t0 = time.time()
     losses = m.fit(num_steps=num_steps, subsample_size=batch, lr=lr, gamma=gamma, seed=seed,
                    log_every=50)
@@ -128,7 +131,7 @@ def main():
     g = m.globals_()
     res = {
         "task_id": task_id, "K": K, "seed": seed, "junc_prior": junc_prior,
-        "arm": params.get("arm"), "trainer": "minibatch",
+        "arm": params.get("arm"), "trainer": "minibatch", "likelihood": likelihood,
         "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma,
         "n_cells": int(junc.shape[0]), "n_junctions": int(junc.shape[1]),
         "observed_rate": obs_rate,

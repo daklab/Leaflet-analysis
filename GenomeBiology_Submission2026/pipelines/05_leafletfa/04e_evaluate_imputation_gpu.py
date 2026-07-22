@@ -787,8 +787,23 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     # Label-free (unlike mb_ct). Both 0-impute (nmf0) and mean-impute (nmfm) reported.
     K_run = int(psi_hvj.shape[0])
     print(f"\n  [NMF] Fitting rank-{K_run} NMF (0-impute + mean-impute) on {n_hvj} junctions...")
-    imp_nmf0, imp_nmfm = fit_nmf_impute(jr_hvj, pm_hvj, K_run)
+    imp_nmf0, imp_nmfm = fit_nmf_impute(jr_hvj, pm_hvj, K_run)      # in-sample (home-field) NMF
     print(f"  NMF imp shapes: nmf0={imp_nmf0.shape}  nmfm={imp_nmfm.shape}")
+
+    # TRANSFER NMF: programs H frozen on TRAIN, loadings projected onto test -- the fair comparator
+    # to LeafletFA, which also transfers a frozen Psi and only infers per-cell loadings on test.
+    try:
+        import nmf_transfer as nt
+        tr_jr, tr_cov = nt.load_train_jr(train_h5ad, n_cells=15000, junc_idx=hvj_idx)
+        tw = nt.fit_nmf_transfer(tr_jr, tr_cov, jr_hvj.toarray().astype(np.float32),
+                                 pm_hvj.toarray().astype(bool), K_run)
+        imp_nmf0_tr = np.clip((tw["nmf0_tr"][0] @ tw["nmf0_tr"][1]).astype(np.float32), 0, 1)
+        imp_nmfm_tr = np.clip((tw["nmfm_tr"][0] @ tw["nmfm_tr"][1]).astype(np.float32), 0, 1)
+        del tr_jr, tr_cov, tw
+        print(f"  NMF-transfer imp shapes: nmf0_tr={imp_nmf0_tr.shape}  nmfm_tr={imp_nmfm_tr.shape}")
+    except Exception as e:
+        print(f"  [NMF-transfer] skipped: {e}", flush=True)
+        imp_nmf0_tr = imp_nmfm_tr = imp_nmf0  # fall back so metric code is unconditional
 
     # ── Step 4: Per-junction Pearson — global + per-dataset ──────────────────
     print(f"\n  Computing per-junction Pearson ({n_hvj} junctions)...")
@@ -826,6 +841,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         naive = imp_naive[cell_mask]
         nmf0  = imp_nmf0[cell_mask]
         nmfm  = imp_nmfm[cell_mask]
+        nmf0_tr = imp_nmf0_tr[cell_mask]     # transfer NMF (frozen train programs) -- fair vs lf
+        nmfm_tr = imp_nmfm_tr[cell_mask]
         ori   = ori_hvj[cell_mask]
 
         r_lf_p,    r_lf_s    = per_junction_correlations(lf,    ori, cm, min_cells_per_junc)
@@ -835,6 +852,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         r_naive_p, r_naive_s = per_junction_correlations(naive, ori, cm, min_cells_per_junc)
         r_nmf0_p,  r_nmf0_s  = per_junction_correlations(nmf0,  ori, cm, min_cells_per_junc)
         r_nmfm_p,  r_nmfm_s  = per_junction_correlations(nmfm,  ori, cm, min_cells_per_junc)
+        r_n0tr_p,  r_n0tr_s  = per_junction_correlations(nmf0_tr, ori, cm, min_cells_per_junc)
+        r_nmtr_p,  r_nmtr_s  = per_junction_correlations(nmfm_tr, ori, cm, min_cells_per_junc)
 
         m = {}
         m.update(summarise_perjunc(r_lf_p,    r_lf_s,    "lf"))
@@ -844,6 +863,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         m.update(summarise_perjunc(r_naive_p, r_naive_s, "naive"))
         m.update(summarise_perjunc(r_nmf0_p,  r_nmf0_s,  "nmf0"))
         m.update(summarise_perjunc(r_nmfm_p,  r_nmfm_s,  "nmfm"))
+        m.update(summarise_perjunc(r_n0tr_p,  r_n0tr_s,  "nmf0_tr"))
+        m.update(summarise_perjunc(r_nmtr_p,  r_nmtr_s,  "nmfm_tr"))
 
         flat_orig  = ori[cm]
         flat_lf    = lf[cm]
@@ -853,6 +874,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         flat_naive = naive[cm]
         flat_nmf0  = nmf0[cm]
         flat_nmfm  = nmfm[cm]
+        flat_n0tr  = nmf0_tr[cm]
+        flat_nmtr  = nmfm_tr[cm]
         if len(flat_orig) > 0 and flat_orig.std() > 1e-8:
             m["global_pearson_lf"]    = float(np.corrcoef(flat_orig, flat_lf)[0, 1])
             m["global_pearson_lf_bb"] = float(np.corrcoef(flat_orig, flat_lf_bb)[0, 1])
@@ -860,6 +883,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
             m["global_pearson_mb_ct"] = float(np.corrcoef(flat_orig, flat_mb_ct)[0, 1])
             m["global_pearson_nmf0"]  = float(np.corrcoef(flat_orig, flat_nmf0)[0, 1])
             m["global_pearson_nmfm"]  = float(np.corrcoef(flat_orig, flat_nmfm)[0, 1])
+            m["global_pearson_nmf0_tr"] = float(np.corrcoef(flat_orig, flat_n0tr)[0, 1])
+            m["global_pearson_nmfm_tr"] = float(np.corrcoef(flat_orig, flat_nmtr)[0, 1])
         else:
             m["global_pearson_lf"]    = np.nan
             m["global_pearson_lf_bb"] = np.nan
@@ -867,13 +892,16 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
             m["global_pearson_mb_ct"] = np.nan
             m["global_pearson_nmf0"]  = np.nan
             m["global_pearson_nmfm"]  = np.nan
+            m["global_pearson_nmf0_tr"] = np.nan
+            m["global_pearson_nmfm_tr"] = np.nan
 
         # CALIBRATION (Reviewer 1): slope / RMSE / bias / binned curve, in PSI units.
         # Correlation alone hides compression toward the mean; slope > 1 (truth ~ pred) means
         # the model under-disperses its predictions.
         for _lbl, _pred in (("lf", flat_lf), ("lf_bb", flat_lf_bb), ("mb", flat_mb),
                             ("mb_ct", flat_mb_ct), ("naive", flat_naive),
-                            ("nmf0", flat_nmf0), ("nmfm", flat_nmfm)):
+                            ("nmf0", flat_nmf0), ("nmfm", flat_nmfm),
+                            ("nmf0_tr", flat_n0tr), ("nmfm_tr", flat_nmtr)):
             for _k, _v in calibration(_pred, flat_orig).items():
                 m[f"calib_{_k}_{_lbl}"] = _v
 
@@ -886,9 +914,11 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
             m["mae_mb_ct"] = float(np.abs(flat_orig - flat_mb_ct).mean())
             m["mae_nmf0"]  = float(np.abs(flat_orig - flat_nmf0).mean())
             m["mae_nmfm"]  = float(np.abs(flat_orig - flat_nmfm).mean())
+            m["mae_nmf0_tr"] = float(np.abs(flat_orig - flat_n0tr).mean())
+            m["mae_nmfm_tr"] = float(np.abs(flat_orig - flat_nmtr).mean())
         else:
             m["mae_naive"] = m["mae_lf"] = m["mae_lf_bb"] = m["mae_mb"] = m["mae_mb_ct"] = np.nan
-            m["mae_nmf0"]  = m["mae_nmfm"] = np.nan
+            m["mae_nmf0"]  = m["mae_nmfm"] = m["mae_nmf0_tr"] = m["mae_nmfm_tr"] = np.nan
 
         m["n_cells"] = int(cell_mask.sum())
         return m

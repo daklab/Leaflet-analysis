@@ -229,11 +229,13 @@ def fit_nmf_W(jr, cov, K, max_iter=300, random_state=0):
 
 
 def infer_phi_fullcov(test_h5mu, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
-                      chunk, epochs, patience, rng, fit_nmf=True):
+                      chunk, epochs, patience, rng, fit_nmf=True, train_h5ad=None):
     """Infer phi for held-out test cells from FULL-COVERAGE counts.
     junc_orig reconstructed = round(junc_ratio_original * atse_original).
 
-    Also fits the rank-K NMF baseline on the same full-coverage matrix (returned as nmf_W)."""
+    Fits TWO NMF baselines: in-sample (fit on the test matrix, nmf0/nmfm) and, if train_h5ad is
+    given, TRANSFER (programs H frozen on train, loadings projected onto test, nmf0_tr/nmfm_tr) --
+    the latter is the apples-to-apples comparator to LeafletFA, which also transfers a frozen Psi."""
     with h5py.File(test_h5mu, "r") as f:
         s = f["mod/splicing"]; N = int(s["obs/_index"].shape[0])
         jr_ori = np.array(s["layers/junc_ratio_original"], dtype=np.float32)
@@ -253,7 +255,17 @@ def infer_phi_fullcov(test_h5mu, psi_tensor, K, dir_conc, junc_prior, pi, alpha_
     # has reads on that ATSE, which is exactly when junc_ratio is defined.
     nmf_W = {}
     if fit_nmf:
-        nmf_W = fit_nmf_W(jr_ori, atse_d > 0, K)
+        nmf_W = fit_nmf_W(jr_ori, atse_d > 0, K)            # in-sample (home-field) baseline
+        if train_h5ad is not None:                          # TRANSFER baseline: fair vs LeafletFA
+            try:
+                import nmf_transfer as nt
+                tr_jr, tr_cov = nt.load_train_jr(train_h5ad, n_cells=15000)
+                tw = nt.fit_nmf_transfer(tr_jr, tr_cov, jr_ori, atse_d > 0, K)
+                for tag, (W, _H) in tw.items():
+                    nmf_W[tag] = (W / (W.sum(1, keepdims=True) + 1e-12)).astype(np.float32)
+                del tr_jr, tr_cov, tw
+            except Exception as e:
+                print(f"[NMF-transfer] skipped: {e}", flush=True)
     junc_orig = np.rint(jr_ori * atse_d).astype(np.float32)   # full-coverage junction counts
     del jr_ori
     junc_sp = csr_matrix(junc_orig); atse_sp = csr_matrix(atse_d)
@@ -361,7 +373,8 @@ def main():
 
     # HELD-OUT: frozen-psi E-step on the 30% test cells, then unsupervised structure
     phi_test, labels, nmf_W = infer_phi_fullcov(test_h5mu, psi, K, dir_conc, junc_prior,
-                                                pi, alpha_pi, bb_conc, chunk, epochs, patience, rng)
+                                                pi, alpha_pi, bb_conc, chunk, epochs, patience, rng,
+                                                train_h5ad=train_h5ad)
     report_e_step_convergence("(held-out phi)")
     print(f"[07c] held-out phi {phi_test.shape}; running Leiden + silhouette", flush=True)
     rows, _ = structure_metrics(phi_test, labels, "heldout_inferred", base, seed=0)
@@ -412,16 +425,18 @@ def main():
         if key not in piv.index:
             continue
         parts = []
-        for src, lbl in (("heldout_inferred", "phi"), ("heldout_nmfm", "nmf-mean"),
-                         ("heldout_nmf0", "nmf-0")):
+        for src, lbl in (("heldout_inferred", "phi"),
+                         ("heldout_nmfm_tr", "nmf-mean-TR"), ("heldout_nmf0_tr", "nmf-0-TR"),
+                         ("heldout_nmfm", "nmf-mean-IS"), ("heldout_nmf0", "nmf-0-IS")):
             if src in piv.columns and pd.notna(piv.loc[key, src]):
                 parts.append(f"{lbl}={piv.loc[key, src]:.3f}")
         if parts:
             margin = ""
-            if {"heldout_inferred", "heldout_nmfm"} <= set(piv.columns):
-                d = piv.loc[key, "heldout_inferred"] - piv.loc[key, "heldout_nmfm"]
+            # the FAIR margin: phi vs NMF-transfer (both frozen-dictionary + projected loadings)
+            if {"heldout_inferred", "heldout_nmfm_tr"} <= set(piv.columns):
+                d = piv.loc[key, "heldout_inferred"] - piv.loc[key, "heldout_nmfm_tr"]
                 if pd.notna(d):
-                    margin = f"   [phi - nmf-mean = {d:+.3f}]"
+                    margin = f"   [phi - nmf-mean-TRANSFER = {d:+.3f}]"
             print(f"  {key:32s} " + "  ".join(parts) + margin, flush=True)
     print(f"\nwrote {out_csv}", flush=True)
 
