@@ -26,7 +26,7 @@ model = {
     "pi": np.asarray(d["pi"], np.float32),
     "alpha_pi": np.asarray(d["alpha_pi"], np.float32),
     "dir_conc": float(np.asarray(d["dir_conc"])),
-    "bb_conc": float(np.asarray(d["bb_conc"])),
+    "bb_conc": (float(np.asarray(d["bb_conc"])) if "bb_conc" in d.files else "infinity"),
     "a": np.asarray(d["a"], np.float32), "b": np.asarray(d["b"], np.float32),
     "K": int(r["K"]),
 }
