@@ -60,9 +60,9 @@ if rows04:
     print("04e: %d model-rows -> %d config rows" % (len(df04), len(agg04)), flush=True)
     sub = agg04[agg04["entry_set"] == "lost_to_downsampling"] if "entry_set" in agg04 else agg04
     for _, r in sub.iterrows():
-        print("  K=%s %-6s lost-entry lf=%.3f+-%.3f nmfm=%.3f+-%.3f calib_slope=%.3f" % (
+        print("  K=%s %-6s lost-entry lf=%.3f+-%.3f | nmfm_TR(fair)=%.3f nmfm_IS=%.3f | calib_slope=%.3f" % (
             r["K"], r["prior"], r.get("median_pearson_lf_mean", float("nan")), r.get("median_pearson_lf_se", 0),
-            r.get("median_pearson_nmfm_mean", float("nan")), r.get("median_pearson_nmfm_se", 0),
+            r.get("median_pearson_nmfm_tr_mean", float("nan")), r.get("median_pearson_nmfm_mean", float("nan")),
             r.get("calib_slope_lf_mean", float("nan"))), flush=True)
 else:
     print("04e: no task_*/04e_out.csv found", flush=True)
@@ -74,7 +74,7 @@ for f in glob.glob(os.path.join(base, "task_*", "07c_out.csv")):
     tid = os.path.basename(os.path.dirname(f)).replace("task_", "")
     K, prior, seed = config_of(tid)
     d = pd.read_csv(f)
-    for src in ("heldout_inferred", "heldout_nmfm", "train_assign_post"):
+    for src in ("heldout_inferred", "heldout_nmfm", "heldout_nmf0", "heldout_nmfm_tr", "heldout_nmf0_tr", "train_assign_post"):
         sub = d[d["phi_source"] == src]
         row = {"task": tid, "K": K, "prior": prior, "seed": seed, "phi_source": src}
         for m in KEYM:
@@ -87,10 +87,13 @@ if rows07:
     agg07 = mean_se(df07, ["K", "prior", "phi_source"], KEYM)
     agg07.to_csv(out_prefix + "_07c.csv", index=False)
     print("\n07c: %d model-rows -> %d config rows" % (len(df07), len(agg07)), flush=True)
-    for _, r in agg07[agg07["phi_source"] == "heldout_inferred"].iterrows():
-        print("  K=%s %-6s held-out ARI_broad=%.3f+-%.3f perp=%.2f (n=%d)" % (
-            r["K"], r["prior"], r.get("ari_leiden_vs_broad_cell_type_mean", float("nan")),
-            r.get("ari_leiden_vs_broad_cell_type_se", 0),
-            r.get("phi_perplexity_median_mean", float("nan")), int(r["n_replicates"])), flush=True)
+    piv = agg07.pivot_table(index=["K","prior"], columns="phi_source",
+                            values="ari_leiden_vs_broad_cell_type_mean", aggfunc="first")
+    print("  ARI vs cell type (mean over seeds): phi | NMF-transfer(fair) | NMF-in-sample")
+    for (K,pr),row in piv.iterrows():
+        g=lambda c: row.get(c, float("nan"))
+        print("  K=%s %-6s phi=%.3f  nmfm_tr=%.3f nmf0_tr=%.3f | nmfm_IS=%.3f nmf0_IS=%.3f" % (
+            K,pr, g("heldout_inferred"), g("heldout_nmfm_tr"), g("heldout_nmf0_tr"),
+            g("heldout_nmfm"), g("heldout_nmf0")), flush=True)
 else:
     print("07c: no task_*/07c_out.csv found", flush=True)
