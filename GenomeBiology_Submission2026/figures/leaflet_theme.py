@@ -229,6 +229,72 @@ def despine(ax, left: bool = False, bottom: bool = False):
     return ax
 
 
+def sentence_case(s: str) -> str:
+    """Upper-case the first letter, leaving the rest of the string alone.
+
+    Skips anything that starts with mathtext ('$\\Psi$ recovery'), a digit, or an already
+    upper-case letter — so 'ARI', 'K=10' and '$\\phi$ usage' are never mangled.
+    """
+    if not s:
+        return s
+    first = s[0]
+    if first == "$" or not first.isalpha() or first.isupper():
+        return s
+    return first.upper() + s[1:]
+
+
+def capitalize_labels(obj) -> None:
+    """Sentence-case every axis label, title and legend title on a Figure or Axes.
+
+    Called automatically by `save()`, so panels get consistent capitalisation without each
+    script having to remember. Safe to call twice.
+    """
+    axes = obj.get_axes() if hasattr(obj, "get_axes") else [obj]
+    for ax in axes:
+        ax.set_xlabel(sentence_case(ax.get_xlabel()))
+        ax.set_ylabel(sentence_case(ax.get_ylabel()))
+        # The theme sets axes.titlelocation='left', so set_title() writes the LEFT title while
+        # get_title() defaults to reading the CENTER one — check all three explicitly.
+        for loc in ("center", "left", "right"):
+            t = ax.get_title(loc=loc)
+            if t:
+                ax.set_title(sentence_case(t), loc=loc)
+        leg = ax.get_legend()
+        if leg is not None and leg.get_title() is not None:
+            leg.get_title().set_text(sentence_case(leg.get_title().get_text()))
+        # Explicit *text* tick labels (categories like 'global prior') get the same treatment.
+        # Numeric ticks are left alone — only axes with a fixed list of labels are touched, so
+        # '10', 'K=10' and 'P1' are never rewritten.
+        # Key off the LOCATOR, not the formatter: set_xticks() installs a FixedLocator, but the
+        # formatter may be a FuncFormatter, so an isinstance check on the formatter silently misses
+        # every categorical axis.
+        import matplotlib.ticker as mticker
+        for axis in (ax.xaxis, ax.yaxis):
+            if not isinstance(axis.get_major_locator(), mticker.FixedLocator):
+                continue
+            texts = [t.get_text() for t in axis.get_ticklabels()]
+            if any(t and t[0].isalpha() and t[0].islower() for t in texts):
+                axis.set_ticklabels([sentence_case(t) for t in texts])
+
+
+def sig_bracket(ax, x1: float, x2: float, y: float, p: float, dh: float = 0.02,
+                fmt: str = "stars"):
+    """Draw a significance bracket between two x positions at height `y`.
+
+    fmt='stars' -> ns / * / ** / ***      fmt='p' -> 'P = 0.013' (or 'P < 0.001')
+    Returns the top of the annotation so callers can stack brackets.
+    """
+    if fmt == "stars":
+        label = "ns" if p >= 0.05 else ("***" if p < 0.001 else ("**" if p < 0.01 else "*"))
+    else:
+        label = "P < 0.001" if p < 0.001 else f"P = {p:.3g}"
+    h = dh * (ax.get_ylim()[1] - ax.get_ylim()[0])
+    ax.plot([x1, x1, x2, x2], [y, y + h, y + h, y], lw=0.6, c=INK, clip_on=False)
+    ax.text((x1 + x2) / 2, y + h, label, ha="center", va="bottom",
+            fontsize=PT["annot"], color=INK, clip_on=False)
+    return y + h
+
+
 def symmetric_norm(values, cmap: str = CMAP["diverging"]):
     """(vmin, vmax, cmap) for a diverging map centered on 0 — never let it drift."""
     import numpy as np
@@ -238,8 +304,12 @@ def symmetric_norm(values, cmap: str = CMAP["diverging"]):
 
 def save(fig, stem, formats=("pdf", "png"), close: bool = False):
     """Write the panel as vector PDF (submission) + 600 dpi PNG (review). `stem` has no
-    extension; parent directories are created."""
+    extension; parent directories are created.
+
+    Axis labels and titles are sentence-cased on the way out (see `capitalize_labels`), so
+    capitalisation is consistent across panels without every script having to remember."""
     from pathlib import Path
+    capitalize_labels(fig)
     stem = Path(stem)
     stem.parent.mkdir(parents=True, exist_ok=True)
     out = []

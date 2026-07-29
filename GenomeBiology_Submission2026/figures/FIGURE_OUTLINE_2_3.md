@@ -49,7 +49,7 @@ Self-contained **without** bulk data.
 
 ### 3.1 Coverage robustness (imputation)   ⏳ needs 04e on the new models
 Read counts thinned to **10/25/50/75/90/99/100 %**; φ inferred under frozen globals; `φ·Ψ` scored
-against ORIGINAL full-depth PSI. Source: `04e_evaluate_imputation_gpu.py` × `resampled/`.
+against ORIGINAL full-depth PSI. Source: `A3_eval_imputation.py` × `resampled/`.
 
 | panel | plot | message |
 |---|---|---|
@@ -57,7 +57,7 @@ against ORIGINAL full-depth PSI. Source: `04e_evaluate_imputation_gpu.py` × `re
 | **B** | calibration: predicted vs observed PSI, binned, at one coverage level, **slope annotated** | Reviewer 1 ask — correlation hides compression toward the mean; slope≈1 = calibrated, >1 = under-dispersed |
 | **C** | calibration slope vs coverage | does it stay calibrated as depth drops? |
 
-### 3.2 Held-out latent structure   ⏳ 07c smoke running (`07c_heldout_structure.py`)
+### 3.2 Held-out latent structure   ⏳ 07c smoke running (`A4_eval_structure.py`)
 Frozen-Ψ E-step on the 30 % → **unsupervised** structure of φ (labels NOT used for fitting).
 
 | panel | plot | message |

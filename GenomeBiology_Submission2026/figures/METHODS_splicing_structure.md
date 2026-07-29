@@ -2,7 +2,7 @@
 
 How much cell-type structure the splicing latent φ carries, why it is less than gene expression,
 and how to visualise it honestly. Numbers are from the minibatch K=20 model, 70/30 split
-(`07c_heldout_structure.py`, held-out 30% via the frozen-Ψ E-step; training φ from the fitted model).
+(`A4_eval_structure.py`, held-out 30% via the frozen-Ψ E-step; training φ from the fitted model).
 
 ## The result
 

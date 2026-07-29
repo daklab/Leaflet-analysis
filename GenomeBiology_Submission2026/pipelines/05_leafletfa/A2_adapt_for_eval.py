@@ -2,12 +2,17 @@
 expect: leafletfa_model.pkl.gz + run_summary.csv.
 
 The minibatch trainer saves psi/phi/globals in an .npz; the eval scripts read a pickled dict plus a
-run_summary.csv. This writes those two files into <out_dir> so the existing 04e/07c can run unchanged
-on a minibatch model. psis_loc/psis_scale are NOT emitted (the minibatch fit stores the posterior
-mean, not the guide's per-site loc/scale), so 04e falls back to the psi point estimate -- fine for a
-smoke; note it discards psi posterior uncertainty.
+run_summary.csv. This writes those two files into <out_dir> so the evaluators can run unchanged on a
+minibatch model.
 
-Usage: mb_to_evalmodel.py <mb_run_dir> <out_dir>
+PSI POSTERIOR: the trainer now stores the guide's per-site `psis_loc`/`psis_scale` (logit space)
+alongside the posterior mean, and they are passed straight through here. A3 therefore SAMPLES
+psi ~ sigmoid(loc + scale*eps) rather than plugging in a point estimate, so psi uncertainty
+propagates into the imputation. (This was not possible under the pre-plate trainer, which exposed
+only the mean; the note that these were "NOT emitted" is obsolete.) If a fit predates that change
+and lacks the two arrays, the code falls back to the point estimate and says so on stdout.
+
+Usage: A2_adapt_for_eval.py <mb_run_dir> <out_dir>
 """
 import sys, os, json, gzip, pickle
 import numpy as np

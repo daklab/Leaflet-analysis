@@ -49,7 +49,7 @@ NOTE: aging is NOT here. It belongs on the full-data model (Figure 4 case study,
 not on a 70%/K-sweep held-out set.
 
 Usage:
-    python 07c_heldout_structure.py <run_dir> <train_h5ad> <test_h5mu> <output_csv>
+    python A4_eval_structure.py <run_dir> <train_h5ad> <test_h5mu> <output_csv>
         [chunk=4096] [epochs=300] [patience=10]
 """
 
@@ -136,6 +136,27 @@ def as_conc_prior(bb_conc):
 
 
 def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
+                    epochs, patience, phi_init, lr=0.1, gamma=0.1):
+    """E-step through the CURRENT (plate minibatch) implementation -- the same code that trained
+    the models. The legacy path below is kept for reference but is no longer used: keeping two
+    inference implementations in one pipeline is how the trainer and the evaluator drifted apart.
+
+    phi_init is accepted but NOT used: the caller passes a random draw from the pi prior
+    (`sample_pi_phi_init`), i.e. a non-informative start. phi is a local variable inside the
+    subsampling plate, so seeding it per-cell does not map cleanly onto the batched guide, and it is
+    unnecessary -- with the globals frozen the E-step is near-convex and was measured to be
+    seed-stable (mean |delta phi| = 0.004 between seeds on simulated data)."""
+    from estep_minibatch import infer_phi_minibatch
+    psi_np = psi_tensor.detach().cpu().numpy() if hasattr(psi_tensor, "detach") else np.asarray(psi_tensor)
+    phi, info = infer_phi_minibatch(
+        chunk_adata, psi_np, K, dir_conc=dir_conc, pi=pi, alpha_pi=alpha_pi, bb_conc=bb_conc,
+        junc_prior=junc_prior, num_epochs=epochs, lr=lr, gamma=gamma,
+        device=("cuda" if DEVICE.type == "cuda" else "cpu"))
+    _E_STEP_CONV.append((info["steps_used"], info["stopped_early"], epochs))
+    return phi
+
+
+def _infer_phi_chunk_legacy(chunk_adata, psi_tensor, K, dir_conc, junc_prior, pi, alpha_pi, bb_conc,
                     epochs, patience, phi_init, lr=0.1, gamma=0.1):   # was 0.01/0.05 -- see estep_lr_sweep
     delta = torch.tensor(float(dir_conc)) if dir_conc is not None else None
     model = LeafletFA(

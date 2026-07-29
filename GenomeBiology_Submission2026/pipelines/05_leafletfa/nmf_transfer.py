@@ -60,3 +60,50 @@ def fit_nmf_transfer(train_jr, train_cov, test_jr, test_cov, K, max_iter=300, ra
               flush=True)
         del Xtr, Xte, m
     return out
+
+# ── cached transfer: H depends only on the TRAINING cells ────────────────────────────────────────
+# `fit_nmf_transfer` fits H on train and then projects the test cells. When it is called once per
+# downsampling level, the train fit (and the train data load) is repeated identically every time --
+# downsampling the TEST set cannot change a dictionary learned on TRAIN. On the atlas eval that was
+# 7 identical NMF fits on 15,000 x 12,197 plus 7 reads of a 13 GB h5ad per model. These two helpers
+# split the work so the train side is done once. Results are unchanged: same random_state, same
+# training input, therefore the same H.
+_TRAIN_CACHE = {}
+_H_CACHE = {}
+
+
+def load_train_jr_cached(train_h5ad, n_cells=15000, junc_idx=None):
+    key = (train_h5ad, int(n_cells), None if junc_idx is None else hash(np.asarray(junc_idx).tobytes()))
+    if key not in _TRAIN_CACHE:
+        _TRAIN_CACHE[key] = load_train_jr(train_h5ad, n_cells=n_cells, junc_idx=junc_idx)
+    return _TRAIN_CACHE[key]
+
+
+def fit_train_H(train_jr, train_cov, K, max_iter=300, random_state=0, cache_key=None):
+    """Fit the NMF dictionary on the training cells once; return {tag: (model, train_col_mean)}."""
+    if cache_key is not None and cache_key in _H_CACHE:
+        return _H_CACHE[cache_key]
+    cnt = train_cov.sum(0)
+    cm = np.where(cnt > 0, (np.clip(np.nan_to_num(train_jr), 0, 1) * train_cov).sum(0)
+                  / np.maximum(cnt, 1), 0.0)
+    out = {}
+    for tag, X in (("nmf0_tr", _fill(train_jr, train_cov, None)),
+                   ("nmfm_tr", _fill(train_jr, train_cov, cm))):
+        m = NMF(n_components=K, init="nndsvda", random_state=random_state, max_iter=max_iter)
+        m.fit(X)
+        out[tag] = (m, cm)
+        print(f"[NMF-transfer] {tag}: fit H on {X.shape[0]} train cells (cached for reuse)",
+              flush=True)
+    if cache_key is not None:
+        _H_CACHE[cache_key] = out
+    return out
+
+
+def project_test(fitted, test_jr, test_cov):
+    """Project test cells onto a frozen, already-fitted dictionary. Cheap; run per coverage level."""
+    out = {}
+    for tag, (m, cm) in fitted.items():
+        Xte = _fill(test_jr, test_cov, None if tag == "nmf0_tr" else cm)
+        W = m.transform(Xte).astype(np.float32)
+        out[tag] = (W, m.components_)
+    return out

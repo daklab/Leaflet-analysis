@@ -17,7 +17,7 @@ recovery under the plate model), because a persistent guide accumulates evidence
 it starts. The `arm`/`waypoints_use` grid column is retained in the output for bookkeeping only.
 
 Usage:
-    run_training_minibatch.py <task_id> <model_dir> <train_h5ad>
+    A1_train_atlas.py <task_id> <model_dir> <train_h5ad>
         [num_steps=1500] [subsample_size=2048] [lr=0.05] [gamma=0.1] [learn_ab_hyperprior=0]
 
 Writes into <model_dir>/mb_run_<task_id>/: fit.npz, result.json, loss_curve.png.
@@ -92,6 +92,13 @@ def main():
     # binomial ablation: the grid's ablation_binomial arm meant input_conc=inf (Binomial, no
     # overdispersion). Honour it now that LeafletFAMinibatch supports likelihood="binomial".
     likelihood = "binomial" if "binomial" in str(params.get("arm", "")) else "betabinomial"
+    # Early stopping, overridable per-config. The defaults (min_delta_rel=1e-4) demand an improvement
+    # of ~1e5 against a loss of ~1e9, but late-stage improvement is ~4e4 per step, so the rule fires
+    # while the ELBO is still descending -- and at a different step in every seed (1,151-1,401 of a
+    # 5,000 cap), which is itself a source of seed-to-seed variation.
+    es = dict(patience=int(params.get("patience", 8)),
+              min_delta_rel=float(params.get("min_delta_rel", 1e-4)),
+              es_smooth=float(params.get("es_smooth", 0.98)))
     out_dir = os.path.join(model_dir, f"mb_run_{task_id}")
     os.makedirs(out_dir, exist_ok=True)
     print(f"=== minibatch task {task_id}: K={K} seed={seed} junc_prior={junc_prior} "
@@ -99,9 +106,9 @@ def main():
 
     try:
         import wandb
-        wandb.init(project="LeafletFA-mouse-atlas-70pct-train", group="minibatch_rerun",
+        wandb.init(project=os.environ.get("LFA_WANDB_PROJECT", "LeafletFA-mouse-atlas"), group="minibatch_rerun",
                    name=f"mb_run_{task_id}", config={**params, "trainer": "minibatch",
-                   "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma,
+                   "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma, **es,
                    "learn_ab_hyperprior": learn_ab},
                    tags=[f"K{K}", f"seed{seed}",
                          ("juncprior" if junc_prior else "globalprior"), "minibatch"],
@@ -116,14 +123,60 @@ def main():
     print(f"  data {junc.shape}  coverage={cov.mean()*100:.2f}%  observed_rate={obs_rate:.4f}",
           flush=True)
 
+    # Optional deterministic psi init (NNDSVD on the splicing matrix; no cell-type labels anywhere,
+    # so it does not compromise the "without prior cell-type labels" claim the way waypoints would).
+    psi0 = phi0 = None
+    if params.get("init") == "waypoints":
+        # The original paper's scheme: SVD of centred usage ratios -> max-min waypoints -> metacell
+        # means. UNSTRATIFIED, so no cell-type label is read and the "without prior cell-type labels"
+        # claim is preserved. Seed-dependent by design: different seeds pick different waypoints, so
+        # agreement across seeds is a real result rather than a restatement of a fixed start.
+        from leafletfa.initialization import waypoint_init, phi_from_psi
+        psi0, _wphi = waypoint_init(junc, clus, K, seed=seed,
+                                    n_sub=int(params.get("waypoint_n_sub", 20000)))
+        print(f"  [init] waypoints (seed {seed}): contrast {psi0.std(0).mean():.4f}", flush=True)
+        if params.get("init_phi"):
+            # waypoint_init only returns phi for the cells it subsampled, so derive phi for ALL cells
+            # from the waypoint psi instead
+            phi0 = _wphi if _wphi is not None and _wphi.shape[0] == junc.shape[0] else \
+                   phi_from_psi(junc, clus, psi0)
+            print(f"  [init] phi from waypoint psi: median max-loading "
+                  f"{float(np.median(phi0.max(1))):.3f}", flush=True)
+    elif params.get("init") == "jitter":
+        # Deterministic, label-free, K-independent symmetry breaking. Not waypoints: no cell-type
+        # annotation is read. See leafletfa.initialization for why the default start is the problem.
+        from leafletfa.initialization import jitter_psi_init
+        psi0 = jitter_psi_init(junc, clus, K)
+        print(f"  [init] jitter psi_init: contrast {psi0.std(0).mean():.4f}", flush=True)
+    elif params.get("det_init"):
+        from det_init_atlas import build as _det_build
+        psi0 = _det_build(train_h5ad, K)
     from leafletfa.minibatch import LeafletFAMinibatch
+    # Pyro's own initialisers, as a one-line alternative to a data-derived start. "sample" draws
+    # from the model's prior, breaking the PROGRAM symmetry (psi spread ~0.12) though not the cell
+    # symmetry (phi stays at 1/K).
+    _strat = {"pyro_sample": "sample", "pyro_median": "median"}.get(params.get("init"), "feasible")
+    if _strat != "feasible":
+        print(f"  [init] pyro init_to_{_strat}", flush=True)
     m = LeafletFAMinibatch(junc, clus, K=K, junc_specific_prior=junc_prior,
-                           learn_ab_hyperprior=learn_ab, likelihood=likelihood)
+                           learn_ab_hyperprior=learn_ab, likelihood=likelihood,
+                           psi_init=psi0, phi_init=phi0, init_strategy=_strat)
     t0 = time.time()
+    print(f"  early stopping: {es}", flush=True)
     losses = m.fit(num_steps=num_steps, subsample_size=batch, lr=lr, gamma=gamma, seed=seed,
-                   log_every=50)
+                   log_every=50, **es)
     dt = time.time() - t0
 
+    # Per-cell posterior width, so downstream work can flag cells whose loadings their own reads do
+    # not determine rather than treating every phi as exact. Cheap: one batch of guide draws.
+    _unc = {}
+    try:
+        _sd, _tp = m.phi_uncertainty(n_samples=64)
+        _unc = {"phi_sd": _sd, "phi_top_prob": _tp}
+        print(f"  [phi uncertainty] median sd {float(_sd.mean()):.4f}; "
+              f"{float((_tp < 0.8).mean()):.1%} of cells below 0.8 top-program probability", flush=True)
+    except Exception as e:
+        print(f"  [warn] phi_uncertainty unavailable: {e}", flush=True)
     psi = m.psi_mean().cpu().numpy()
     phi = m.phi_mean().cpu().numpy()
     p = np.clip(phi, 1e-12, None)
@@ -132,7 +185,7 @@ def main():
     res = {
         "task_id": task_id, "K": K, "seed": seed, "junc_prior": junc_prior,
         "arm": params.get("arm"), "trainer": "minibatch", "likelihood": likelihood,
-        "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma,
+        "num_steps": num_steps, "subsample_size": batch, "lr": lr, "gamma": gamma, **es,
         "n_cells": int(junc.shape[0]), "n_junctions": int(junc.shape[1]),
         "observed_rate": obs_rate,
         "psi_mean": float(psi.mean()), "psi_median": float(np.median(psi)),
@@ -151,7 +204,8 @@ def main():
     _ploc, _psc = m.psi_loc_scale()   # q(psi) logit-space loc/scale -> lets 04e SAMPLE psi
     _extra = {} if _ploc is None else {"psis_loc": _ploc, "psis_scale": _psc}
     np.savez_compressed(os.path.join(out_dir, "fit.npz"), psi=psi, phi=phi,
-                        losses=np.asarray(losses), **{k: v for k, v in g.items()}, **_extra)
+                        losses=np.asarray(losses), **{k: v for k, v in g.items()},
+                        **_unc, **_extra)
     json.dump(res, open(os.path.join(out_dir, "result.json"), "w"), indent=2)
 
     # THE loss curve -- now a single continuous ELBO, not 96 stitched per-chunk segments.

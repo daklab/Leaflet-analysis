@@ -29,7 +29,7 @@ so Fig 2 (sim) and Fig 3 (real) report the identical NMF baseline.
 Metrics: per-junction Pearson + Spearman (cell ranking), MAE, global Pearson, calibration slope.
 
 Usage:
-    python 04e_evaluate_imputation_gpu.py <run_dir> <train_h5ad> <resampled_dir> <output_csv>
+    python A3_eval_imputation.py <run_dir> <train_h5ad> <resampled_dir> <output_csv>
         [chunk_size=4096] [num_epochs=100] [patience=10]
         [n_hvj=10000] [min_atse=0] [min_cells_per_junc=20] [phi_init_mode=pi]
 """
@@ -392,6 +392,25 @@ def get_phi_init_chunk(jc_chunk, at_chunk, svd, nn_index, train_phi, junc_means)
 
 
 def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_specific_prior,
+                    pi_init, alpha_pi_init, bb_conc, num_epochs, patience, phi_init=None,
+                    num_particles=10, num_samples=100):
+    """E-step through the CURRENT (plate minibatch) implementation -- the same code that trained
+    the models, rather than the legacy class kept below for reference.
+
+    phi_init is accepted but NOT used: the caller passes a non-informative start. phi is a local
+    variable inside the subsampling plate, so seeding it per-cell does not map cleanly onto the
+    batched guide, and with the globals frozen the E-step is near-convex and seed-stable
+    (mean |delta phi| = 0.004 between seeds on simulated data)."""
+    from estep_minibatch import infer_phi_minibatch
+    psi_np = psi_tensor.detach().cpu().numpy() if hasattr(psi_tensor, "detach") else np.asarray(psi_tensor)
+    phi, _info = infer_phi_minibatch(
+        chunk_adata, psi_np, K, dir_conc=dir_conc, pi=pi_init, alpha_pi=alpha_pi_init,
+        bb_conc=bb_conc, junc_prior=junc_specific_prior, num_epochs=num_epochs,
+        device=("cuda" if DEVICE.type == "cuda" else "cpu"))
+    return phi
+
+
+def _infer_phi_chunk_legacy(chunk_adata, psi_tensor, K, dir_conc, junc_specific_prior,
                     pi_init, alpha_pi_init, bb_conc, num_epochs, patience, phi_init=None,
                     num_particles=10, num_samples=100):
     """
@@ -794,12 +813,19 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     # to LeafletFA, which also transfers a frozen Psi and only infers per-cell loadings on test.
     try:
         import nmf_transfer as nt
-        tr_jr, tr_cov = nt.load_train_jr(train_h5ad, n_cells=15000, junc_idx=hvj_idx)
-        tw = nt.fit_nmf_transfer(tr_jr, tr_cov, jr_hvj.toarray().astype(np.float32),
-                                 pm_hvj.toarray().astype(bool), K_run)
+        # The transfer dictionary H is learned on the TRAINING cells, so it does not depend on how
+        # much the TEST set was downsampled. Fitting it inside this per-level function repeated an
+        # identical NMF fit (and an identical 15,000-cell read of a 13 GB h5ad) at every coverage
+        # level. Both are now cached on the training inputs; only the cheap projection of the test
+        # cells runs per level. Same random_state and same training data => identical H.
+        tr_jr, tr_cov = nt.load_train_jr_cached(train_h5ad, n_cells=15000, junc_idx=hvj_idx)
+        fitted = nt.fit_train_H(tr_jr, tr_cov, K_run,
+                                cache_key=(train_h5ad, int(K_run), int(len(hvj_idx))))
+        tw = nt.project_test(fitted, jr_hvj.toarray().astype(np.float32),
+                             pm_hvj.toarray().astype(bool))
         imp_nmf0_tr = np.clip((tw["nmf0_tr"][0] @ tw["nmf0_tr"][1]).astype(np.float32), 0, 1)
         imp_nmfm_tr = np.clip((tw["nmfm_tr"][0] @ tw["nmfm_tr"][1]).astype(np.float32), 0, 1)
-        del tr_jr, tr_cov, tw
+        del tw
         print(f"  NMF-transfer imp shapes: nmf0_tr={imp_nmf0_tr.shape}  nmfm_tr={imp_nmfm_tr.shape}")
     except Exception as e:
         print(f"  [NMF-transfer] skipped: {e}", flush=True)
