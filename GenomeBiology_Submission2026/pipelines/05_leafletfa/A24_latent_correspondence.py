@@ -119,10 +119,32 @@ def main():
         col, matched = perm_from_psi(np.asarray(A["psi"], float), np.asarray(B["psi"], float))
         rec = dict(pair=pair, K=K)
 
-        # --- program profiles ---
+        # --- program profiles, BOTH ways ---
+        # Matched correlation is the conventional number and it is INFLATED twice over: 88% of psi's
+        # variance is the shared per-junction baseline, which every program has in common, and the
+        # matching itself is near-arbitrary -- at K=30, 62% of programs match a second partner within
+        # 0.02 of the chosen one. A high matched r is therefore close to guaranteed and is weak
+        # evidence that the same programs were found.
         rec["psi_matched_median_r"] = float(np.median(matched))
         rec["psi_matched_min_r"] = float(matched.min())
         rec["psi_frac_above_0.9"] = float((matched > 0.9).mean())
+        # how decisive was the assignment? margin of the chosen partner over the next best
+        Cm = np.abs((lambda x: x / np.maximum(np.linalg.norm(x, axis=1, keepdims=True), 1e-12))(
+                np.asarray(A["psi"], float) - np.asarray(A["psi"], float).mean(1, keepdims=True)) @
+            (lambda x: x / np.maximum(np.linalg.norm(x, axis=1, keepdims=True), 1e-12))(
+                np.asarray(B["psi"], float) - np.asarray(B["psi"], float).mean(1, keepdims=True)).T)
+        marg = [Cm[i, col[i]] - np.delete(Cm[i], col[i]).max() for i in range(K)]
+        rec["psi_match_margin_median"] = float(np.median(marg))
+        rec["psi_match_ambiguous_frac"] = float(np.mean(np.array(marg) < 0.02))
+        # MATCHING-FREE: canonical correlations between the centred program subspaces. Invariant to
+        # permutation (verified: self vs column-permuted self = 0.997) and to how the fits divided the
+        # variance; null is ~0.016 against junction-shuffled psi. This is the number to quote.
+        pa_c = (np.asarray(A["psi"], np.float64) - np.asarray(A["psi"], np.float64).mean(0)).T
+        pb_c = (np.asarray(B["psi"], np.float64) - np.asarray(B["psi"], np.float64).mean(0)).T
+        sp_psi = cca(pa_c, pb_c)
+        rec["psi_FREE_mean_canon_corr"] = float(sp_psi.mean())
+        rec["psi_FREE_effective_K"] = int((sp_psi > 0.9).sum())
+        rec["psi_FREE_effective_frac"] = float((sp_psi > 0.9).sum() / (K - 1))
 
         # --- per-cell loadings ---
         phiA = np.asarray(A["phi"], np.float32); phiB = np.asarray(B["phi"], np.float32)[:, col]
@@ -178,8 +200,12 @@ def main():
     d = pd.DataFrame(rows)
     d.to_csv(out_csv, index=False)
 
-    order = [("psi_matched_median_r", "psi  program profiles (matched)"),
-             ("psi_frac_above_0.9", "psi  fraction of programs r>0.9"),
+    order = [("psi_FREE_mean_canon_corr", "psi  MATCHING-FREE mean canonical corr  <-- quote this"),
+             ("psi_FREE_effective_frac", "psi  MATCHING-FREE reproducible directions"),
+             ("psi_matched_median_r", "psi  matched r (INFLATED -- see margin below)"),
+             ("psi_match_margin_median", "psi  matching margin over 2nd-best"),
+             ("psi_match_ambiguous_frac", "psi  fraction of programs with an equal alternative"),
+             ("psi_frac_above_0.9", "psi  fraction of programs matched r>0.9"),
              ("pi_r", "pi   program usage"),
              ("a_r", "a    junction Beta prior"),
              ("b_r", "b    junction Beta prior"),
