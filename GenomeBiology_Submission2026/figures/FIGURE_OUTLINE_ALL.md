@@ -103,9 +103,27 @@ and its posterior probabilities are calibrated.**
 | panel | content | status |
 |---|---|---|
 | A | LeafletFA vs LeafCutter — concordance of differential junctions per cell type | ❓ |
+| A′ | **seed reproducibility of the cell-type DS calls** — Jaccard / effect-size slope / top-N overlap across 3 seeds | 🔧 **run on the fresh models (2026-07-30)** |
 | B | calibration — nominal posterior probability vs realised FDR | 🔧 |
 | C | effect-size agreement — LeafletFA β vs LeafCutter ΔΨ, with the **slope**, not just correlation | 🔧 |
 | D | what LeafletFA finds that LeafCutter cannot (or vice versa) | 🔧 |
+
+### Reproducibility of the DS calls — measure the RIGHT analysis
+
+Measured on the old K=30 models, the **factor-level** contrast (program *k* vs the mean of the other
+programs) reproduces poorly across seeds: **Jaccard 0.51**, effect-size **slope 0.72**, top-2000
+overlap **42%**, on ~235,000 calls per fit.
+
+That is the analysis being demoted to "program characterisation", so it is a caveat for that section
+rather than a result for this figure. **The primary analysis is group-vs-group by cell type, and it has
+not been measured yet.** It should reproduce considerably better for a structural reason: cell-type
+labels are fixed, so the groups are identical across seeds and nothing depends on program matching —
+only the per-cell-type splicing estimate varies, and that reproduces at *r* = 0.79 (map) to 0.90
+(structure).
+
+Run the same Jaccard / slope / top-N framework (`A23_ds_reproducibility.py`, adapted to
+`compute_differential_splicing_groups`) on the freshly retrained models. Do not design this figure
+around the 0.51 figure — it is the wrong analysis.
 
 ### Cautions carried in from earlier work — these matter for this figure
 - **Report the slope, not the correlation**, when comparing effect sizes. Hungarian-matched Pearson *r*,
