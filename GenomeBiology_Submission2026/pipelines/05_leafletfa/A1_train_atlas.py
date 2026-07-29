@@ -123,44 +123,13 @@ def main():
     print(f"  data {junc.shape}  coverage={cov.mean()*100:.2f}%  observed_rate={obs_rate:.4f}",
           flush=True)
 
-    # Optional deterministic psi init (NNDSVD on the splicing matrix; no cell-type labels anywhere,
-    # so it does not compromise the "without prior cell-type labels" claim the way waypoints would).
-    psi0 = phi0 = None
-    if params.get("init") == "waypoints":
-        # The original paper's scheme: SVD of centred usage ratios -> max-min waypoints -> metacell
-        # means. UNSTRATIFIED, so no cell-type label is read and the "without prior cell-type labels"
-        # claim is preserved. Seed-dependent by design: different seeds pick different waypoints, so
-        # agreement across seeds is a real result rather than a restatement of a fixed start.
-        from leafletfa.initialization import waypoint_init, phi_from_psi
-        psi0, _wphi = waypoint_init(junc, clus, K, seed=seed,
-                                    n_sub=int(params.get("waypoint_n_sub", 20000)))
-        print(f"  [init] waypoints (seed {seed}): contrast {psi0.std(0).mean():.4f}", flush=True)
-        if params.get("init_phi"):
-            # waypoint_init only returns phi for the cells it subsampled, so derive phi for ALL cells
-            # from the waypoint psi instead
-            phi0 = _wphi if _wphi is not None and _wphi.shape[0] == junc.shape[0] else \
-                   phi_from_psi(junc, clus, psi0)
-            print(f"  [init] phi from waypoint psi: median max-loading "
-                  f"{float(np.median(phi0.max(1))):.3f}", flush=True)
-    elif params.get("init") == "jitter":
-        # Deterministic, label-free, K-independent symmetry breaking. Not waypoints: no cell-type
-        # annotation is read. See leafletfa.initialization for why the default start is the problem.
-        from leafletfa.initialization import jitter_psi_init
-        psi0 = jitter_psi_init(junc, clus, K)
-        print(f"  [init] jitter psi_init: contrast {psi0.std(0).mean():.4f}", flush=True)
-    elif params.get("det_init"):
-        from det_init_atlas import build as _det_build
-        psi0 = _det_build(train_h5ad, K)
+    # Initialisation: Pyro's default (init_to_feasible). A full comparison against waypoints,
+    # NNDSVD, a fixed jitter and Pyro's init_to_sample/init_to_median found NOTHING that beat it on
+    # the atlas -- see figures/INIT_COMPARISON_REPORT.md. Those branches are removed rather than left
+    # switched off, so there is one training path and no way to run a variant by accident.
     from leafletfa.minibatch import LeafletFAMinibatch
-    # Pyro's own initialisers, as a one-line alternative to a data-derived start. "sample" draws
-    # from the model's prior, breaking the PROGRAM symmetry (psi spread ~0.12) though not the cell
-    # symmetry (phi stays at 1/K).
-    _strat = {"pyro_sample": "sample", "pyro_median": "median"}.get(params.get("init"), "feasible")
-    if _strat != "feasible":
-        print(f"  [init] pyro init_to_{_strat}", flush=True)
     m = LeafletFAMinibatch(junc, clus, K=K, junc_specific_prior=junc_prior,
-                           learn_ab_hyperprior=learn_ab, likelihood=likelihood,
-                           psi_init=psi0, phi_init=phi0, init_strategy=_strat)
+                           learn_ab_hyperprior=learn_ab, likelihood=likelihood)
     t0 = time.time()
     print(f"  early stopping: {es}", flush=True)
     losses = m.fit(num_steps=num_steps, subsample_size=batch, lr=lr, gamma=gamma, seed=seed,
