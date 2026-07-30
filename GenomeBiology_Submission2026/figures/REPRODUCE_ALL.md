@@ -263,7 +263,6 @@ python $PIPE/A10_effective_K.py  $MODEL_DIR $MODEL_DIR/A10_effective_K.csv      
 python $PIPE/A11_seed_stability.py $MD2/A11_seed_stability.csv                  # convergence vs prior
 python $SIMPY/A13_overdispersion_vs_reproducibility.py $WD/SIMULATION/A13.csv 3 cuda
 python $PIPE/A14_consensus_subspace.py $MODEL_DIR 30 $MODEL_DIR/A14_consensus_K30.npz
-python $SIMPY/A15_seed_consistency_sim.py $WD/SIMULATION/A15_seed_consistency.csv 5 cuda
 ```
 Independently initialised fits agree on Ψ (*r* ≈ 0.97) and π (0.93) but only on ~30–50% of φ
 directions. **A13** shows why, on simulated data where the truth is known: the same design at
@@ -275,9 +274,22 @@ junction-specific prior each moved effective K by ±1 against a within-arm sprea
 
 **A14** is the deliverable: align every fit by Hungarian matching on Ψ (the well-determined latent),
 apply that permutation to all program-indexed latents, and average — yielding one complete consensus
-model that beats any single fit on leave-one-out at every K. **A15** splits the residual variance into
-initialisation and minibatch components and produces the supplementary figure. Rationale and the
-alternatives considered: `SEED_CONSISTENCY_APPROACHES.md`.
+model that beats any single fit on leave-one-out at every K.
+
+**A24** reports every latent at once (matched AND matching-free, with the matching margin), and **A25**
+reports the biological output — whether independent seeds agree on which junctions are elevated in
+which cell types, which needs no program matching at all and is the number to quote. **A23** does the
+same for factor-level DS calls.
+
+```bash
+python $PIPE/A24_latent_correspondence.py $MODEL_DIR 6,7,8 out.csv --labels <train.h5ad>
+python $PIPE/A25_celltype_junction_reproducibility.py $MODEL_DIR 6,7,8 <train.h5ad> out.csv
+python $PIPE/A23_ds_reproducibility.py $MODEL_DIR 6,7,8 out.csv 100 0.1 0.9
+```
+
+The A15/A16-A22 initialisation experiments were removed after the comparison concluded (nothing beat
+Pyro's default on the atlas); they remain in commit `bd923e4` and their results in
+`INIT_COMPARISON_REPORT.md`. Rationale and alternatives: `SEED_CONSISTENCY_APPROACHES.md`.
 
 ---
 

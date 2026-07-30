@@ -175,7 +175,29 @@ def main():
     np.savez_compressed(os.path.join(out_dir, "fit.npz"), psi=psi, phi=phi,
                         losses=np.asarray(losses), **{k: v for k, v in g.items()},
                         **_unc, **_extra)
+    # ---- HARD HEALTH GATE -------------------------------------------------------------------
+    # A non-finite loss during training triggers the checkpoint-restore, which recovers psi, phi and
+    # psis_loc -- but NOT psis_scale, which came back 100% NaN in 4 of 9 fits on 2026-07-29 and was
+    # only noticed a day later, after the evaluations had already been queued against the bad models.
+    # Nothing checked. Now the run FAILS loudly and exits non-zero, so an `afterok` dependency will
+    # not start downstream work on a corrupt fit.
+    bad = []
+    for _k, _v in list(np.load(os.path.join(out_dir, "fit.npz")).items()):
+        _a = np.asarray(_v, dtype=np.float64)
+        if _a.size and not np.isfinite(_a).all():
+            bad.append(f"{_k} ({np.mean(~np.isfinite(_a)):.1%} non-finite)")
+    if not np.isfinite(np.asarray(losses, float)).all():
+        bad.append("losses (training hit a non-finite value)")
+    res["health_ok"] = not bad
+    res["health_problems"] = bad
     json.dump(res, open(os.path.join(out_dir, "result.json"), "w"), indent=2)
+    if bad:
+        print(f"\n  !! FIT IS CORRUPT: {'; '.join(bad)}", flush=True)
+        print("  !! not usable downstream -- exiting non-zero so dependent jobs do not run",
+              flush=True)
+        sys.exit(2)
+    print(f"  health gate: all saved arrays finite", flush=True)
+
 
     # THE loss curve -- now a single continuous ELBO, not 96 stitched per-chunk segments.
     fig, ax = plt.subplots(1, 2, figsize=(11, 4))
