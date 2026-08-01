@@ -174,6 +174,10 @@ Writes `leafletfa_model.pkl.gz` + `run_summary.csv`.
 sbatch --array=0-8 $MODEL_DIR/eval_04e_allcov.sh     # links all 7 resampled files, then:
 python $PIPE/A3_eval_imputation.py <out>/model <train.h5ad> <out>/rs_all \
        <out>/04e_allcov.csv 4096 500 20 3000 0 20 pi
+#      ^^^ the OUTPUT CSV is the 4th positional argument. Omitting it shifts every later
+#      argument by one, so `pi` is parsed as min_cells_per_junc and A3 dies immediately with
+#      `invalid literal for int() with base 10: 'pi'`. Worse, if A4 is chained after it in the
+#      same script the job still exits 0 and the failure is invisible -- chain with `|| exit`.
 #      chunk=4096  epochs=500  patience=20  n_hvj=3000  min_atse=0  min_cells=20  phi_init=pi
 ```
 For each of the seven levels: infer φ from the thinned counts with **every global frozen** (Ψ, π, α,

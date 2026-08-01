@@ -1,7 +1,7 @@
 #!/bin/bash
 /gpfs/commons/home/kisaev/miniconda3/envs/LeafletSC/bin/python - <<'PYEOF'
 import pandas as pd, glob, re, os
-F="/gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/FIGURE2_benchmark"
+F="/gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/FIGURE2_simulation_imputation/data"
 # shard index -> (effect, seed), matching eff2_benchmark.sh exactly
 EFFS=[0.1,0.1,0.1,0.25,0.25,0.25,0.5,0.5,0.5,1.0,1.0,1.0]
 frames=[]

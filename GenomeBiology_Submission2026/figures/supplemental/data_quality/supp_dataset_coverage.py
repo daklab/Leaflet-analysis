@@ -67,7 +67,7 @@ from matplotlib.ticker import LogLocator
 
 HERE = Path(__file__).resolve().parent                    # figures/supplemental/data_quality
 sys.path.insert(0, str(HERE.parent / "_shared"))          # -> _h5ad_scan
-sys.path.insert(0, str(HERE.parent.parent))               # figures/ -> leaflet_theme
+sys.path.insert(0, str(HERE.parent.parent / "_common"))    # figures/_common -> leaflet_theme
 
 import _h5ad_scan as scan                                        # noqa: E402
 from leaflet_theme import (apply_theme, PALETTE, CMAP, PT, INK,  # noqa: E402

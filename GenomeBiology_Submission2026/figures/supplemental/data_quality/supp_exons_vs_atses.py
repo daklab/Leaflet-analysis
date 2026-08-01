@@ -85,7 +85,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_common"))
 from leaflet_theme import (apply_theme, PALETTE, CMAP, PT, INK,     # noqa: E402
                            figsize, panel_label, save)
 

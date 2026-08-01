@@ -1,14 +1,21 @@
-"""Panel builders for Figure 2 (cassette-exon simulation) and Figure 3 (atlas held-out eval).
+"""Panel builders for Figure 2: cassette-exon simulation (2A-D) + held-out imputation (2E-F).
 
-    import build_figures as bf
-    bench = bf.load_benchmark()     # Fig 2: LeafletFA vs NMF on simulated cassette exons
-    sweep = bf.load_sweep()         # Fig 2 supp: which axis matters (lr, prior, waypoints, batching)
-    imp   = bf.load_imputation()    # Fig 3: atlas imputation vs coverage
-    struc = bf.load_structure()     # Fig 3: atlas held-out latent structure
+    import panels as P
+    bench = P.load_benchmark()     # 2B-D: LeafletFA vs NMF on simulated cassette exons
+    imp   = P.load_imputation()    # 2E-F: imputation vs coverage on the held-out 30%
+    struc = P.load_structure()     # supp:  held-out latent structure
+
+NAMING -- "atlas" means the full dataset (Figure 1) and the released full-data models
+(*_full_K30_*). It does NOT mean the work in this file. Everything here is the 70/30 HELD-OUT
+analysis, so the constants and loaders say `impute` / `heldout`. Figure 3 is a different figure
+entirely (calibration against LeafCutter + differential splicing) and lives in FIGURE3_leafcutter_ds.
+
+Layout: this file is in code/, reads from ../data/, writes panels to ../plots/.
 
 Data provenance
 ---------------
-FIG 2  benchmark_results.csv / sweep_results.csv / representative_fit.npz  (this directory)
+2A-D   data/benchmark_results.csv, data/benchmark_effect_sweep.csv, data/representative_fit.npz,
+       data/rerun_logs/{odbench,prbench}_*.csv
        Cassette-exon simulation from pipelines/09_simulation/00_simulate_splicing.py: each ATSE is
        exactly 3 junctions (J1, J2 inclusion; J3 skip), psi[k] = P(skip) per program and
        P(J1) = P(J2) = (1 - psi)/2, so the event collapses to one interpretable number. `atse_total`
@@ -16,9 +23,17 @@ FIG 2  benchmark_results.csv / sweep_results.csv / representative_fit.npz  (this
        real. Sweep axis = fraction of differential ATSEs (10/50/90%), 3 seeds, K_true = 5.
        Baselines: NMF at the same rank with 0-impute and mean-impute (NMF has no missing-data model).
 
-FIG 3  LEAFLETFA_MODELS/2026-07-26_atlas9/eval_grouped/task_*/{04e,07c}_out.csv
-       9 models = K in {10,20,30} x 3 seeds, trained on the 70% split (random init, Beta-Binomial,
-       junction-specific prior, minibatch B=8192, early stopping), evaluated on the held-out 30%.
+2E-F   LEAFLETFA_MODELS/2026-07-30_atlas9_default/eval_grouped/task_*/{04e_allcov*,07c_out}.csv
+       9 models = K in {10,20,30} x 3 seeds, trained on the 70% split (default random init,
+       Beta-Binomial, junction-specific prior, minibatch B=8192, early stopping), evaluated on the
+       held-out 30%. These are the FRESH 2026-07-30 fits; the earlier 2026-07-26_atlas9 models are
+       superseded and must not be mixed in.
+
+       Three entry sets are available per level. `fixed_lost_at_hardest` is the one to lead with --
+       the same 93.4M entries at every coverage level, so the curve is a curve. But at mild
+       downsampling 93% of those entries are still observed and lf_bb/mb/mb_ct pass the observed
+       value through, so plot only the pure-prediction methods (lf, nmf0_tr, nmfm_tr, naive) there;
+       passthrough methods belong on `all_covered`.
 """
 from __future__ import annotations
 import os, glob, json
@@ -27,12 +42,19 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import sys
-_HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(_HERE))
+_CODE = os.path.dirname(os.path.abspath(__file__))          # .../FIGURE2_.../code
+_FIG  = os.path.dirname(_CODE)                              # .../FIGURE2_...
+_HERE = f"{_FIG}/data"                                      # inputs
+_OUT  = f"{_FIG}/plots"                                     # rendered panels
+sys.path.insert(0, f"{os.path.dirname(_FIG)}/_common")
 import leaflet_theme as th
 
-ATLAS_DIR = ("/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/"
-             "MOUSE_SPLICING_FOUNDATION/LEAFLETFA_MODELS/2026-07-26_atlas9")
+# The 70/30 HELD-OUT models -- 9 fits, K in {10,20,30} x 3 seeds, default (random) init,
+# Beta-Binomial, junction-specific prior. Deliberately NOT called "atlas": in this paper "atlas"
+# means the full dataset (Figure 1) and the released full-data models (*_full_K30_*). These are the
+# held-out imputation/transfer models and nothing else.
+IMPUTE_DIR = ("/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/"
+              "MOUSE_SPLICING_FOUNDATION/LEAFLETFA_MODELS/2026-07-30_atlas9_default")
 
 # Fig 2 series. `likelihood` doubles as the arm label: bb/binom for LeafletFA, imputation for NMF.
 SIM_SERIES = [
@@ -99,8 +121,20 @@ def load_benchmark() -> pd.DataFrame:
     return pd.read_csv(f"{_HERE}/benchmark_results.csv")
 
 
-def load_sweep() -> pd.DataFrame:
-    return pd.read_csv(f"{_HERE}/sweep_results.csv")
+def _odbench_csvs() -> list[str]:
+    """Overdispersion-arm results, EXCLUDING the abandoned deterministic-init experiment.
+
+    A bare `odbench_*.csv` glob also matches the six `odbench_detinit_bb{2,20}_seed{0,1,2}.csv`
+    written during the initialisation investigation, which was closed and reverted -- those runs
+    used a different initialiser and were silently being averaged into the overdispersion panels.
+    """
+    out, dropped = [], []
+    for f in sorted(glob.glob(f"{_HERE}/rerun_logs/odbench_*.csv")):
+        (dropped if "detinit" in os.path.basename(f) else out).append(f)
+    if dropped:
+        print(f"  [odbench] excluding {len(dropped)} deterministic-init file(s) from the "
+              f"abandoned init experiment: {', '.join(os.path.basename(f) for f in dropped)}")
+    return out
 
 
 def load_representative() -> dict:
@@ -110,19 +144,25 @@ def load_representative() -> dict:
 
 
 def _task_map() -> dict[int, tuple[int, int]]:
-    p = json.load(open(f"{ATLAS_DIR}/parameter_combinations.json"))
+    p = json.load(open(f"{IMPUTE_DIR}/parameter_combinations.json"))
     return {i: (int(r["K"]), int(r["seed"])) for i, r in enumerate(p)}
 
 
-def _load_atlas(kind: str) -> pd.DataFrame:
+def _load_heldout(kind: str) -> pd.DataFrame:
+    """Concatenate the per-task eval CSVs from the 70/30 held-out models.
+
+    `kind` is the CSV stem, e.g. "07c" for held-out structure or "04e_allcov"/"04e_allcov_fixedset"
+    for imputation. Note the imputation files are named `<kind>.csv`, not `<kind>_out.csv`.
+    """
+    suffix = "_out.csv" if not kind.startswith("04e") else ".csv"
     tmap, frames = _task_map(), []
-    for f in sorted(glob.glob(f"{ATLAS_DIR}/eval_grouped/task_*/{kind}_out.csv")):
+    for f in sorted(glob.glob(f"{IMPUTE_DIR}/eval_grouped/task_*/{kind}{suffix}")):
         t = int(os.path.basename(os.path.dirname(f)).split("_")[1])
         d = pd.read_csv(f)
         d["task"], d["K_cfg"], d["seed"] = t, tmap[t][0], tmap[t][1]
         frames.append(d)
     if not frames:
-        raise FileNotFoundError(f"no {kind}_out.csv under {ATLAS_DIR}/eval_grouped/")
+        raise FileNotFoundError(f"no {kind}{suffix} under {IMPUTE_DIR}/eval_grouped/")
     return pd.concat(frames, ignore_index=True)
 
 
@@ -134,14 +174,14 @@ def load_imputation() -> pd.DataFrame:
     seven levels (10/25/50/75/90/99/100%); use it when present and fall back otherwise.
     """
     try:
-        return _load_atlas("04e_allcov")
+        return _load_heldout("04e_allcov")
     except FileNotFoundError:
         print("  (04e_allcov.csv not found — falling back to the single-coverage 04e_out.csv)")
-        return _load_atlas("04e")
+        return _load_heldout("04e")
 
 
 def load_structure() -> pd.DataFrame:
-    return _load_atlas("07c")
+    return _load_heldout("07c")
 
 
 
@@ -232,7 +272,7 @@ def load_overdispersion() -> pd.DataFrame:
         b = b[np.isclose(b.effect, 0.25)].copy()      # matched effect size
         b["sim_bb_conc"] = float("inf")               # that sweep was generated Binomial
         frames.append(b)
-    od = sorted(glob.glob(f"{_HERE}/rerun_logs/odbench_*.csv"))
+    od = sorted(_odbench_csvs())
     if od:
         frames.append(pd.concat([pd.read_csv(x) for x in od], ignore_index=True))
     if not frames:
@@ -280,7 +320,7 @@ def panel_overdispersion(ax, od: pd.DataFrame, metric: str = "spearman_delta") -
 def load_prior_test() -> pd.DataFrame:
     """All c=2 (atlas-like overdispersion) runs: 3 seeds from the overdispersion arm + 7 more."""
     import glob
-    fs = sorted(glob.glob(f"{_HERE}/rerun_logs/odbench_*.csv")) + \
+    fs = sorted(_odbench_csvs()) + \
          sorted(glob.glob(f"{_HERE}/rerun_logs/prbench_*.csv"))
     if not fs:
         raise FileNotFoundError("no overdispersion / prior-test runs found")
@@ -322,7 +362,7 @@ def panel_prior_interaction(ax, pt: pd.DataFrame, metric: str = "psi_r") -> None
 
 
 # ── reproducibility on real data (A6) ────────────────────────────────────────
-ATLAS_A6 = f"{ATLAS_DIR}/A6_seed_consistency.csv"
+IMPUTE_A6 = f"{IMPUTE_DIR}/A6_seed_consistency.csv"
 # Measured on the atlas, where there is no ground truth: models differing only in random seed are
 # compared to each other. Agreement falls at each level of the pipeline for a mechanical reason —
 # psi pools every training cell, phi_c uses one cell's reads at ~13.5% coverage, and Leiden then
@@ -331,9 +371,9 @@ A6_LEIDEN_ARI = 0.305      # from A5_repro_K10.csv, LeafletFA seed-to-seed Leide
 
 
 def load_seed_consistency() -> pd.DataFrame:
-    if not os.path.exists(ATLAS_A6):
-        raise FileNotFoundError(f"{ATLAS_A6} missing — run A6_seed_consistency.py")
-    return pd.read_csv(ATLAS_A6)
+    if not os.path.exists(IMPUTE_A6):
+        raise FileNotFoundError(f"{IMPUTE_A6} missing — run A6_seed_consistency.py")
+    return pd.read_csv(IMPUTE_A6)
 
 
 def panel_seed_consistency(ax, a6: pd.DataFrame) -> None:
@@ -363,7 +403,7 @@ def panel_seed_consistency(ax, a6: pd.DataFrame) -> None:
 
 
 # ── program x cell-type map, train vs held-out (A7) ──────────────────────────
-ATLAS_A7 = f"{ATLAS_DIR}/A7_prog_ct_K10.npz"
+IMPUTE_A7 = f"{IMPUTE_DIR}/A7_prog_ct_K10.npz"
 
 
 _ACRONYM = {"nk": "NK", "b": "B", "t": "T"}
@@ -376,9 +416,9 @@ def _ct_label(t):
 
 
 def load_program_celltype():
-    if not os.path.exists(ATLAS_A7):
-        raise FileNotFoundError(f"{ATLAS_A7} missing — run A7_program_celltype_map.py")
-    z = np.load(ATLAS_A7, allow_pickle=True)
+    if not os.path.exists(IMPUTE_A7):
+        raise FileNotFoundError(f"{IMPUTE_A7} missing — run A7_program_celltype_map.py")
+    z = np.load(IMPUTE_A7, allow_pickle=True)
     return dict(types=list(z["types"]), train=z["train"], test=z["test"], K=int(z["K"]))
 
 
@@ -781,7 +821,7 @@ def figure_sim(save: bool = True):
                loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
     if save:
-        th.save(fig, f"{_HERE}/FIG2_simulation_draft")
+        th.save(fig, f"{_OUT}/FIG2_simulation_draft")
     return fig
 
 
@@ -841,7 +881,7 @@ def figure_validation(save: bool = True, K: int = 20):
                loc="upper center", bbox_to_anchor=(0.5, 1.0))
 
     if save:
-        th.save(fig, f"{_HERE}/FIG2_validation")
+        th.save(fig, f"{_OUT}/FIG2_validation")
     return fig
 
 
@@ -891,7 +931,7 @@ def figure_simulation(save: bool = True):
     fig.legend(handles, labels, ncol=4, frameon=False, fontsize=th.PT["legend"],
                loc="upper center", bbox_to_anchor=(0.5, 1.0))
     if save:
-        th.save(fig, f"{_HERE}/FIG2_simulation")
+        th.save(fig, f"{_OUT}/FIG2_simulation")
     return fig
 
 
@@ -908,7 +948,7 @@ def figure_heldout_structure_supp(save: bool = True):
         th.panel_label(a, letter)
     fig.tight_layout()
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_heldout_structure")
+        th.save(fig, f"{_OUT}/FIG2_supp_heldout_structure")
     return fig
 
 
@@ -967,11 +1007,11 @@ def figure_sim_supp(save: bool = True):
         print(f"  (minibatch panel skipped: {e})")
 
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_draft")
+        th.save(fig, f"{_OUT}/FIG2_supp_draft")
     return fig
 
 
-def figure_atlas(K: int = 20, save: bool = True):
+def figure_imputation(K: int = 20, save: bool = True):
     """Fig 3 draft: imputation accuracy, calibration, held-out structure."""
     th.apply_theme()
     imp, struc = load_imputation(), load_structure()
@@ -988,7 +1028,7 @@ def figure_atlas(K: int = 20, save: bool = True):
         th.panel_label(a, letter)
     fig.tight_layout()
     if save:
-        th.save(fig, f"{_HERE}/FIG3_atlas_draft")
+        th.save(fig, f"{_OUT}/FIG2_imputation")
     return fig
 
 
@@ -996,7 +1036,7 @@ TASKS_BY_K = {10: (0, 1, 2), 20: (3, 4, 5), 30: (6, 7, 8)}
 
 
 def load_program_celltype_task(task):
-    p = f"{ATLAS_DIR}/A7_prog_ct_task{task}.npz"
+    p = f"{IMPUTE_DIR}/A7_prog_ct_task{task}.npz"
     if not os.path.exists(p):
         return None
     z = np.load(p, allow_pickle=True)
@@ -1024,8 +1064,8 @@ def _align_to(ref, m):
 
 
 def load_transfer_controls(K=10):
-    c = f"{ATLAS_DIR}/A9_K{K}_controls.csv"
-    g = f"{ATLAS_DIR}/A9_K{K}_gram.npz"
+    c = f"{IMPUTE_DIR}/A9_K{K}_controls.csv"
+    g = f"{IMPUTE_DIR}/A9_K{K}_gram.npz"
     if not (os.path.exists(c) and os.path.exists(g)):
         raise FileNotFoundError(f"{c} / {g} missing — run A9_transfer_controls.py")
     return pd.read_csv(c), np.load(g, allow_pickle=True)
@@ -1119,7 +1159,7 @@ def figure_transfer_controls(K: int = 10, save: bool = True):
     panel_celltype_gram(axes_b, gz, cbar_ax=fig.add_subplot(gs[1, 3]))
     th.panel_label(axes_b[0], "B", dx=-0.62)
 
-    gr = pd.read_csv(f"{ATLAS_DIR}/A9_K{K}_gram.csv")
+    gr = pd.read_csv(f"{IMPUTE_DIR}/A9_K{K}_gram.csv")
     across = gr[gr.comparison.str.contains("_vs_seed")]["gram_r"]
     within = gr[gr.comparison.str.contains("train_vs_test")]["gram_r"]
     axes_b[1].text(0.5, -0.10,
@@ -1128,7 +1168,7 @@ def figure_transfer_controls(K: int = 10, save: bool = True):
                    transform=axes_b[1].transAxes, ha="center", fontsize=th.PT["annot"],
                    color=th.INK)
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_transfer_controls_K{K}")
+        th.save(fig, f"{_OUT}/FIG2_supp_transfer_controls_K{K}")
     return fig
 
 
@@ -1136,6 +1176,66 @@ def figure_transfer_controls(K: int = 10, save: bool = True):
 SIM_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION"
 A15_CSV = f"{SIM_DIR}/A15_seed_consistency.csv"
 DISP_ORDER = ["no overdispersion", "mild (c=20)", "atlas-like (c=2)"]
+
+
+A26_NPZ = f"{SIM_DIR}/A26_cellcell.npz"
+A26_LEVELS = [("binom", "no overdispersion"), ("bb20", "mild (c=20)"), ("bb2", "atlas-like (c=2)")]
+
+
+def figure_cellcell_consistency(save: bool = True, n_show: int = 400):
+    """Do independently seeded fits group the same cells together? (simulation, truth known)
+
+    Cell-cell similarity S[i,j] = corr(phi_i, phi_j) is invariant to relabelling the programs or to
+    dividing the same variation among them differently, so it sidesteps the matching problem that
+    makes every per-program comparison ambiguous -- on the atlas at K=30, 62% of programs match a
+    second partner within 0.02 of the one Hungarian picks.
+
+    Rows are overdispersion levels. First two columns are two independent seeds; the third is the
+    TRUTH. Cells are ordered by their true program, so a reproducible fit shows the same block
+    structure in all three. Reading across a row separates "the seeds agree" from "the seeds are
+    right": an initialisation that made every run agree on a wrong grouping would match in columns 1-2
+    and differ from column 3.
+    """
+    if not os.path.exists(A26_NPZ):
+        raise FileNotFoundError(f"{A26_NPZ} missing — run A26_cellcell_consistency.py")
+    th.apply_theme()
+    z = np.load(A26_NPZ, allow_pickle=True)
+    summ = pd.DataFrame(z["summary"]) if "summary" in z.files else None
+    levels = [(t, l) for t, l in A26_LEVELS if f"S_{t}_seed0" in z.files]
+    fig, axes = plt.subplots(len(levels), 3, figsize=th.figsize("onehalf", 1.9 * len(levels) + 0.9),
+                             gridspec_kw=dict(wspace=0.08, hspace=0.30, left=0.16, right=0.88))
+    axes = np.atleast_2d(axes)
+    for r, (tag, lab) in enumerate(levels):
+        order = np.argsort(np.asarray(z[f"order_{tag}"]))[:n_show]
+        panels = [(f"S_{tag}_seed0", "Seed 0"), (f"S_{tag}_seed1", "Seed 1"),
+                  (f"S_{tag}_true", "True $\\phi$")]
+        for c, (key, ttl) in enumerate(panels):
+            ax = axes[r, c]
+            M = np.asarray(z[key])[np.ix_(order, order)]
+            im = ax.imshow(M, cmap=th.CMAP["diverging"], vmin=-1, vmax=1, aspect="equal",
+                           interpolation="nearest")
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ("top", "right", "bottom", "left"):
+                ax.spines[sp].set_visible(False)
+            if r == 0:
+                ax.set_title(ttl, fontsize=th.PT["annot"])
+            if c == 0:
+                ax.text(-0.10, 0.5, lab, transform=ax.transAxes, rotation=90, va="center",
+                        ha="center", fontsize=th.PT["annot"])
+        if summ is not None and tag in list(summ["dispersion"].astype(str)):
+            row = summ[summ["dispersion"].astype(str) == tag].iloc[0]
+            axes[r, 1].text(0.5, -0.09,
+                            f"between seeds r = {float(row['between_seeds']):.3f}   ·   "
+                            f"vs truth r = {float(row['vs_truth']):.3f}",
+                            transform=axes[r, 1].transAxes, ha="center",
+                            fontsize=th.PT["annot"] - 1, color=th.INK)
+    cb = fig.colorbar(im, ax=axes, fraction=0.02, pad=0.02)
+    cb.set_label(r"cell-cell similarity in $\phi$", fontsize=th.PT["annot"])
+    cb.ax.tick_params(labelsize=th.PT["annot"])
+    th.panel_label(axes[0, 0], "A", dx=-0.22)
+    if save:
+        th.save(fig, f"{_OUT}/FIG2_supp_cellcell_consistency")
+    return fig
 
 
 def figure_seed_consistency_sim(save: bool = True):
@@ -1183,7 +1283,7 @@ def figure_seed_consistency_sim(save: bool = True):
                  transform=axes[2].transAxes, ha="center", fontsize=th.PT["annot"] - 1,
                  color=th.PALETTE["grey"])
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_seed_consistency_sim")
+        th.save(fig, f"{_OUT}/FIG2_supp_seed_consistency_sim")
     return fig
 
 
@@ -1243,7 +1343,7 @@ def figure_transfer_all_K(save: bool = True, Ks=(10, 20, 30)):
     # ---- B: seed agreement on cell-type structure, per K ----
     axb = fig.add_subplot(gs[0, 2])
     for i, (K, _, _) in enumerate(have):
-        gr = pd.read_csv(f"{ATLAS_DIR}/A9_K{K}_gram.csv")
+        gr = pd.read_csv(f"{IMPUTE_DIR}/A9_K{K}_gram.csv")
         a = gr[gr.comparison.str.contains("_vs_seed")]["gram_r"].values
         b = gr[gr.comparison.str.contains("train_vs_test")]["gram_r"].values
         for xoff, v, col, lab in ((-0.13, a, th.PALETTE["indigo"], "between seeds"),
@@ -1292,7 +1392,7 @@ def figure_transfer_all_K(save: bool = True, Ks=(10, 20, 30)):
     cb.set_label(r"similarity of $\phi$ profiles ($r$)", fontsize=th.PT["annot"])
     cb.ax.tick_params(labelsize=th.PT["annot"])
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_transfer_all_K")
+        th.save(fig, f"{_OUT}/FIG2_supp_transfer_all_K")
     return fig
 
 
@@ -1348,7 +1448,7 @@ def figure_program_celltype_all(K: int, save: bool = True):
     cb.set_label("mean loading", fontsize=th.PT["annot"])
     fig.suptitle(f"K = {K}", fontsize=th.PT["label"], y=0.97)
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_program_celltype_K{K}")
+        th.save(fig, f"{_OUT}/FIG2_supp_program_celltype_K{K}")
     return fig
 
 
@@ -1363,23 +1463,5 @@ def figure_program_celltype(save: bool = True):
     th.panel_label(ax[0], "A", dx=-0.42)
     th.panel_label(ax[1], "B", dx=-0.06)
     if save:
-        th.save(fig, f"{_HERE}/FIG2_supp_program_celltype")
+        th.save(fig, f"{_OUT}/FIG2_supp_program_celltype")
     return fig
-
-
-if __name__ == "__main__":
-    for name, fn in (("FIG2_validation", figure_validation),
-                     ("FIG2_supp_draft", figure_sim_supp),
-                     ("FIG2_supp_heldout_structure", figure_heldout_structure_supp),
-                     ("FIG2_supp_program_celltype", figure_program_celltype),
-                     ("FIG2_supp_program_celltype_K10", lambda: figure_program_celltype_all(10)),
-                     ("FIG2_supp_program_celltype_K20", lambda: figure_program_celltype_all(20)),
-                     ("FIG2_supp_program_celltype_K30", lambda: figure_program_celltype_all(30)),
-                     ("FIG2_supp_transfer_controls_K10", lambda: figure_transfer_controls(10)),
-                     ("FIG2_supp_transfer_all_K", figure_transfer_all_K),
-                     ("FIG2_supp_seed_consistency_sim", figure_seed_consistency_sim)):
-        try:
-            fn()
-            print(f"wrote {name}.{{pdf,png}}")
-        except FileNotFoundError as e:
-            print(f"{name} skipped: {e}")
