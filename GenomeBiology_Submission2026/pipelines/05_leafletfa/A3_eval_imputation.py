@@ -32,6 +32,17 @@ Usage:
     python A3_eval_imputation.py <run_dir> <train_h5ad> <resampled_dir> <output_csv>
         [chunk_size=4096] [num_epochs=100] [patience=10]
         [n_hvj=10000] [min_atse=0] [min_cells_per_junc=20] [phi_init_mode=pi]
+        [hardest_h5mu]
+
+<output_csv> is the 4th POSITIONAL argument. Omitting it shifts every later argument by one and the
+run dies on `int('pi')` -- and if anything is chained after it in the same job the failure is
+invisible, so chain with `|| exit`.
+
+[hardest_h5mu] is optional. Given the h5mu at the hardest downsampling, a third entry set
+`fixed_lost_at_hardest` is scored alongside `all_covered` and `lost_to_downsampling`: the entries
+covered originally but absent at that hardest level, held FIXED across every coverage level so the
+curve is a curve rather than a moving population. See the note above `fixed_lost_mask` for the
+verified counts. Every method is written for every entry set; the figure does the subsetting.
 """
 
 import sys
@@ -639,7 +650,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                        dir_conc, bb_conc, junc_specific_prior, pi_init, alpha_pi_init,
                        chunk_size, num_epochs, patience, min_atse, min_cells_per_junc,
                        svd=None, nn_index=None, train_phi=None, junc_means=None,
-                       phi_init_mode="atlas", rng=None, train_h5ad=None):
+                       phi_init_mode="atlas", rng=None, train_h5ad=None,
+                       hardest_pm=None):
 
     J_all = psi.shape[1]
     psi_hvj = psi[:, hvj_idx]       # (K × n_hvj)
@@ -851,6 +863,42 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     # so it is the honest head-to-head, and it is the number to lead Figure 3 with.
     pm_bool  = pm_hvj.toarray().astype(bool)
     lost_mask = cov_mask & ~pm_bool
+
+    # "fixed_lost" -- the SAME entries at every coverage level.
+    #
+    # `lost_mask` above changes composition along the coverage axis and so cannot be read as a
+    # performance-vs-coverage curve: the shallowest entries lose their last read first, so the lost
+    # set starts out enriched for single-read entries and grows steadily deeper as more reads are
+    # removed. Two effects then move in opposite directions -- the task gets harder while the target
+    # gets cleaner -- and they largely cancel, which is why `lf` looks flat at ~0.05 across a
+    # 450-fold depth range.
+    #
+    # Fixing the population removes the confound: take the entries that are covered originally and
+    # absent at the HARDEST downsampling, and score those same entries everywhere. Coverage is
+    # ATSE-level by construction (psi_mask is exactly cluster_matrix > 0 -- verified, identical nnz
+    # 9,409,850 -- and the cluster matrix is the ATSE total), so an ATSE is either wholly present or
+    # wholly absent in a cell and all of its junctions travel together automatically. Verified
+    # directly: over 400 ATSEs / 15.9M cell-ATSEs, zero were partially observed.
+    #
+    # Verified properties of this set on the 70/30 held-out data (n_hvj=3000 -> 12,197 junctions /
+    # 2,754 ATSEs / 2,329 genes / 39,812 cells; 95,710,571 covered pairs):
+    #   fixed_lost = 93,394,617 entries (97.6% of covered), spanning ALL of those junctions, ATSEs,
+    #   genes and cells; median original ATSE depth 8, mean 22.7, 10.7% single-read.
+    #   Still observed at each level (% dropped -> % still observed):
+    #     10 -> 93.3 | 25 -> 91.4 | 50 -> 86.4 | 75 -> 74.6 | 90 -> 55.2 | 99 -> 14.9 | 100 -> 0.0
+    # Note the levels are INDEPENDENT resamples, not a nested thinning: ~1.03M entries (1.1%) lost at
+    # 99% dropped are still observed at 100% dropped. So this is "absent at the hardest level", not
+    # "absent at every level at or beyond".
+    fixed_lost_mask = None
+    if hardest_pm is not None:
+        fixed_lost_mask = cov_mask & ~hardest_pm
+        _still_obs = float((fixed_lost_mask & pm_bool).sum() / max(fixed_lost_mask.sum(), 1))
+        print(f"  fixed_lost entries: {int(fixed_lost_mask.sum()):,} "
+              f"({100.0*fixed_lost_mask.sum()/max(cov_mask.sum(),1):.1f}% of covered); "
+              f"{_still_obs:.1%} of them are STILL OBSERVED at this level")
+        print(f"    -> where they are still observed, lf_bb/mb/mb_ct pass the observed value "
+              f"through; only lf/nmf0/nmfm are pure prediction everywhere. All methods are still "
+              f"written to the CSV; the figure subsets them.")
     del pm_bool
     print(f"\n  Entry sets: all_covered={int(cov_mask.sum()):,}  "
           f"lost_to_downsampling={int(lost_mask.sum()):,} "
@@ -974,6 +1022,10 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                  **m_all})
 
     # THE HONEST HEAD-TO-HEAD: only entries lost to downsampling, where no method can pass through
+    if fixed_lost_mask is not None and fixed_lost_mask.sum() > 0:
+        m_fx = compute_metrics_for_mask(all_mask, entry_mask=fixed_lost_mask)
+        rows.append({"dataset": "all", "entry_set": "fixed_lost_at_hardest",
+                     **base_row, **m_fx})
     if lost_mask.sum() > 0:
         m_lost = compute_metrics_for_mask(all_mask, entry_mask=lost_mask)
         print(f"\n  === LOST-ENTRY imputation (no passthrough possible) ===")
@@ -1022,6 +1074,8 @@ def main():
     min_atse           = int(sys.argv[9])  if len(sys.argv) > 9  else 0
     min_cells_per_junc = int(sys.argv[10]) if len(sys.argv) > 10 else 20
     phi_init_mode      = sys.argv[11]      if len(sys.argv) > 11 else "pi"
+    # optional: h5mu at the HARDEST downsampling, used to fix the lost-entry population
+    hardest_pm_path    = sys.argv[12]      if len(sys.argv) > 12 else None
 
     if phi_init_mode not in ("atlas", "pi"):
         print(f"ERROR: phi_init_mode must be 'atlas' or 'pi', got '{phi_init_mode}'")
@@ -1110,6 +1164,32 @@ def main():
     # Compute HVJ once from the lowest-dropout file
     hvj_idx = compute_hvj_indices(h5mu_files[0], n_hvj)
 
+    # Read the HARDEST level's psi_mask ONCE, not once per level -- these files are ~38 GB each and
+    # the mask does not depend on the level being scored.
+    hardest_pm = None
+    if hardest_pm_path:
+        # Fail fast and loudly. A wrong path here would otherwise either crash 6 h in or, worse,
+        # silently produce a fixed set defined at the wrong coverage level.
+        if not os.path.exists(hardest_pm_path):
+            print(f"ERROR: hardest_h5mu does not exist: {hardest_pm_path}")
+            sys.exit(1)
+        _hard_pct = max(int(re.search(r"RESAMPLED_(\d+)_PERCENT", p).group(1))
+                        for p in h5mu_files)
+        _got_pct = re.search(r"RESAMPLED_(\d+)_PERCENT", os.path.basename(hardest_pm_path))
+        if not _got_pct or int(_got_pct.group(1)) != _hard_pct:
+            print(f"ERROR: hardest_h5mu is not the hardest level. The percentage in the filename is "
+                  f"percent DROPPED, so the hardest of the {len(h5mu_files)} levels found is "
+                  f"{_hard_pct}%, but got '{os.path.basename(hardest_pm_path)}'.")
+            sys.exit(1)
+        print(f"\nReading hardest-level psi_mask for the fixed entry set ({_hard_pct}% dropped):\n"
+              f"  {os.path.basename(hardest_pm_path)}")
+        with h5py.File(hardest_pm_path, "r") as _hf:
+            _s = _hf["mod/splicing"] if "mod/splicing" in _hf else _hf
+            hardest_pm = read_sparse_layer(
+                _s["layers/psi_mask"])[:, hvj_idx].toarray().astype(bool)
+        print(f"  observed at hardest level: {int(hardest_pm.sum()):,} of "
+              f"{hardest_pm.size:,} (cell, HVJ) pairs")
+
     # Single rng across all dropout levels for reproducible pi-init draws
     rng = np.random.default_rng(42)
 
@@ -1128,7 +1208,8 @@ def main():
             chunk_size, num_epochs, patience, min_atse, min_cells_per_junc,
             svd=svd_phi, nn_index=nn_index_phi,
             train_phi=train_phi_arr, junc_means=junc_means_phi,
-            phi_init_mode=phi_init_mode, rng=rng, train_h5ad=train_h5ad
+            phi_init_mode=phi_init_mode, rng=rng, train_h5ad=train_h5ad,
+            hardest_pm=hardest_pm
         )
 
         base = {
