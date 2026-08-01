@@ -1,5 +1,14 @@
 # Getting one consistent model out of a stochastic fit
 
+> **CLOSED — 2026-07-30.** No initialisation tried beat the Pyro default on the atlas, which is
+> the arm that decides (simulation mispredicted the atlas twice). Waypoints and jitter both work
+> mechanically at scale and neither improved cross-seed reproducibility. The variant branches were
+> removed from `A1`, and the 70/30 models were retrained from the default path as
+> `2026-07-30_atlas9_default`. Seed variation is now **reported, not engineered away** — see
+> `FIGURE_OUTLINE_ALL.md` § "Cross-cutting: initialisation and reproducibility".
+>
+> Kept for the evidence, and because a reviewer will ask what was tried. Companion document: `INIT_COMPARISON_REPORT.md` (the measured results).
+
 **Question.** Independently initialised LeafletFA fits agree on Ψ (*r* ≈ 0.97) and π (*r* ≈ 0.93) but
 only on ~30–50% of φ directions. We want one released model, and to be able to say the structure is
 learned consistently — without waypoint initialisation, which reads cell-type labels and so undercuts

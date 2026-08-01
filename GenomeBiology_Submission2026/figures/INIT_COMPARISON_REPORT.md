@@ -1,5 +1,14 @@
 # Initialisation comparison — simulation and 70% atlas
 
+> **CLOSED — 2026-07-30.** No initialisation tried beat the Pyro default on the atlas, which is
+> the arm that decides (simulation mispredicted the atlas twice). Waypoints and jitter both work
+> mechanically at scale and neither improved cross-seed reproducibility. The variant branches were
+> removed from `A1`, and the 70/30 models were retrained from the default path as
+> `2026-07-30_atlas9_default`. Seed variation is now **reported, not engineered away** — see
+> `FIGURE_OUTLINE_ALL.md` § "Cross-cutting: initialisation and reproducibility".
+>
+> Kept for the evidence, and because a reviewer will ask what was tried. Companion document: `SEED_CONSISTENCY_APPROACHES.md` (what the field does, and why).
+
 **Goal:** consistent, meaningful programs across random seeds.
 
 Every arm is scored on BOTH axes. Consistency alone is not success: an initialisation that makes

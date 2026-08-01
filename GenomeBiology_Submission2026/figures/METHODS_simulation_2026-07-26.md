@@ -210,8 +210,8 @@ seeds) with standard errors; comparisons between methods use Welch's *t*-test.
 ## Code availability
 
 `pipelines/09_simulation/00_simulate_splicing.py` (simulation),
-`figures/FIGURE2_benchmark/sim_benchmark.py` (fitting and evaluation),
-`figures/FIGURE2_benchmark/build_figures.py` (figures).
+`figures/FIGURE2_simulation_imputation/code/sim_benchmark.py` (fitting and evaluation),
+`figures/FIGURE2_simulation_imputation/code/panels.py` (figures).
 
 ---
 

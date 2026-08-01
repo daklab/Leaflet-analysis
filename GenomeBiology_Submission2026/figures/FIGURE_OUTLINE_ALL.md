@@ -1,9 +1,20 @@
 # Figure outline, Figures 1–5 — status and what remains
 
-*Working record, 2026-07-29. Supersedes `FIGURE_OUTLINE_2_3.md`, which is stale: it references
-`benchmark_sweep.py`, `sweep_results.csv` and the 2026-07-18 models (all replaced), and repeats the
-"waypoints collapse seed variance ~130×" figure from **before** the Pyro-plate rewrite, which no
-longer describes the trainer.*
+*Working record, updated 2026-08-01. The single authority for what each figure contains.
+`FIGURE_OUTLINE_2_3.md` was deleted on 2026-08-01 — it referenced `benchmark_sweep.py`,
+`sweep_results.csv` and the 2026-07-18 models (all replaced) and described the pre-Pyro-plate
+trainer. Recover it from git history if ever needed.*
+
+**Directory layout (2026-08-01).** Each figure has `code/ data/ plots/`; shared modules are in
+`figures/_common/`. `FIGURE2_benchmark` → `FIGURE2_simulation_imputation`, `FIGURE3_programs` →
+`FIGURE3_leafcutter_ds`, `FIGURE4_parsebio` → `FIGURE4_aging`. Panels are built by
+`FIGURE2_simulation_imputation/code/build_sim.py` and `build_imputation.py`, both thin entry points
+over the shared `panels.py`.
+
+**"Atlas" means the full dataset (Figure 1) and the released full-data models (`*_full_K30_*`).**
+It does not mean the 70/30 held-out imputation work, which is named `impute`/`heldout` throughout.
+The held-out models are `2026-07-30_atlas9_default` — the directory keeps its historical name, but
+nothing in the figure code calls it atlas.
 
 Status: **✅ built** · **📊 data ready, figure to build** · **⏳ running** · **🔧 to build** ·
 **❓ inputs not inspected**
@@ -54,15 +65,24 @@ Reproduction: `REPRODUCE_ALL.md` §A.
 Effect-size recovery 0.41 → 0.96 with ΔΨ; **both NMF variants ~0 at every effect size**. Silhouette
 0.55 → 0.87 vs NMF −0.05 → 0.49.
 
-### 2b — Imputation on held-out cells 📊 DATA READY (A3 9/9)
+### 2b — Imputation on held-out cells ⏳ fixed-entry-set rerun in flight (`19414852`)
 
 | panel | content | status |
 |---|---|---|
-| E | imputation accuracy vs coverage (10–100%) — LeafletFA vs NMF 0-impute / mean-impute / naive / mean-Bayes | 📊 **build this first** |
-| F | imputation at matched coverage, by K | 📊 |
+| E | imputation accuracy vs coverage on **`fixed_lost_at_hardest`** — LeafletFA vs NMF-transfer (0-impute / mean-impute) vs naive. **Pure-prediction methods only** | ⏳ |
+| F | imputation at matched coverage, by K (10/20/30) | ⏳ |
+| E-supp | the same curve on `all_covered` with every method, plus the old `lost_to_downsampling` curve and its moving-population caveat — the contrast is what justifies the fixed set | 🔧 |
 
-Longest-running analysis in the project (~13 h for 9 models × 7 coverage levels); finished this
-morning and nothing blocks the panels.
+**Why a rerun.** The original entry set changes composition at every coverage level, so its curve is
+not a curve; the fixed set holds the same 93.4M entries throughout. Full derivation, verified counts
+and the plotting caveat are in `REPRODUCE_ALL.md` §B3b — read that before building these panels.
+
+The one thing not to get wrong: at mild downsampling **93% of the fixed set is still observed**, and
+`lf_bb`/`mb`/`mb_ct` pass observed values through. Plot them here and the junction-mean baseline
+appears to beat LeafletFA for reasons that have nothing to do with imputation. All methods are in the
+CSV; panel E subsets to the ones that predict at every level.
+
+~7 h per batch of 3 tasks, 9 tasks at `%3` → ~21 h.
 
 ### Design decisions, each with its own evidence
 - **Beta-Binomial over Binomial** — indistinguishable on non-overdispersed data *by construction*;
@@ -199,34 +219,36 @@ Gates the released model, so it gates Figures 3–5.
   the **real atlas worse** (effective K 36% → 29%). Arbitrary symmetry-breaking is not the answer.
 - Decomposition: location **−0.010**, symmetry **+0.092**, data content **+0.066**.
 
-**Running:** `19358688` — A20, simulation, three arms (default / waypoints-ψ / waypoints-ψ-and-φ) at
-three overdispersion levels × 3 seeds, reporting consistency **and** accuracy against known φ.
+**CLOSED (2026-07-30).** Jobs `19358688` (A20 simulation, three init arms × three overdispersion
+levels × 3 seeds) and `19358721` (the same on the 70% atlas, K = 30) both landed. **No initialisation
+tried beat the default.** Waypoints and jitter were each verified to work mechanically at scale
+(waypoint contrast 0.1494 against 0.000 for the default) yet neither improved cross-seed
+reproducibility on the atlas, which is the result that decides — simulation had already mispredicted
+the atlas once. The variant branches were removed from `A1`, and the 70/30 models were retrained from
+the default path as `2026-07-30_atlas9_default` (9/9 finite, health-gated).
 
-**Also running:** `19358721` — `2026-07-29_atlas70_K30_waypoints`, the same comparison on the 70%
-atlas, K = 30 × 3 seeds. Launched in parallel rather than gated behind A20, because simulation already
-mispredicted the atlas once (jitter helped in simulation at c = 2, hurt on the atlas), so the atlas
-result is the one that decides. Waypoint init verified working at scale: contrast 0.1494 against 0.000
-for the default and 0.065 for jitter.
-
-**Why waypoints:** SVD of centred usage ratios → max-min waypoints → metacell means. **Unstratified**,
-so no cell-type label is read and the "without prior cell-type labels" claim holds. **Seed-dependent
-by design**, so "three seeds agree" is a real result rather than a restatement of a fixed start.
-
-**Then:** `A19_uncertainty_calibration.py` — does per-cell posterior width predict which cells the
-seeds disagree on? If yes, seed variation is reportable as *calibrated uncertainty*. `A1` now saves
-`phi_sd` and `phi_top_prob`.
+Consequence for the paper: seed variation is **reported, not engineered away**. Ψ, π and the
+cell-type × junction rate are what reproduce; per-cell φ does not, for the overdispersion reason
+established above. The `A19_uncertainty_calibration.py` question — does per-cell posterior width
+predict which cells the seeds disagree on — remains open and is the honest way to present it; `A1`
+saves `phi_sd` and `phi_top_prob` for exactly this.
 
 ---
 
 ## Immediate to-do, in order
 
-1. **Build Fig 2E/2F (imputation)** — data ready since this morning, nothing blocks it.
-2. **A20 + `19358721` land** → decide initialisation from the ATLAS result (simulation is advisory
-   only, having mispredicted once). Watcher writes `figures/WAYPOINT_RESULT.md`.
+1. **Build Fig 2E/2F (imputation)** from `04e_allcov_fixedset.csv` once the fixed-entry-set array
+   lands (`19414852`, ~21 h). Plot **pure-prediction methods only** on `fixed_lost_at_hardest` —
+   at mild downsampling 93% of that set is still observed and the passthrough methods would win
+   spuriously. See `REPRODUCE_ALL.md` §B3b.
+2. **Regenerate the A7/A9 supplements** — queued as `19414889` → `19414890` behind the imputation
+   array. Every program × cell-type and transfer-control panel previously on disk came from the
+   *superseded* 2026-07-26 models; those files are deleted rather than left to mislead.
 3. **Fig 2A** hand-drawn cassette schematic — the only missing piece of an otherwise complete 2a.
-4. **Inspect the Fig 3 LeafCutter outputs** and the Fig 4 / Fig 5 pipelines; replace ❓ with real status.
-5. **Reconcile the DS/FDR machinery** before Fig 3 numbers are quoted.
-6. Retire `FIGURE_OUTLINE_2_3.md`.
+4. **Cell-type group-vs-group DS reproducibility** on the fresh models (`A23` adapted to
+   `compute_differential_splicing_groups`) — prerequisite for Fig 3A′.
+5. **Inspect the Fig 3 LeafCutter outputs** and the Fig 4 / Fig 5 pipelines; replace ❓ with real status.
+6. **Reconcile the DS/FDR machinery** before Fig 3 numbers are quoted.
 
 ## Known loose ends
 - `phi_uncertainty` logged `median sd nan` on the atlas though the saved array has 0% NaN — the printed

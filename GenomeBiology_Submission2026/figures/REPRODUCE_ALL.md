@@ -18,7 +18,7 @@ WD    = /gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD
 REPO  = /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026
 PIPE  = $REPO/pipelines/05_leafletfa
 SIMPY = $REPO/pipelines/09_simulation
-FIG2  = $REPO/figures/FIGURE2_benchmark
+FIG2  = $REPO/figures/FIGURE2_simulation_imputation
 ```
 
 ---
@@ -145,10 +145,15 @@ test  : $WD/.../MODEL_INPUT/20260526/resampled/RESAMPLED_{10,25,50,75,90,99,100}
 The 70/30 split is by **cell**. Each resampled file carries both the downsampled counts and the
 `*_original` full-coverage layers, which are the evaluation truth.
 
-### B1 · Train the atlas models
+### B1 · Train the 70/30 held-out models
 ```
-MODEL_DIR = $WD/.../LEAFLETFA_MODELS/2026-07-26_atlas9
+MODEL_DIR = $WD/.../LEAFLETFA_MODELS/2026-07-30_atlas9_default
 ```
+**Naming caution.** Despite the directory name, `*_atlas9_default` are the **70/30 held-out**
+models — 9 fits used for imputation and transfer evaluation. The *atlas* models, meaning the
+released full-data fits, are `*_full_K30_*` (see `REPRODUCE_FULL_ATLAS.md`). The directory keeps its
+historical name so job logs stay traceable, but the figure code calls it `IMPUTE_DIR`.
+`2026-07-26_atlas9` is **superseded** — it is the pre-retrain set and must not be mixed in.
 `parameter_combinations.json` defines **9 models**: K ∈ {10, 20, 30} × seeds {0, 1, 2}, Beta-Binomial
 likelihood, junction-specific Ψ prior, **random initialisation with `waypoints_use=false`** — no
 cell-type label enters model fitting anywhere in the pipeline.
@@ -190,6 +195,53 @@ Baselines: junction mean; cell-type mean (uses labels, so an upper bound rather 
 comparator); NMF in-sample; and NMF-transfer, whose dictionary is fitted on the training cells and
 cached once per model — it does not depend on how the test set was thinned, so it is not refitted per
 level.
+
+#### B3b · The FIXED entry set — this is the one the coverage curve is read from
+```bash
+sbatch $MODEL_DIR/run_imputation_fixedset.sh          # array 0-8%3, ~7 h per batch of 3
+python $PIPE/A3_eval_imputation.py <out>/model <train.h5ad> <out>/rs_all \
+       <out>/04e_allcov_fixedset.csv 4096 500 20 3000 0 20 pi $RS/RESAMPLED_100_PERCENT_...h5mu
+#                                                                ^^^ 12th positional, new
+```
+**Read the level names correctly: the number in `RESAMPLED_<n>_PERCENT` is percent DROPPED.** So
+`100_PERCENT` is the *hardest*, most-depleted file, not the fullest. A3 now refuses to run if the
+12th argument is not the hardest of the levels it found.
+
+The default entry set `lost_to_downsampling` (covered originally, absent after downsampling) **cannot
+be read as a performance-vs-coverage curve**, because its membership changes at every level: the
+shallowest entries lose their last read first, so the set starts enriched for single-read entries and
+grows deeper as more reads are removed. The task gets harder while the target gets cleaner, the two
+largely cancel, and LeafletFA reads flat at ~0.05 across a 450-fold depth range.
+
+`fixed_lost_at_hardest` fixes the population once, at the hardest level, and scores those same
+entries everywhere. Verified before running:
+
+| | |
+|---|---|
+| entries | **93,394,617** — 97.6% of the 95,710,571 covered pairs |
+| spans | all **12,197** junctions / **2,754** ATSEs / **2,329** genes / **39,812** cells |
+| original ATSE depth | median 8, mean 22.7, 10.7% single-read |
+
+Coverage is ATSE-level by construction — `psi_mask` is exactly `cell_by_cluster_matrix > 0` (identical
+nnz) and the cluster matrix holds ATSE totals — so an ATSE is wholly present or wholly absent in a
+cell and all its junctions travel together. Confirmed directly: 0 partially-observed cell-ATSEs over
+400 ATSEs / 15.9M cell-ATSEs.
+
+**Plotting caveat that matters.** The fraction of the fixed set still *observed* at each level is
+93.3 / 91.4 / 86.4 / 74.6 / 55.2 / 14.9 / 0.0 % (10 → 100 % dropped). Where an entry is still
+observed, `lf_bb`, `mb` and `mb_ct` pass the observed value straight through, so on this entry set
+the junction-mean baseline would appear to beat LeafletFA at high coverage for reasons that have
+nothing to do with imputation. Only `lf`, `nmf0`, `nmfm`, `nmf0_tr`, `nmfm_tr` are pure prediction at
+every level. **All methods are written to the CSV for every entry set** — the figure subsets them:
+pure-prediction methods on `fixed_lost_at_hardest`, passthrough methods on `all_covered`.
+
+All three entry sets appear in the same CSV, so the `all_covered` rows of
+`04e_allcov_fixedset.csv` should match `04e_allcov.csv` exactly — a free regression check that the
+new argument changed nothing else.
+
+Footnote: the downsampling levels are **independent resamples, not a nested thinning** — ~1.03M
+entries (1.1%) lost at 99% dropped are still observed at 100% dropped. So the set is "absent at the
+hardest level", not "absent at every level at or beyond".
 
 ### B4 · Held-out latent structure (07c)
 ```bash
@@ -300,7 +352,7 @@ Pyro's default on the atlas); they remain in commit `bd923e4` and their results 
 # C. FIGURES
 
 ```bash
-cd $FIG2 && python build_figures.py
+cd $FIG2 && python code/build_sim.py && python code/build_imputation.py
 ```
 | output | contents |
 |---|---|

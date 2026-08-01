@@ -160,7 +160,7 @@ Rules:
 - `bbox_inches="tight"`, `pad_inches=0.02`.
 - No `transparent=True` — Genome Biology composites on white.
 - Filenames: `FIGURE<N>_<topic>/figure_panels/<panel><letter>_<slug>.pdf`, e.g.
-  `FIGURE2_benchmark/figure_panels/2c_pr_curve.pdf`. Lowercase, underscores, no spaces.
+  `FIGURE2_simulation_imputation/plots/2c_pr_curve.pdf`. Lowercase, underscores, no spaces.
 - Rasterize dense *data* layers only (`rasterized=True` on the artist), never whole axes —
   text and axes must stay vector.
 

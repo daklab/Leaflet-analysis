@@ -1,6 +1,6 @@
 # Figure 2 (simulation half) — caption and how to read it
 
-Figure file: `FIG2_simulation.{pdf,png}` · built by `build_figures.py::figure_simulation()`
+Figure file: `FIG2_simulation.{pdf,png}` · built by `code/panels.py::figure_simulation()`, driven by `code/build_sim.py`
 Data: `benchmark_effect_sweep.csv` (12 simulations = 4 effect levels × 3 seeds) and `panel_data.npz`.
 
 ---

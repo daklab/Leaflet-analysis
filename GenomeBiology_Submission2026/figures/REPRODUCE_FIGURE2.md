@@ -66,7 +66,7 @@ controls *how many* cassettes differ. Median true |ΔΨ| by effect level: 0.085,
 
 ## Step 2 — fit every method on every simulation
 
-`figures/FIGURE2_benchmark/sim_benchmark.py`  (supersedes `benchmark_sweep.py`)
+`figures/FIGURE2_simulation_imputation/code/sim_benchmark.py`  (supersedes `benchmark_sweep.py`)
 
 ```bash
 python sim_benchmark.py <sim.h5ad> <out.csv> cuda 2048
@@ -94,7 +94,7 @@ Shards are concatenated to `benchmark_effect_sweep.csv` (12 sims × 6 arms = 72 
 
 ## Step 3 — panel inputs that need the full h5ad
 
-`figures/FIGURE2_benchmark/prep_panels.py` → `panel_data.npz`
+`figures/FIGURE2_simulation_imputation/code/prep_panels.py` → `panel_data.npz`
 
 - **UMAPs** of the true φ, LeafletFA's φ and NMF's *W* (both imputations), coloured by true program.
 - **Silhouettes** printed on those panels, computed on the **latent representation**, not the 2-D
@@ -109,7 +109,7 @@ Shards are concatenated to `benchmark_effect_sweep.csv` (12 sims × 6 arms = 72 
 ## Step 4 — draw the figures
 
 ```bash
-cd figures/FIGURE2_benchmark && python build_figures.py
+cd figures/FIGURE2_simulation_imputation && python code/build_sim.py && python code/build_imputation.py
 ```
 
 Panels report the mean over seeds with s.e.m.; all pairwise comparisons are Welch's *t*-test with
@@ -152,4 +152,4 @@ variational family, and leaves standard training unchanged.
 | `benchmark_results.csv` | `sim_benchmark.py` (9 shards) | supplement |
 | `panel_data.npz`, `representative_fit.npz` | `prep_panels.py` | UMAP + ATSE panels |
 | `rerun_logs/ablate_{0,3}.csv` | `ablate_trainer.py` | trainer attribution |
-| `FIG2_validation.{pdf,png}` | `build_figures.py` | the figure |
+| `FIG2_validation.{pdf,png}` | `code/build_imputation.py` | the figure |
