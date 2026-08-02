@@ -1238,8 +1238,25 @@ def main():
         for row in rows:
             results.append({**base, **row})
 
+        # Checkpoint after EVERY level, not only at the end. A level costs ~1 h and the whole run
+        # ~7-9 h, so a timeout, a node failure or a crash in a later level used to discard every
+        # completed level with it.
+        #
+        # Deliberately written to `<output>.partial`, NOT to `<output>`: main() skips the run
+        # entirely if the output CSV exists, so checkpointing straight to it would make a killed
+        # half-finished job look complete to the next resubmission. The real CSV is written once,
+        # below, only after every level has succeeded -- so "the file exists" still means "the run
+        # finished". The .partial is written via a temp + rename so it is never half-written, and is
+        # removed on success.
+        _part, _tmp = output_csv + ".partial", output_csv + ".tmp"
+        pd.DataFrame(results).to_csv(_tmp, index=False)
+        os.replace(_tmp, _part)
+        print(f"  [checkpoint] {len(results)} rows through {pct}% dropped -> {_part}", flush=True)
+
     df = pd.DataFrame(results)
     df.to_csv(output_csv, index=False)
+    if os.path.exists(output_csv + ".partial"):
+        os.remove(output_csv + ".partial")
     print(f"\nResults → {output_csv}")
     cols = ["downsampling_pct", "dataset", "median_pearson_lf", "median_pearson_nmfm",
             "median_pearson_nmf0", "median_pearson_mb", "median_pearson_mb_ct",
