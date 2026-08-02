@@ -10,23 +10,23 @@
     },
     "A26_cellcell_fig.npz": {
       "bytes": 10981791,
-      "mtime": 1785642218,
+      "mtime": 1785653020,
       "note": "reduced for the figure: 600x600 cells, seed0/seed1/true only (panel shows 400 and never displays seed2); full file stays in $WD",
       "sha256": "5d119bf3879149557111b3c1127bf62a6f33dbf0a1b072733921bb221b403a44",
       "source": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION/A26_cellcell.npz"
     },
     "benchmark_effect_sweep.csv": {
-      "bytes": 13849,
-      "mtime": 1785111399,
+      "bytes": 14977,
+      "mtime": 1785647734,
       "note": "effect sweep, from eff3_assemble.sh",
-      "sha256": "ebe81b522607f4957a4c51f3ede5c5107b16f712b60be6e461161d654ba87640",
+      "sha256": "432bd457fc0e2cb65d0f7ec9e552d8b4baf7afbce3503db58f7aa1b64fe0305b",
       "source": "(generated in place)"
     },
     "benchmark_results.csv": {
-      "bytes": 9935,
-      "mtime": 1785090518,
+      "bytes": 10753,
+      "mtime": 1785645037,
       "note": "frac sweep, from step3_assemble.sh",
-      "sha256": "9be328752c5c40dfc0d6841b8a0d7d6a64ef9e24a3ce17478912005dfba59d91",
+      "sha256": "7db74905785f1bfc38b03123df97021318eb9c411ca0c66023a213fe8f2ff529",
       "source": "(generated in place)"
     },
     "panel_data.npz": {

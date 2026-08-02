@@ -62,15 +62,26 @@ Reproduction: `REPRODUCE_ALL.md` §A.
 | C | cell separation (silhouette) vs ΔΨ | ✅ |
 | D | Ψ recovery vs ΔΨ, with the "read this with B and C" caveat | ✅ |
 
-Effect-size recovery 0.41 → 0.96 with ΔΨ; **both NMF variants ~0 at every effect size**. Silhouette
-0.55 → 0.87 (verified: 0.545 → 0.868).
+Effect-size recovery **0.409 → 0.959** with ΔΨ; **both NMF variants ≈ 0 at every effect size**
+(range [−0.035, 0.098], mean 0.017). Silhouette **0.545 → 0.868**.
 
-**Be precise about the NMF silhouette comparison.** "NMF −0.05 → 0.49" is *mean-impute alone*.
-Averaged over both NMF variants it is **0.168 → 0.452**, and **0-impute never drops below 0.389**.
-Quoting −0.05 without naming the variant states the worst NMF arm as if it were NMF, which overstates
-the gap at low effect size — the honest low-effect comparison is 0.545 (LeafletFA) vs 0.389 (NMF
-0-impute), not vs −0.05. Effect-size recovery needs no such caveat: both NMF variants sit in
-[−0.036, 0.098], mean 0.017, at every effect level.
+*All numbers below are from the 2026-08-02 rebuild, after NMF was allowed to converge (see the note
+under Design decisions). The LeafletFA numbers are unchanged by that fix; only the NMF baseline moved.*
+
+**Be precise about the NMF silhouette comparison.** "NMF −0.05 → 0.49" was *mean-impute alone*, and
+is now **−0.116 → 0.519** for that variant. Averaged over both NMF variants it is **0.137 → 0.467**,
+and **0-impute never drops below 0.389**. Naming the worst NMF arm as if it were NMF overstates the
+gap at low effect size — the honest low-effect comparison is 0.545 (LeafletFA) vs 0.389 (NMF
+0-impute). Effect-size recovery needs no such caveat.
+
+Per effect level, silhouette (LeafletFA / NMF 0-impute / NMF mean-impute):
+
+| effect | LeafletFA | NMF 0-imp | NMF mean-imp |
+|---|---|---|---|
+| 0.1 | 0.545 | 0.389 | −0.116 |
+| 0.25 | 0.819 | 0.391 | 0.284 |
+| 0.5 | 0.854 | 0.396 | 0.438 |
+| 1.0 | 0.868 | 0.416 | 0.519 |
 
 ### 2b — Imputation on held-out cells ⏳ fixed-entry-set rerun in flight (`19414852`)
 
@@ -90,6 +101,26 @@ appears to beat LeafletFA for reasons that have nothing to do with imputation. A
 CSV; panel E subsets to the ones that predict at every level.
 
 ~7 h per batch of 3 tasks, 9 tasks at `%3` → ~21 h.
+
+### The NMF baseline is now run to convergence (2026-08-02)
+
+`max_iter` was **300**, at which neither NMF variant reliably converges — `mean-impute` needs
+~1,400–3,000+ iterations and `0-impute` ~400–600. The published baseline was therefore stopped
+short, which is not a fair comparison and is an easy reviewer objection. Raised to **3,000**; 57 of
+68 fits now converge, and the 11 that do not are all `mean-impute`.
+
+74 NMF rows moved; **no LeafletFA row moved**, so every LeafletFA claim is unaffected. The direction
+is mixed — `mean-impute` silhouette improves at high effect (0.493 → 0.519) and worsens at low
+effect (−0.053 → −0.116) — and the headline "both NMF variants ≈ 0 on effect-size recovery" is if
+anything firmer.
+
+Recorded per fit in the CSVs: `nmf_converged`, `steps_used` (iterations), and `psi_r_absmatch` /
+`n_anti_matched` from the matching-rule check below.
+
+**`psi_r` now matches programs on the signed correlation, not |C|.** Ψ is a usage probability, not a
+sign-flippable loading, so an anti-correlated program has recovered nothing. Measured rather than
+assumed: `n_anti_matched = 0` across all 68 fits, so the two rules agree on this data and no
+LeafletFA refit was needed.
 
 ### Design decisions, each with its own evidence
 - **Beta-Binomial over Binomial** — indistinguishable on non-overdispersed data *by construction*;
