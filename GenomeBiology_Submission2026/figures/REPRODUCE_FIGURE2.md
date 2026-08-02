@@ -153,3 +153,33 @@ variational family, and leaves standard training unchanged.
 | `panel_data.npz`, `representative_fit.npz` | `prep_panels.py` | UMAP + ATSE panels |
 | `rerun_logs/ablate_{0,3}.csv` | `ablate_trainer.py` | trainer attribution |
 | `FIG2_validation.{pdf,png}` | `code/build_imputation.py` | the figure |
+
+## Driver scripts — the actual pipeline
+
+All in `code/`, all SLURM arrays. Each arm is simulate → benchmark → (assemble). Run in order; the
+benchmark step needs the simulate step's `.h5ad` to exist. **These were previously undocumented**,
+which meant the file map above listed outputs with no way to regenerate them.
+
+| arm | simulate | benchmark | assemble | array | varies | → |
+|---|---|---|---|---|---|---|
+| **frac sweep** (supplement) | `step1_simulate.sh` | `step2_benchmark.sh` | `step3_assemble.sh` | `0-8` | `frac ∈ {0.1,0.5,0.9}` × 3 seeds, effect 1.0 | `benchmark_results.csv` |
+| **effect sweep** (main figure) | `eff1_simulate.sh` | `eff2_benchmark.sh` | `eff3_assemble.sh` | `0-11` | `effect ∈ {0.1,0.25,0.5,1.0}` × 3 seeds, frac 0.3 | `benchmark_effect_sweep.csv` |
+| **overdispersion** | `od1_simulate.sh` | `od2_benchmark.sh` | — (globbed) | `0-5` | `bb_conc ∈ {2,20}` × 3 seeds | `rerun_logs/odbench_*.csv` |
+| **prior test at c=2** | `pr1_simulate.sh` | `pr2_benchmark.sh` | — (globbed) | `0-6` | seeds 3–9 at `bb_conc=2` | `rerun_logs/prbench_*.csv` |
+
+```bash
+cd code
+sbatch --array=0-11 eff1_simulate.sh          # then wait
+sbatch --array=0-11 eff2_benchmark.sh         # then wait
+bash eff3_assemble.sh                          # -> ../data/benchmark_effect_sweep.csv
+```
+
+The overdispersion and prior arms have no assemble step — `panels.py` globs
+`data/rerun_logs/{odbench,prbench}_*.csv` at build time. `_odbench_csvs()` deliberately **excludes**
+`odbench_detinit_*.csv` from the abandoned deterministic-init experiment; a bare glob would sweep
+those into the overdispersion panels.
+
+The shard→config mapping is duplicated between each arm's simulate and benchmark script (the `effs`,
+`fracs`, `seeds`, `concs` arrays). They must stay in step. Note this is belt-and-braces only:
+`sim_benchmark.py` reads the true configuration from `sim.uns["sim_params"]`, written by the
+simulator, so a mismatched array would fail to find its `.h5ad` rather than silently mislabel a row.

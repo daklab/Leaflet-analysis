@@ -63,7 +63,14 @@ Reproduction: `REPRODUCE_ALL.md` §A.
 | D | Ψ recovery vs ΔΨ, with the "read this with B and C" caveat | ✅ |
 
 Effect-size recovery 0.41 → 0.96 with ΔΨ; **both NMF variants ~0 at every effect size**. Silhouette
-0.55 → 0.87 vs NMF −0.05 → 0.49.
+0.55 → 0.87 (verified: 0.545 → 0.868).
+
+**Be precise about the NMF silhouette comparison.** "NMF −0.05 → 0.49" is *mean-impute alone*.
+Averaged over both NMF variants it is **0.168 → 0.452**, and **0-impute never drops below 0.389**.
+Quoting −0.05 without naming the variant states the worst NMF arm as if it were NMF, which overstates
+the gap at low effect size — the honest low-effect comparison is 0.545 (LeafletFA) vs 0.389 (NMF
+0-impute), not vs −0.05. Effect-size recovery needs no such caveat: both NMF variants sit in
+[−0.036, 0.098], mean 0.017, at every effect level.
 
 ### 2b — Imputation on held-out cells ⏳ fixed-entry-set rerun in flight (`19414852`)
 
