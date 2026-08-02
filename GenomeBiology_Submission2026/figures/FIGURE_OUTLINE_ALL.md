@@ -112,10 +112,33 @@ label-shuffled 0.244; held-out φ is not prior-dominated (perplexity 2.37 vs 2.3
 and its posterior probabilities are calibrated.**
 
 ### Inputs
-- **Model:** the released full-atlas fit. Pending the initialisation decision, that is
-  `2026-07-27_full_K30_tight` (10 converged seeds, K = 30, 102–136 epochs), selected by **medoid**
-  rather than best ELBO — those disagreed at K = 20 and K = 30, and ELBO selects for fit rather than
-  representativeness.
+
+- **Model: `2026-07-26_atlas_FULL`.** 9 fits, K ∈ {10, 20, 30} × 3 seeds, all 132,706 cells,
+  **all 9 finite**, `psis_loc`/`psis_scale` present so the DS sampler works. Trained with the current
+  code: plate-based minibatch B = 8192 (after `c8cad3d`, the fix for subsampling never engaging),
+  Beta-Binomial, junction-specific Ψ prior, random init, and **default** early stopping
+  (`patience=8, min_delta_rel=1e-4`) — byte-identical settings to the clean 70/30 set. The only
+  package change since is `68a3185`, which is default-off and does not touch the training path.
+
+- **⚠️ NOT `2026-07-27_full_K30_tight` — 9 of its 10 seeds are CORRUPT** (`psis_scale` 100 % NaN).
+  It was trained with `patience=25, min_delta_rel=1e-6`, the same tight early stopping that drove 4
+  of 9 fits non-finite on the 70/30 attempt. Only seed 9 survives, so medoid selection over 10 seeds
+  is not available from it. `2026-07-28_full_K30_{jitter,detinit}` are also unusable (corrupt, and
+  no fits at all respectively) — both are abandoned-experiment arms.
+
+- **The under-training worry that motivated the tight retrain is not supported.** Doubling the
+  epochs (77 → 136) moved the Ψ contrast from **0.0808 to 0.0814**, i.e. +0.7 %, with `bb_conc`
+  unchanged at ~1.95. Step-counted early stopping does give the full atlas fewer epochs than the 70/30
+  set at the same step count, but the quantity the paper reports barely moves.
+
+- **Open gap:** `atlas_FULL` has only **3 seeds per K**. If Figure 3 wants medoid selection or a
+  consensus over ~10 seeds at K = 30, that needs a retrain at K = 30 with the **default** early
+  stopping — cheap and low-risk, and it must be health-gated (`A1` now exits 2 on any non-finite
+  array; `atlas_FULL` predates that gate but passes it when checked manually).
+
+- **LeafCutter:** exists from 2026-06-20 — `pipelines/08_leafcutter_ds/` (steps 00–04) and
+  `$WD/LEAFCUTTER_DS/` (`by_celltype`, `by_tissue`, `ds_summary_all.tsv`, `leafcutter_counts.tsv.gz`).
+  ❓ not inspected against the current models.
 - **LeafCutter:** exists from 2026-06-20 — `pipelines/08_leafcutter_ds/` (steps 00–04) and
   `$WD/LEAFCUTTER_DS/` (`by_celltype`, `by_tissue`, `ds_summary_all.tsv`, `leafcutter_counts.tsv.gz`).
   ❓ not inspected against the current models.
