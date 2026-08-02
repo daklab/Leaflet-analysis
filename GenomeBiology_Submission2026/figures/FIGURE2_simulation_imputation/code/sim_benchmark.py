@@ -46,7 +46,11 @@ from leafletfa.minibatch import LeafletFAMinibatch
 DELTA = 0.10          # |delta psi| threshold at which an ATSE is called differential
 STEPS = 5000          # a CAP; early stopping decides the actual number
 LR, GAMMA = 0.05, 0.1
-NMF_MAX_ITER = 3000   # 300 left mean-impute under-converged; it needs ~2,068
+# Set high enough that sklearn's `tol` decides, not the cap. At 300 BOTH variants were truncated
+# (0-impute needs 400-600, mean-impute 1,343-3,000+). At 3,000, 11 of 34 mean-impute fits still hit
+# the ceiling. A capped fit is an under-converged baseline, which is not a fair comparison -- so the
+# cap is set out of the way rather than tuned, and `nmf_converged` is recorded per fit to prove it.
+NMF_MAX_ITER = 20000
 
 
 def _dense(x):
@@ -107,8 +111,10 @@ def metrics(T, psi_hat, phi_hat):
 
 
 def fit_lfa(sim, K, likelihood, junc_prior, seed, device, batch):
-    """`seed` here is the MODEL seed -- see the module docstring on decoupling it from the data."""
-    """Fit through the SAME trainer the atlas uses, and verify subsampling is really on."""
+    """Fit through the SAME trainer the atlas uses, and verify subsampling is really on.
+
+    `seed` is the MODEL seed -- see the module docstring on decoupling it from the data seed.
+    """
     junc = _dense(sim.layers["cell_by_junction_matrix"]).astype(np.float32)
     clus = _dense(sim.layers["cell_by_cluster_matrix"]).astype(np.float32)
     # Optional deterministic psi init (LFA_INIT=jitter). The default start puts every program at
