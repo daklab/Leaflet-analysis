@@ -99,7 +99,7 @@ def main():
                          frac=float(np.mean(eff)) / (K - 1), prog_corr=float(np.mean(pp)),
                          steps_mean=float(np.mean(steps)), steps_min=int(min(steps)),
                          steps_max=int(max(steps))))
-        print(f"{label:<38} effective K = {np.mean(eff):.1f}/{K} ({np.mean(eff)/K:.0%})   "
+        print(f"{label:<38} effective K = {np.mean(eff):.1f}/{K-1} ({np.mean(eff)/(K-1):.0%})   "
               f"prog-corr {np.mean(pp):+.3f}   steps {int(np.mean(steps))} "
               f"[{min(steps)}-{max(steps)}]", flush=True)
 

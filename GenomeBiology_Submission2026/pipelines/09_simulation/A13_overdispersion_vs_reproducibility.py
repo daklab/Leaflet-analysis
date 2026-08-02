@@ -105,10 +105,10 @@ def main():
             s_ = cca(fits[x]["phi"], fits[y]["phi"])
             eff.append(int((s_ > 0.9).sum())); mn.append(float(s_.mean()))
         rows.append(dict(level=tag, label=label, K=K, n_seeds=n_seeds,
-                         effective_K=float(np.mean(eff)), frac=float(np.mean(eff)) / K,
+                         effective_K=float(np.mean(eff)), frac=float(np.mean(eff)) / (K - 1),
                          mean_canon_corr=float(np.mean(mn)),
                          phi_recovery=float(np.nanmean([v["recovery"] for v in fits.values()]))))
-        print(f"  -> effective K = {np.mean(eff):.1f}/{K} ({np.mean(eff)/K:.0%}), "
+        print(f"  -> effective K = {np.mean(eff):.1f}/{K-1} ({np.mean(eff)/(K-1):.0%}), "
               f"mean canonical corr = {np.mean(mn):.3f}", flush=True)
 
     if not rows:

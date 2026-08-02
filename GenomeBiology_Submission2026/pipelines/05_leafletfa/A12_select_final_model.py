@@ -112,9 +112,9 @@ def main():
         for a, b in itertools.combinations(got, 2):
             Ga, Gb = gram(models[a]["phi"].T), gram(models[b]["phi"].T)
             gr.append(float(np.corrcoef(Ga.ravel(), Gb.ravel())[0, 1]))
-        perK.append(dict(K=K, n=len(got), effective_K=float(np.mean(eff)), frac=np.mean(eff) / K,
+        perK.append(dict(K=K, n=len(got), effective_K=float(np.mean(eff)), frac=np.mean(eff) / (K - 1),
                          prog_corr=float(np.mean([models[t]["prog_corr"] for t in got]))))
-        print(f"  K={K:>2}: effective K = {np.mean(eff):.1f}/{K} ({np.mean(eff)/K:.0%})   "
+        print(f"  K={K:>2}: effective K = {np.mean(eff):.1f}/{K-1} ({np.mean(eff)/(K-1):.0%})   "
               f"program correlation {np.mean([models[t]['prog_corr'] for t in got]):+.3f}", flush=True)
 
     print("\n=== 3. which seed is most representative? (medoid, not best ELBO) ===", flush=True)
