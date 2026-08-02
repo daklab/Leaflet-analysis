@@ -14,19 +14,49 @@ CEILING 1 -- SAMPLING NOISE IN THE TARGET.
     against half B across cells, per junction. Spearman-Brown corrects the half-length correlation to
     full length; the square root of that reliability bounds any predictor of the latent rate.
 
-CEILING 2 -- OVERDISPERSION, WHICH IS LOWER AND IS THE BINDING ONE.
+CEILING 2 -- BOTH NOISE SOURCES AT ONCE, AND THE ONE TO QUOTE.
     The model predicts p = phi @ psi. Under the Beta-Binomial the cell's realised rate is
-    q ~ Beta(p*c, (1-p)*c), so reads inform q, not p, and the two are only loosely tied:
+    q ~ Beta(p*c, (1-p)*c) and the observation is q thinned by finite reads. Since E[q|p] = p we have
+    Cov(p, obs) = Var(p), so the best correlation ANY predictor of p can reach is
 
-        Var(q | p) = p(1-p) / (c + 1)
+        ceiling = sqrt( Var(p) / Var(obs) )        with
+        Var(obs) = Var(p)  +  E[p(1-p)]/(c+1)  +  E[q(1-q)/T]
+                              ^ overdispersion     ^ finite reads
 
-    Even a PERFECT p therefore correlates with q at only
+    Var(p) is recovered by subtracting the two noise terms from the observed variance. An earlier
+    version of this script used Var(obs) itself in place of Var(p), which ignores both subtracted
+    terms and inflates the ceiling substantially -- do not reintroduce that shortcut.
 
-        corr(p, q) = sqrt( Var(p) / ( Var(p) + E[p(1-p)] / (c+1) ) )
+    At the learned c ~ 1.97 each junction carries about c+1 ~ 3 reads' worth of information about q
+    regardless of sequencing depth, the same mechanism behind the cross-seed phi irreproducibility.
 
-    computed per junction across cells. At the learned c ~ 1.97 each junction carries about c+1 ~ 3
-    reads' worth of information about q regardless of sequencing depth -- which is the same mechanism
-    behind the cross-seed phi irreproducibility.
+Ceiling 2 subsumes ceiling 1 and is the number to quote; ceiling 1 is kept because it is
+model-free -- it needs no assumption about c -- and so is a useful independent check.
+
+Note both are computed on HIGH-VARIANCE junctions by construction (the HVJ set is selected on
+across-cell PSI variance), which raises the ceiling relative to a random junction. That is the
+right comparison here, since it is the same set `median_pearson_lf` is measured on.
+
+READ THIS BEFORE QUOTING THE GAP -- the ceiling is a valid bound but a LOOSE one for imputation.
+    Both ceilings are achievable only by a predictor that can see the entry's OWN reads: the
+    split-half estimate literally splits those reads, and the variance decomposition asks how much
+    of Var(obs) is signal. `lf` = phi @ psi does the opposite -- it predicts entry (c, j) WITHOUT
+    using that entry, from the cell's other junctions through phi_c and the global psi_j.
+
+    So "0.070 is 10% of 0.736" mixes two different questions. 0.736 says the target contains
+    recoverable per-cell signal, i.e. the metric is not noise-saturated and the low value is not an
+    artefact of an unpredictable target. It does NOT say a method that never observes the entry
+    should reach 0.736, and the gap should not be read as pure model deficiency.
+
+    The fair comparators are the other methods that also do not see the entry:
+        LeafletFA (lf)        0.070
+        NMF transfer 0-imp    0.030
+        NMF transfer mean-imp 0.064
+        naive (junction mean) 0.000   <- exact, by construction
+    Against those LeafletFA leads. Decomposing the 0.070-to-0.736 gap into "imputation is
+    intrinsically harder than observation" versus "the model is leaving signal behind" would need a
+    third quantity -- e.g. an oracle that sees every OTHER junction in the cell at full depth -- and
+    is not measured here.
 
 Both are computed on the same junctions, with the same >=min_cells rule, as A3's
 `per_junction_correlations`, so the numbers are directly comparable to `median_pearson_lf`.
@@ -96,12 +126,27 @@ def main() -> int:
         else:
             rec["r_splithalf"] = rec["ceiling_sampling"] = np.nan
 
-        # Var(p) across cells is unknown without the model, so use the observed full-depth spread as
-        # its upper bound: Var(psi_obs) >= Var(q) >= Var(p). This makes ceiling 2 GENEROUS.
+        # The quantity that actually bounds the metric. obs = q + sampling noise and E[q|p] = p, so
+        # Cov(p, obs) = Var(p) and the best achievable correlation is sqrt(Var(p)/Var(obs)). This
+        # subsumes BOTH noise sources rather than treating them separately:
+        #
+        #     Var(obs) = Var(p)  +  E[p(1-p)]/(c+1)   +  E[q(1-q)/T]
+        #                           ^ overdispersion     ^ finite reads
+        #
+        # Using Var(obs) itself as Var(p) -- as an earlier version did -- ignores both subtracted
+        # terms and inflates the ceiling badly. Plugging obs into the two noise terms slightly
+        # OVER-estimates them (obs is noisier than p or q), so Var(p) here is if anything an
+        # under-estimate and the ceiling is conservative. Reported next to the split-half figure,
+        # which bounds sampling noise alone and is therefore always the looser of the two.
         obs = jr[m, j].astype(np.float64)
-        vp = float(np.var(obs))
-        ep = float(np.mean(obs * (1 - obs)))
-        rec["ceiling_overdisp"] = float(np.sqrt(vp / (vp + ep / (c + 1)))) if vp > 0 else 0.0
+        T = np.maximum(cl[m, j].astype(np.float64), 1.0)
+        v_obs = float(np.var(obs))
+        pq = obs * (1 - obs)
+        v_over = float(np.mean(pq)) / (c + 1.0)
+        v_samp = float(np.mean(pq / T))
+        v_p = max(v_obs - v_over - v_samp, 0.0)
+        rec["var_obs"], rec["var_p_est"] = v_obs, v_p
+        rec["ceiling_overdisp"] = float(np.sqrt(v_p / v_obs)) if v_obs > 0 else 0.0
         rows.append(rec)
 
     d = pd.DataFrame(rows)
@@ -109,7 +154,7 @@ def main() -> int:
     print(f"\n=== ceilings on median per-junction Pearson ({len(d):,} junctions, c={c}) ===")
     print(f"  ceiling 1, sampling noise in the target : {d.ceiling_sampling.median():.3f} "
           f"(IQR {d.ceiling_sampling.quantile(.25):.3f}-{d.ceiling_sampling.quantile(.75):.3f})")
-    print(f"  ceiling 2, overdispersion at c={c}      : {d.ceiling_overdisp.median():.3f} "
+    print(f"  ceiling 2, sqrt(Var(p)/Var(obs)) at c={c} : {d.ceiling_overdisp.median():.3f} "
           f"(IQR {d.ceiling_overdisp.quantile(.25):.3f}-{d.ceiling_overdisp.quantile(.75):.3f})")
     both = np.minimum(d.ceiling_sampling, d.ceiling_overdisp)
     print(f"  BINDING ceiling (min of the two)        : {np.nanmedian(both):.3f}")
