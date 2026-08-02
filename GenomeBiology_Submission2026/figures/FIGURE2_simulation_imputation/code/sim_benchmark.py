@@ -15,10 +15,18 @@ Arms, all fitted at the true K:
     LeafletFA  Beta-Binomial / Binomial  x  junction-specific / global psi prior
     NMF        rank K, 0-impute and mean-impute (NMF has no missing-data model)
 
-Usage:  sim_benchmark.py <sim.h5ad> <out.csv> [device=cuda] [batch=2048]
+Usage:  sim_benchmark.py <sim.h5ad> <out.csv> [device=cuda] [batch=2048] [model_seed]
+
+`model_seed` defaults to the simulation's own seed, which is what every published run used. That
+default couples the two: seeds 0,1,2 differ in BOTH the simulated data and the model
+initialisation, so their spread measures the two together. That is the right design for the
+accuracy benchmark -- they are independent replicates -- but it means the simulation cannot, on its
+own, separate "seeds disagree because the data differ" from "seeds disagree because the
+optimisation landed elsewhere". Pass `model_seed` explicitly to hold the data fixed and vary only
+the initialisation, which is the controlled version of the seed-consistency question.
 """
 from __future__ import annotations
-import os, sys, time, itertools
+import os, sys, time, itertools, warnings
 import numpy as np
 import pandas as pd
 import anndata as ad
@@ -26,6 +34,7 @@ import scipy.sparse as sp
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import spearmanr
 from sklearn.decomposition import NMF
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import (adjusted_rand_score, silhouette_score, average_precision_score,
                              roc_auc_score, precision_score)
 
@@ -37,6 +46,7 @@ from leafletfa.minibatch import LeafletFAMinibatch
 DELTA = 0.10          # |delta psi| threshold at which an ATSE is called differential
 STEPS = 5000          # a CAP; early stopping decides the actual number
 LR, GAMMA = 0.05, 0.1
+NMF_MAX_ITER = 3000   # 300 left mean-impute under-converged; it needs ~2,068
 
 
 def _dense(x):
@@ -66,8 +76,17 @@ def metrics(T, psi_hat, phi_hat):
         for j in range(Kt):
             m = np.isfinite(tp[j]) & np.isfinite(ph[i])
             C[i, j] = np.corrcoef(ph[i][m], tp[j][m])[0, 1] if m.sum() > 2 else 0
-    r, c = linear_sum_assignment(-np.abs(np.nan_to_num(C)))
+    # Match on the SIGNED correlation, not |C|. Psi is a usage probability in [0,1], not a loading
+    # that may flip sign, so a program that ANTI-correlates with a true program has not recovered it.
+    # Matching on |C| could pair them and then `psi_r` would report that pairing's signed value --
+    # selecting a match on the strength of a relationship while scoring it as a failure. Reported
+    # alongside: `psi_r_absmatch`, the old |C| rule, so the two can be compared on any run.
+    Cn = np.nan_to_num(C)
+    r, c = linear_sum_assignment(-Cn)
     psi_r = float(np.median([C[i, j] for i, j in zip(r, c)]))
+    ra, ca = linear_sum_assignment(-np.abs(Cn))
+    psi_r_absmatch = float(np.median([C[i, j] for i, j in zip(ra, ca)]))
+    n_anti = int(sum(Cn[i, j] < 0 for i, j in zip(ra, ca)))   # >0 means the old rule mispaired
     lab = tphi.argmax(1)
     ari = float(adjusted_rand_score(lab, phi_hat.argmax(1)))
     sil = float(silhouette_score(phi_hat, lab)) if len(np.unique(lab)) > 1 else np.nan
@@ -83,11 +102,12 @@ def metrics(T, psi_hat, phi_hat):
         m2 = ok & np.isfinite(td) & isd
         if m2.sum() > 2:
             sd = float(spearmanr(td[m2], d[m2]).correlation)
-    return dict(psi_r=psi_r, ari=ari, sil=sil, ap=ap, auroc=auroc, precision=prec,
-                spearman_delta=sd)
+    return dict(psi_r=psi_r, psi_r_absmatch=psi_r_absmatch, n_anti_matched=n_anti,
+                ari=ari, sil=sil, ap=ap, auroc=auroc, precision=prec, spearman_delta=sd)
 
 
 def fit_lfa(sim, K, likelihood, junc_prior, seed, device, batch):
+    """`seed` here is the MODEL seed -- see the module docstring on decoupling it from the data."""
     """Fit through the SAME trainer the atlas uses, and verify subsampling is really on."""
     junc = _dense(sim.layers["cell_by_junction_matrix"]).astype(np.float32)
     clus = _dense(sim.layers["cell_by_cluster_matrix"]).astype(np.float32)
@@ -126,9 +146,18 @@ def fit_nmf(sim, K):
     for tag, X in (("0-impute", np.where(cov, R, 0.0)),
                    ("mean-impute", np.where(cov, R, cm[None, :]))):
         t0 = time.time()
-        mm = NMF(n_components=K, init="nndsvda", random_state=0, max_iter=300)
-        W = mm.fit_transform(X)
-        out[tag] = (mm.components_, W, round(time.time() - t0, 1))
+        # max_iter was 300, at which mean-impute does NOT converge (it needs ~2,068). An
+        # under-converged baseline is not a fair comparison and is an easy reviewer objection.
+        # 0-impute converges in ~78 iterations either way, so only mean-impute is affected.
+        with warnings.catch_warnings(record=True) as _w:
+            warnings.simplefilter("always", ConvergenceWarning)
+            mm = NMF(n_components=K, init="nndsvda", random_state=0, max_iter=NMF_MAX_ITER)
+            W = mm.fit_transform(X)
+            conv = not any(issubclass(x.category, ConvergenceWarning) for x in _w)
+        if not conv:
+            print(f"    WARNING: NMF {tag} did NOT converge in {NMF_MAX_ITER} iterations",
+                  flush=True)
+        out[tag] = (mm.components_, W, round(time.time() - t0, 1), int(mm.n_iter_), bool(conv))
     return out
 
 
@@ -136,6 +165,7 @@ def main():
     sim_path, out_csv = sys.argv[1], sys.argv[2]
     device = sys.argv[3] if len(sys.argv) > 3 else "cuda"
     batch = int(sys.argv[4]) if len(sys.argv) > 4 else 2048
+    model_seed_arg = int(sys.argv[5]) if len(sys.argv) > 5 else None
     sim = ad.read_h5ad(sim_path)
     sp_ = dict(sim.uns["sim_params"]) if hasattr(sim.uns["sim_params"], "keys") else {}
     if not sp_:
@@ -151,27 +181,30 @@ def main():
     # cannot represent the extra variance. Must be recorded or the arms are indistinguishable.
     _bb = sp_.get("bb_conc", None)
     sim_bb_conc = float("inf") if _bb in (None, "inf") else float(_bb)
+    # default = the data seed, preserving every published number exactly
+    model_seed = seed_sim if model_seed_arg is None else model_seed_arg
     T = truth_of(sim)
     print(f"=== {os.path.basename(sim_path)}: {sim.shape[0]:,} cells x {sim.shape[1]:,} junctions, "
           f"K_true={K}, frac_diff={frac}, effect={effect}, sim_bb_conc={sim_bb_conc}, "
-          f"seed={seed_sim} ===", flush=True)
+          f"seed={seed_sim} model_seed={model_seed} ===", flush=True)
     rows = []
     for likelihood, junc_prior in itertools.product(("betabinomial", "binomial"), (True, False)):
         pyro.clear_param_store()
-        psi, phi, used, secs, B = fit_lfa(sim, K, likelihood, junc_prior, seed_sim, device, batch)
+        psi, phi, used, secs, B = fit_lfa(sim, K, likelihood, junc_prior, model_seed, device, batch)
         r = metrics(T, psi, phi)
         r.update(dict(model="LeafletFA", likelihood={"betabinomial": "bb", "binomial": "binom"}[likelihood],
                       junc_prior=junc_prior, frac=frac, effect=effect, sim_bb_conc=sim_bb_conc,
-                      seed=seed_sim, K=K, batch_size=B,
+                      seed=seed_sim, model_seed=model_seed, K=K, batch_size=B,
                       steps_used=used, seconds=secs, trainer="minibatch_plate"))
         rows.append(r)
         print(f"  LeafletFA {likelihood[:4]} jp={str(junc_prior):>5}  psi_r={r['psi_r']:.3f} "
               f"sd={r['spearman_delta']:.3f} sil={r['sil']:.3f}  steps={used}  {secs}s", flush=True)
-    for tag, (H, W, secs) in fit_nmf(sim, K).items():
+    for tag, (H, W, secs, n_it, conv) in fit_nmf(sim, K).items():
         r = metrics(T, H, W)
         r.update(dict(model="NMF", likelihood=tag, junc_prior=False, frac=frac, effect=effect,
-                      sim_bb_conc=sim_bb_conc, seed=seed_sim,
-                      K=K, batch_size=np.nan, steps_used=np.nan, seconds=secs, trainer="sklearn_NMF"))
+                      sim_bb_conc=sim_bb_conc, seed=seed_sim, model_seed=model_seed,
+                      K=K, batch_size=np.nan, steps_used=n_it, nmf_converged=conv,
+                      seconds=secs, trainer="sklearn_NMF"))
         rows.append(r)
         print(f"  NMF {tag:>11}          psi_r={r['psi_r']:.3f} "
               f"sd={r['spearman_delta']:.3f} sil={r['sil']:.3f}  {secs}s", flush=True)
