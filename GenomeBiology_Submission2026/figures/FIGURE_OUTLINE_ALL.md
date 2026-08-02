@@ -63,25 +63,31 @@ Reproduction: `REPRODUCE_ALL.md` §A.
 | D | Ψ recovery vs ΔΨ, with the "read this with B and C" caveat | ✅ |
 
 Effect-size recovery **0.409 → 0.959** with ΔΨ; **both NMF variants ≈ 0 at every effect size**
-(range [−0.035, 0.098], mean 0.017). Silhouette **0.545 → 0.868**.
+(range [−0.035, 0.098], mean 0.013). Silhouette **0.545 → 0.868**.
 
-*All numbers below are from the 2026-08-02 rebuild, after NMF was allowed to converge (see the note
-under Design decisions). The LeafletFA numbers are unchanged by that fix; only the NMF baseline moved.*
+*All numbers below are from the 2026-08-02 rebuild, with **every NMF fit run to convergence** (68/68,
+none capped). The LeafletFA numbers are unchanged by that fix; only the NMF baseline moved.*
 
 **Be precise about the NMF silhouette comparison.** "NMF −0.05 → 0.49" was *mean-impute alone*, and
-is now **−0.116 → 0.519** for that variant. Averaged over both NMF variants it is **0.137 → 0.467**,
-and **0-impute never drops below 0.389**. Naming the worst NMF arm as if it were NMF overstates the
-gap at low effect size — the honest low-effect comparison is 0.545 (LeafletFA) vs 0.389 (NMF
-0-impute). Effect-size recovery needs no such caveat.
+is now **−0.121 → 0.556** for that variant. Averaged over both NMF variants it is **0.134 → 0.486**,
+and **0-impute stays in a narrow 0.389 → 0.416**. Naming the worst NMF arm as if it were NMF
+overstates the gap at low effect size — the honest low-effect comparison is 0.545 (LeafletFA) vs
+0.389 (NMF 0-impute). Effect-size recovery needs no such caveat: both variants sit in
+**[−0.035, 0.098], mean 0.013**.
 
-Per effect level, silhouette (LeafletFA / NMF 0-impute / NMF mean-impute):
+Per effect level, silhouette:
 
 | effect | LeafletFA | NMF 0-imp | NMF mean-imp |
 |---|---|---|---|
-| 0.1 | 0.545 | 0.389 | −0.116 |
+| 0.1 | 0.545 | 0.389 | −0.121 |
 | 0.25 | 0.819 | 0.391 | 0.284 |
 | 0.5 | 0.854 | 0.396 | 0.438 |
-| 1.0 | 0.868 | 0.416 | 0.519 |
+| 1.0 | 0.868 | 0.416 | 0.556 |
+
+Note the shape of the NMF baseline: **0-impute is flat** (0.389 → 0.416 across a 10× range of effect
+size) while **mean-impute tracks the effect** (−0.121 → 0.556). Neither recovers effect sizes. The
+LeafletFA claim rests on doing both — separating cells *and* recovering ΔΨ — which neither NMF
+variant does.
 
 ### 2b — Imputation on held-out cells ⏳ fixed-entry-set rerun in flight (`19414852`)
 
@@ -104,15 +110,16 @@ CSV; panel E subsets to the ones that predict at every level.
 
 ### The NMF baseline is now run to convergence (2026-08-02)
 
-`max_iter` was **300**, at which neither NMF variant reliably converges — `mean-impute` needs
-~1,400–3,000+ iterations and `0-impute` ~400–600. The published baseline was therefore stopped
-short, which is not a fair comparison and is an easy reviewer objection. Raised to **3,000**; 57 of
-68 fits now converge, and the 11 that do not are all `mean-impute`.
+`max_iter` was **300**, at which neither NMF variant converges — `mean-impute` needs 1,343–8,995
+iterations (median 2,006) and `0-impute` 400–614. The published baseline was stopped short, which is
+not a fair comparison and is an easy reviewer objection.
 
-74 NMF rows moved; **no LeafletFA row moved**, so every LeafletFA claim is unaffected. The direction
-is mixed — `mean-impute` silhouette improves at high effect (0.493 → 0.519) and worsens at low
-effect (−0.053 → −0.116) — and the headline "both NMF variants ≈ 0 on effect-size recovery" is if
-anything firmer.
+The cap is now **20,000**, set so sklearn's `tol` decides rather than the ceiling: **68/68 fits
+converge, none capped.** An intermediate 3,000 was tried and rejected — 11 fits still hit it, and
+tuning the cap to whatever this data happens to need is the same mistake as 300, just further along.
+
+**No LeafletFA row moved**, so every LeafletFA claim is unaffected; only the baseline shifted, and
+the headline "both NMF variants ≈ 0 on effect-size recovery" is if anything firmer.
 
 Recorded per fit in the CSVs: `nmf_converged`, `steps_used` (iterations), and `psi_r_absmatch` /
 `n_anti_matched` from the matching-rule check below.
