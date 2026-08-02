@@ -1,0 +1,69 @@
+{
+  "a26_cells_kept": 600,
+  "files": {
+    "A15_seed_consistency.csv": {
+      "bytes": 4950,
+      "mtime": 1785174214,
+      "note": "pipelines/09_simulation \u2014 seed-consistency across simulated fits",
+      "sha256": "a94d8aad025317cfff56c6c3edf2b2e9facbdb8a98ad8cb4b0010a2bd179cac4",
+      "source": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION/A15_seed_consistency.csv"
+    },
+    "A26_cellcell_fig.npz": {
+      "bytes": 10981791,
+      "mtime": 1785642218,
+      "note": "reduced for the figure: 600x600 cells, seed0/seed1/true only (panel shows 400 and never displays seed2); full file stays in $WD",
+      "sha256": "5d119bf3879149557111b3c1127bf62a6f33dbf0a1b072733921bb221b403a44",
+      "source": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION/A26_cellcell.npz"
+    },
+    "benchmark_effect_sweep.csv": {
+      "bytes": 13849,
+      "mtime": 1785111399,
+      "note": "effect sweep, from eff3_assemble.sh",
+      "sha256": "ebe81b522607f4957a4c51f3ede5c5107b16f712b60be6e461161d654ba87640",
+      "source": "(generated in place)"
+    },
+    "benchmark_results.csv": {
+      "bytes": 9935,
+      "mtime": 1785090518,
+      "note": "frac sweep, from step3_assemble.sh",
+      "sha256": "9be328752c5c40dfc0d6841b8a0d7d6a64ef9e24a3ce17478912005dfba59d91",
+      "source": "(generated in place)"
+    },
+    "panel_data.npz": {
+      "bytes": 212035,
+      "mtime": 1785092047,
+      "note": "from prep_panels.py",
+      "sha256": "476a8c81caa3456186c554c1481a6e19716bad09b48770d05cdecf1b73e64c76",
+      "source": "(generated in place)"
+    },
+    "representative_fit.npz": {
+      "bytes": 366931,
+      "mtime": 1785092047,
+      "note": "from prep_panels.py",
+      "sha256": "059641deb484594fd326c2b1565c01422e64dc12b13c687226575ab8f2384675",
+      "source": "(generated in place)"
+    },
+    "sim_recover10_Kmodel10.csv": {
+      "bytes": 2588,
+      "mtime": 1785049342,
+      "note": "K_true=10 simulation, model K=10 (minibatch vs full-batch)",
+      "sha256": "8885c12cd88ef51b9e7346dfbed236ff943e70938f877cc01ab26c065bc85096",
+      "source": "/gpfs/commons/home/kisaev/LeafletFA/experiments/minibatch/sim_recover10_Kmodel10.csv"
+    },
+    "sim_recover10_Kmodel20.csv": {
+      "bytes": 2590,
+      "mtime": 1785050347,
+      "note": "K_true=10 simulation, model K=20",
+      "sha256": "f8cc9362b1f0e7c6f7ef94f01084b9af428140a71591c7fe44667a42d7625bbe",
+      "source": "/gpfs/commons/home/kisaev/LeafletFA/experiments/minibatch/sim_recover10_Kmodel20.csv"
+    },
+    "sim_recover10_Kmodel30.csv": {
+      "bytes": 2593,
+      "mtime": 1785053648,
+      "note": "K_true=10 simulation, model K=30",
+      "sha256": "4d2f6eb8ae93d9056a2ed3e9e9cbba035a36241a8f4d46bb453bce3ccf5481ce",
+      "source": "/gpfs/commons/home/kisaev/LeafletFA/experiments/minibatch/sim_recover10_Kmodel30.csv"
+    }
+  },
+  "generated_by": "code/collect_inputs.py"
+}

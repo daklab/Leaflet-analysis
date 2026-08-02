@@ -301,3 +301,18 @@ CLAUDE.md
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# generated coverage-metric caches (regenerate with supp_dataset_coverage.py)
+GenomeBiology_Submission2026/figures/supplemental/*/cache/
+GenomeBiology_Submission2026/figures/supplemental/**/__pycache__/
+
+# --- Figure inputs are tracked (exception to the *.csv / *.npz rules above) ---
+# figures/*/data/ holds the small, consolidated inputs the figure builders read. They were
+# previously read by absolute path from $WD and ~/LeafletFA/experiments and were untracked, so the
+# figures could only be rebuilt on one filesystem. See figures/*/code/collect_inputs.py, which
+# copies them in and records provenance in data/INPUTS.json. Large regenerable artefacts (the
+# simulated .h5ad, the full-resolution A26) stay outside the repo.
+!GenomeBiology_Submission2026/figures/*/data/**/*.csv
+!GenomeBiology_Submission2026/figures/*/data/**/*.npz
+!GenomeBiology_Submission2026/figures/*/data/*.csv
+!GenomeBiology_Submission2026/figures/*/data/*.npz

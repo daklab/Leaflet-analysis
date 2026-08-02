@@ -711,7 +711,10 @@ def panel_structure(ax, struc: pd.DataFrame,
 
 
 # ── whole-figure drafts ──────────────────────────────────────────────────────
-SIM_RECOVER_DIR = "/gpfs/commons/home/kisaev/LeafletFA/experiments/minibatch"
+# All Figure 2 inputs live in ../data/ -- see code/collect_inputs.py, which copies them in from
+# $WD/SIMULATION and ~/LeafletFA/experiments and records provenance in data/INPUTS.json. Reading
+# them by absolute path from outside the repo meant the figures built only on this filesystem.
+SIM_RECOVER_DIR = _HERE
 
 
 def load_recover10() -> pd.DataFrame:
@@ -1173,12 +1176,12 @@ def figure_transfer_controls(K: int = 10, save: bool = True):
 
 
 # ── phi consistency across seeds, in simulation (A15) ────────────────────────
-SIM_DIR = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/SIMULATION"
+SIM_DIR = _HERE
 A15_CSV = f"{SIM_DIR}/A15_seed_consistency.csv"
 DISP_ORDER = ["no overdispersion", "mild (c=20)", "atlas-like (c=2)"]
 
 
-A26_NPZ = f"{SIM_DIR}/A26_cellcell.npz"
+A26_NPZ = f"{SIM_DIR}/A26_cellcell_fig.npz"   # reduced by collect_inputs.py
 A26_LEVELS = [("binom", "no overdispersion"), ("bb20", "mild (c=20)"), ("bb2", "atlas-like (c=2)")]
 
 
