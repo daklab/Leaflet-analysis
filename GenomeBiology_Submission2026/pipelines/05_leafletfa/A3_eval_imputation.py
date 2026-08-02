@@ -1021,11 +1021,19 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                  "psi_hvj_median_std": psi_hvj_median_std,
                  **m_all})
 
-    # THE HONEST HEAD-TO-HEAD: only entries lost to downsampling, where no method can pass through
+    # THE COMPARABLE-ACROSS-COVERAGE SET: the same entries at every level, so the curve is a curve.
     if fixed_lost_mask is not None and fixed_lost_mask.sum() > 0:
         m_fx = compute_metrics_for_mask(all_mask, entry_mask=fixed_lost_mask)
+        print(f"\n  === FIXED-ENTRY-SET imputation (same entries at every coverage level) ===")
+        print(f"  [pearson]  lf={m_fx['median_pearson_lf']:.4f}  lf_bb={m_fx['median_pearson_lf_bb']:.4f}  "
+              f"nmf0_tr={m_fx['median_pearson_nmf0_tr']:.4f}  nmfm_tr={m_fx['median_pearson_nmfm_tr']:.4f}  "
+              f"mb={m_fx['median_pearson_mb']:.4f}  naive={m_fx['median_pearson_naive']:.4f}")
+        print(f"  [MAE]      lf={m_fx['mae_lf']:.4f}  lf_bb={m_fx['mae_lf_bb']:.4f}  "
+              f"nmf0_tr={m_fx['mae_nmf0_tr']:.4f}  naive={m_fx['mae_naive']:.4f}")
         rows.append({"dataset": "all", "entry_set": "fixed_lost_at_hardest",
-                     **base_row, **m_fx})
+                     "psi_hvj_mean_std":   psi_hvj_mean_std,
+                     "psi_hvj_median_std": psi_hvj_median_std,
+                     **m_fx})
     if lost_mask.sum() > 0:
         m_lost = compute_metrics_for_mask(all_mask, entry_mask=lost_mask)
         print(f"\n  === LOST-ENTRY imputation (no passthrough possible) ===")
