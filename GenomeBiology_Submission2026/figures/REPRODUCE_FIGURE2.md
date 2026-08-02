@@ -154,6 +154,40 @@ variational family, and leaves standard training unchanged.
 | `rerun_logs/ablate_{0,3}.csv` | `ablate_trainer.py` | trainer attribution |
 | `FIG2_validation.{pdf,png}` | `code/build_imputation.py` | the figure |
 
+## Inputs — all of them live in `data/`
+
+```bash
+python code/collect_inputs.py           # gather / refresh
+python code/collect_inputs.py --check   # verify data/ still matches data/INPUTS.json
+```
+
+`panels.py` reads **only** from `../data/`. Nothing is fetched by absolute path from `$WD` or from
+`~/LeafletFA/experiments` at build time, and `data/INPUTS.json` records the source path, size, mtime
+and sha256 of every input so drift is detectable rather than silent.
+
+| in `data/` | origin |
+|---|---|
+| `benchmark_results.csv`, `benchmark_effect_sweep.csv` | `step3_assemble.sh`, `eff3_assemble.sh` |
+| `rerun_logs/{odbench,prbench}_*.csv` | `od2_benchmark.sh`, `pr2_benchmark.sh` |
+| `panel_data.npz`, `representative_fit.npz` | `prep_panels.py` |
+| `A15_seed_consistency.csv` | copied from `$WD/SIMULATION` |
+| `sim_recover10_Kmodel{10,20,30}.csv` | copied from `~/LeafletFA/experiments/minibatch` |
+| `A26_cellcell_fig.npz` | **reduced** from `$WD/SIMULATION/A26_cellcell.npz`, 94 MB → 11 MB |
+
+**Why A26 is reduced, and the trap in doing it.** The panel renders `n_show=400` cells and only ever
+displays `seed0`/`seed1`/`true`, so 3 of the 12 stored 1500×1500 matrices are never read and the rest
+at 7% of their stored resolution. `collect_inputs.py` keeps 600×600 of the 9 that are used.
+
+The subtlety: `order_{tag}` is **not a permutation** — it is the true program label per cell, heavily
+tied, and `np.argsort` on it is what forms the heatmap's block structure. Subsetting it and
+re-ranking converts tied labels into distinct ranks and visibly reorders the figure. So the matrices
+are stored **already in display order** with `order_{tag} = arange(n)`, making the panel's `argsort`
+the identity. Verified: difference over the rendered panels is exactly 0.0, and every buildable panel
+is byte-identical to the pre-consolidation build.
+
+Not in the repo, by design — large and regenerable from the drivers below: the 39 simulated `.h5ad`
+in `$WD/SIMULATION`, and the full-resolution `A26_cellcell.npz`.
+
 ## Driver scripts — the actual pipeline
 
 All in `code/`, all SLURM arrays. Each arm is simulate → benchmark → (assemble). Run in order; the

@@ -1,0 +1,121 @@
+{
+  "purpose": "Reference LeafCutter pseudobulk DS result. Compare LeafletFA group DS (differential_splicing_groups.py) against these numbers on the same contrast.",
+  "event_id": "ENSMUSG00000064080.12_atse_2",
+  "gene": "Fbln2",
+  "chrom": "chr6",
+  "strand": "+",
+  "leafcutter_cluster": "chr6:ENSMUSG00000064080.12_atse_2_+",
+  "contrast": {
+    "pair_dir": "Heart_ENDOTHELIAL_CELL__vs__Heart_FIBROBLAST",
+    "dataset": "tabula_muris_senis",
+    "group_col": "tissue_cell_type",
+    "group_1": "Heart_ENDOTHELIAL CELL",
+    "group_2": "Heart_FIBROBLAST",
+    "covariates_in_leafcutter": [
+      "sex",
+      "age"
+    ]
+  },
+  "design": {
+    "n_samples_per_group": 13,
+    "n_donors_per_group": 13,
+    "donors_shared_by_both_groups": 13,
+    "note": "Every donor contributes one pseudobulk sample to EACH group, so age and sex are exactly balanced across the contrast and cannot confound it.",
+    "age_composition": {
+      "3m": 6,
+      "18m": 3,
+      "24m": 4
+    },
+    "sex_composition": {
+      "female": 5,
+      "male": 8
+    }
+  },
+  "leafcutter_result": {
+    "p_raw": 4.044136934743753e-34,
+    "p_adjust": 4.4505726966855e-31,
+    "status": "Success",
+    "loglr": 76.890625,
+    "df": 2.0
+  },
+  "junctions": [
+    {
+      "junction_id": "chr6_91257826_91263338_+",
+      "role": "skip",
+      "psi_Heart_ENDOTHELIAL_CELL": 0.9169,
+      "psi_Heart_FIBROBLAST": 0.0203,
+      "delta_psi": 0.8966
+    },
+    {
+      "junction_id": "chr6_91257826_91259629_+",
+      "role": "include_5p",
+      "psi_Heart_ENDOTHELIAL_CELL": 0.0368,
+      "psi_Heart_FIBROBLAST": 0.3878,
+      "delta_psi": -0.351
+    },
+    {
+      "junction_id": "chr6_91259770_91263338_+",
+      "role": "include_3p",
+      "psi_Heart_ENDOTHELIAL_CELL": 0.0463,
+      "psi_Heart_FIBROBLAST": 0.5919,
+      "delta_psi": -0.5456
+    }
+  ],
+  "files": {
+    "plot": "Fbln2_atse2_HeartEndo_vs_HeartFibro.pdf",
+    "per_sample_psi": "reference_atse_Fbln2_per_sample_psi.tsv",
+    "leafcutter_run": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/LEAFCUTTER_DS_2026-08/by_pair/Heart_ENDOTHELIAL_CELL__vs__Heart_FIBROBLAST"
+  },
+  "what_leafletfa_should_reproduce": [
+    "Sign and rough magnitude of delta_psi per junction (skip ~ +0.90 endothelial over fibroblast).",
+    "ATSE-level total variation ~0.90 (differential_splicing_atses).",
+    "The ATSE ranking near the top of this contrast.",
+    "Report the SLOPE of LeafletFA beta on these deltas, not the correlation -- correlation is scale-invariant and hides attenuation.",
+    "Consistency across all 13 donors and all 3 age groups -- if LeafletFA imputed PSI shows the cell-type split only at some ages, that is a red flag."
+  ],
+  "age_consistency": {
+    "method": "Paired per-donor delta PSI (endothelial - fibroblast), n=13 donors, regressed on age in months; Kruskal-Wallis across 3m/18m/24m.",
+    "cell_type_effect_consistent": true,
+    "all_13_donors_same_sign_all_3_junctions": true,
+    "per_junction": {
+      "skip": {
+        "mean_delta_by_age": {
+          "3m": 0.941,
+          "18m": 0.915,
+          "24m": 0.817
+        },
+        "slope_per_month": -0.00509,
+        "slope_p": 0.101,
+        "kruskal_p": 0.562,
+        "verdict": "no significant age trend"
+      },
+      "include_5p": {
+        "mean_delta_by_age": {
+          "3m": -0.397,
+          "18m": -0.354,
+          "24m": -0.28
+        },
+        "slope_per_month": 0.005,
+        "slope_p": 0.001,
+        "kruskal_p": 0.011,
+        "verdict": "modest age-dependent attenuation; POST-HOC on a hand-picked top ATSE, treat as a lead not a finding"
+      },
+      "include_3p": {
+        "mean_delta_by_age": {
+          "3m": -0.544,
+          "18m": -0.561,
+          "24m": -0.536
+        },
+        "slope_per_month": 9e-05,
+        "slope_p": 0.967,
+        "kruskal_p": 0.862,
+        "verdict": "flat"
+      }
+    },
+    "caveats": [
+      "n=13 donors, unbalanced ages (6/3/4).",
+      "This ATSE was selected for being a top hit, so any age trend here is post-hoc and uncorrected across the ~9,700 tested ATSEs in this contrast.",
+      "age was a covariate in the LeafCutter model, so the reported p_adjust is already adjusted for it."
+    ]
+  }
+}
