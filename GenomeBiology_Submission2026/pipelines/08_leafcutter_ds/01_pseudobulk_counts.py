@@ -22,13 +22,35 @@ the active-junction submatrix to dense, which fills zeros automatically.
 
 Pseudobulk design
 -----------------
-Cells are aggregated by (mouse.id × tissue_cell_type). Each unique combination
-becomes one sample (column) in the LeafCutter counts matrix. Groups with fewer
-than MIN_CELLS cells are excluded — too few cells produce unreliable PSI estimates
-and low read depth, which LeafCutter DS will filter anyway at the cluster level.
+The unit is `tissue_cell_type`, stratified by whichever replicate/covariate fields the
+dataset actually has:
 
-The age of each pseudobulk sample is recorded in sample_metadata.csv for use
-in the groups file when running LeafCutter DS (01_run_leafcutter_ds.py).
+    sample_name = tissue_cell_type [_sex] [_age] [_donor]
+
+  tabula_muris_senis : sex, age, donor  ->  Heart_FIBROBLAST_female_18m_18_46_F
+  allen_brain        : sex              ->  Brain_Isocortex_Visual_EXCITATORY_NEURON_male
+
+Because tissue_cell_type already carries the tissue, a contrast between two
+tissue_cell_types is within-tissue by construction — no pooling decision, no tissue
+covariate.
+
+Allen contributes no donor and no age deliberately: its `mouse.id` comes from
+`external_donor_name_label` (519 values over 54,571 cells, median 46 cells each — too
+thin to be a biological replicate), and its `age` is hardcoded "2m" in
+04_align/cell_id_cleaners/allen_brain_mouse.py:73 because Allen's metadata has no age
+field. Omitting them rather than faking them means `age` can never be picked up as a
+covariate on the Allen side.
+
+Groups with fewer than MIN_CELLS cells are excluded — too few cells produce unreliable
+PSI estimates and low read depth, which LeafCutter DS filters anyway at the cluster
+level (`--min_coverage`).
+
+EVERY field is sanitised through lc_utils.safe_name. LeafCutter reads its groups file
+whitespace-separated, so a space anywhere (e.g. "ENDOTHELIAL CELL") silently truncates
+sample names and merges distinct groups. See lc_utils for the full account.
+
+Run 01b_audit_pseudobulk_design.py first — it derives the exact sample list from `obs`
+alone, in seconds, before this script's single pass over the 30 GB matrix.
 
 Memory strategy
 ---------------
@@ -58,8 +80,56 @@ import pandas as pd
 import scipy.sparse as sp
 import anndata as ad
 
+from lc_utils import pseudobulk_sample_name
+
 
 CHUNK_SIZE = 5000   # cells per batch when loading the junction matrix
+
+# Fields used to stratify each dataset, in label order. Must match
+# 01b_audit_pseudobulk_design.py::DATASET_KEYS, which is the fast preview of this.
+DATASET_KEYS = {
+    "tabula_muris_senis": ["sex", "age", "mouse.id"],
+    "allen_brain":        ["sex"],
+}
+DEFAULT_KEYS = ["sex"]
+
+
+def assign_group_keys(obs):
+    """Add `group_key` / `sample_name` per cell, using the dataset's available fields.
+
+    `group_key` stays human-readable (unsanitised) for metadata; `sample_name` is the
+    sanitised label that becomes a counts-matrix column. Vectorised — this runs over
+    every cell in the atlas.
+    """
+    group_key   = pd.Series(index=obs.index, dtype=object)
+    sample_name = pd.Series(index=obs.index, dtype=object)
+
+    for dataset, sub in obs.groupby("dataset", observed=True):
+        keys = [k for k in DATASET_KEYS.get(dataset, DEFAULT_KEYS) if k in obs.columns]
+        parts = [sub["tissue_cell_type"].astype(str)] + [sub[k].astype(str) for k in keys]
+
+        group_key.loc[sub.index] = parts[0].str.cat(parts[1:], sep="||")
+        # Same rule as lc_utils.safe_name, applied column-wise.
+        clean = [p.str.replace(r"[^A-Za-z0-9_.-]", "_", regex=True) for p in parts]
+        sample_name.loc[sub.index] = clean[0].str.cat(clean[1:], sep="_")
+
+    obs["group_key"]   = group_key
+    obs["sample_name"] = sample_name
+
+    # Guard the vectorised path against lc_utils drifting apart from it.
+    probe = obs.iloc[0]
+    keys = [k for k in DATASET_KEYS.get(probe["dataset"], DEFAULT_KEYS) if k in obs.columns]
+    expected = pseudobulk_sample_name(
+        probe["tissue_cell_type"],
+        probe.get("sex")      if "sex"      in keys else None,
+        probe.get("age")      if "age"      in keys else None,
+        probe.get("mouse.id") if "mouse.id" in keys else None,
+    )
+    assert probe["sample_name"] == expected, (
+        f"label mismatch vs lc_utils.pseudobulk_sample_name: "
+        f"{probe['sample_name']!r} != {expected!r}"
+    )
+    return obs
 
 
 def load_obs(splice_h5ad):
@@ -96,8 +166,8 @@ def main():
                     help="junction_atse_map.tsv from 00_export_junction_atse_map.py")
     ap.add_argument("--output-dir", required=True,
                     help="Directory for output files")
-    ap.add_argument("--min-cells", type=int, default=10,
-                    help="Minimum cells per pseudobulk group (default: 10)")
+    ap.add_argument("--min-cells", type=int, default=25,
+                    help="Minimum cells per pseudobulk group (default: 25)")
     args = ap.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -110,14 +180,19 @@ def main():
     n_cells_total = len(obs)
     print(f"  {n_cells_total:,} cells total", flush=True)
 
-    # Group key: donor × cell type
-    obs["group_key"] = obs["mouse.id"].astype(str) + "||" + obs["tissue_cell_type"].astype(str)
+    # Group key: tissue_cell_type × (dataset-specific replicate/covariate fields)
+    obs = assign_group_keys(obs)
+    for ds, sub in obs.groupby("dataset", observed=True):
+        keys = [k for k in DATASET_KEYS.get(ds, DEFAULT_KEYS) if k in obs.columns]
+        print(f"    {ds:<20} key = tissue_cell_type x {' x '.join(keys)}", flush=True)
+
     group_sizes = obs["group_key"].value_counts()
     valid_groups = group_sizes[group_sizes >= args.min_cells].index
     print(f"  Groups with >= {args.min_cells} cells: {len(valid_groups):,} / {len(group_sizes):,}", flush=True)
 
     obs_valid = obs[obs["group_key"].isin(valid_groups)].copy()
-    print(f"  Cells in valid groups: {len(obs_valid):,}", flush=True)
+    print(f"  Cells in valid groups: {len(obs_valid):,} "
+          f"({100 * len(obs_valid) / n_cells_total:.1f}%)", flush=True)
 
     # Assign integer group index to each cell (for sparse accumulation)
     group_list = sorted(valid_groups)
@@ -129,6 +204,7 @@ def main():
         obs_valid
         .groupby("group_key", observed=True)
         .agg(
+            sample_name     = ("sample_name", "first"),
             mouse_id        = ("mouse.id", "first"),
             tissue_cell_type= ("tissue_cell_type", "first"),
             tissue          = ("tissue", "first"),
@@ -141,10 +217,24 @@ def main():
         .loc[group_list]
         .reset_index()
     )
-    # Sample name = group_key with || replaced by __ for LeafCutter compatibility
-    meta["sample_name"] = meta["group_key"].str.replace("||", "__", regex=False)
+
+    # `donor` is the replicate id where one exists. Allen's mouse.id is not usable as a
+    # donor (see module docstring), so it is blanked rather than carried through and
+    # mistaken for a biological replicate downstream.
+    meta["donor"] = np.where(meta["dataset"] == "allen_brain", "", meta["mouse_id"])
+    # Likewise Allen's `age` is a hardcoded constant, not a measurement.
+    meta["age_is_measured"] = meta["dataset"] != "allen_brain"
+    meta["pseudobulk_key"] = meta["dataset"].map(
+        lambda d: "tissue_cell_type x " + " x ".join(DATASET_KEYS.get(d, DEFAULT_KEYS))
+    )
+
+    # A collision would silently merge two distinct biological groups into one column.
+    dup = meta["sample_name"][meta["sample_name"].duplicated(keep=False)]
+    assert dup.empty, f"sample_name collisions after sanitisation: {sorted(set(dup))[:5]}"
+
     meta.to_csv(out_meta, index=False)
     print(f"  Sample metadata saved → {out_meta}", flush=True)
+    print(f"  Sample-name collisions: 0", flush=True)
 
     sample_names = meta["sample_name"].tolist()
 
@@ -285,6 +375,46 @@ def main():
                   f"B count={int(ex_counts_b[sample_with_both])}", flush=True)
     else:
         print("    No 2-junction ATSE found with mixed zero/nonzero — all balanced.", flush=True)
+
+    # 4b2. Denominator identity — the fact the whole LeafletFA comparison rests on.
+    # LeafCutter never sees cell_by_cluster_matrix; it rebuilds each cluster's
+    # denominator as the sum of that cluster's junction counts. LeafletFA uses T_cj
+    # directly. If those disagree, the two methods compute PSI on different
+    # denominators and their effect sizes are not comparable.
+    # Cell-level identity (T_cj == sum over the ATSE of y_cj) holds exactly in this
+    # object; this checks that pseudobulk aggregation preserves it.
+    print("\n  [4b2] Denominator identity at pseudobulk level "
+          "(sum of junction counts in ATSE == pseudobulked ATSE total):", flush=True)
+    probe_grp = int(np.argmax(np.asarray(pb_counts.sum(axis=1)).ravel()))
+    probe_cells = np.where(cell_to_group == probe_grp)[0]
+    probe_cells = probe_cells[:200]          # a slice is enough; the identity is exact
+    T_sum = np.zeros(J, dtype=np.int64)
+    with h5py.File(args.splice_h5ad, "r") as f:
+        cl = f["layers/cell_by_cluster_matrix"]
+        for ci in probe_cells:
+            s, e = int(cl["indptr"][ci]), int(cl["indptr"][ci + 1])
+            np.add.at(T_sum, cl["indices"][s:e], cl["data"][s:e])
+    Y_sum = np.zeros(J, dtype=np.int64)
+    with h5py.File(args.splice_h5ad, "r") as f:
+        jc = f["layers/cell_by_junction_matrix"]
+        for ci in probe_cells:
+            s, e = int(jc["indptr"][ci]), int(jc["indptr"][ci + 1])
+            np.add.at(Y_sum, jc["indices"][s:e], jc["data"][s:e])
+    events = junc_map["event_id"].astype(str).values
+    uniq_ev, inv_ev = np.unique(events, return_inverse=True)
+    per_atse = np.zeros(len(uniq_ev), dtype=np.int64)
+    np.add.at(per_atse, inv_ev, Y_sum)
+    reconstructed = per_atse[inv_ev]          # broadcast back to junctions, like T_cj
+    n_bad = int((reconstructed != T_sum).sum())
+    print(f"    group {group_list[probe_grp]}  ({len(probe_cells)} cells sampled)",
+          flush=True)
+    print(f"    junctions where sum-within-ATSE != pseudobulked ATSE total: {n_bad:,} / {J:,}",
+          flush=True)
+    assert n_bad == 0, (
+        "Denominator identity FAILED: LeafCutter's within-cluster sum would not match "
+        "LeafletFA's T_cj, so ΔPSI is not the same estimand on both sides."
+    )
+    print(f"    ✓ identical — both methods will use the same PSI denominators", flush=True)
 
     # 4c. Zero-count junction examples
     print("\n  [4c] Zero-count junction examples (reads=0 in all pseudobulks):", flush=True)

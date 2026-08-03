@@ -2,6 +2,26 @@
 """
 Step 08-02: Run LeafCutter DS for each testable tissue_cell_type.
 
+!! NEEDS THE lc_utils FIX BEFORE RE-RUNNING — see below. !!
+
+The age contrast itself ("young"/"old") is fine, but this script writes sample names
+straight from `tissue_cell_type`, which contains spaces for most cell types
+("Bladder_EPITHELIAL CELL", "Marrow_B CELL"). LeafCutter parses the groups file
+whitespace-separated, so those names truncate and stop matching the counts columns.
+That is why the 2026-06-20 run completed only 4 of 20 cell types — exactly the four
+whose cell type is a single word (MICROGLIA, FIBROBLAST, GRANULOCYTE, KERATINOCYTE).
+The others died with "There are no groups with enough samples to test", which reads
+like a sample-size problem but is not.
+
+Before re-running: route every field through lc_utils.safe_name and validate with
+lc_utils.assert_groups_file_parses, exactly as 02c does. Also pass --baseline_group
+explicitly; leaving it at the default makes LeafCutter label the reference level
+"Control" regardless of what it actually used, so the deltapsi sign convention in the
+output is not self-describing.
+
+The four completed runs are usable (their labels happen to be whitespace-free), but
+carry that baseline-naming caveat; 03_collect_ds_results.py reports it.
+
 Strategy
 --------
 Comparison: young (2m + 3m) vs old (18m + 24m) within each tissue_cell_type.

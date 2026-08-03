@@ -13,6 +13,15 @@ Each junction is a horizontal coloured line; colour = PSI via copper colormap
 
 Usage
 -----
+# Pairwise cell-type DS (02c output) — group labels come from the pair directory name
+python 04_visualize_ds_atse.py \\
+    --cluster   "chr6:ENSMUSG00000064080.12_atse_2_-" \\
+    --condition  Heart_ENDOTHELIAL_CELL__vs__Heart_FIBROBLAST \\
+    --analysis   pairwise_ds \\
+    --group1    "Heart_ENDOTHELIAL CELL" --group2 "Heart_FIBROBLAST" \\
+    --lc-dir    <LEAFCUTTER_DS_2026-08 dir> \\
+    --output    <out.pdf>
+
 # Age DS (young vs old in one tissue_cell_type)
 python 04_visualize_ds_atse.py \\
     --cluster   "chr11:ENSMUSG00000018381.15_atse_3_-" \\
@@ -124,6 +133,11 @@ def get_transcripts(db, chrom, region_start, region_end, strand, max_tx=6):
             seen.add(tx_name)
             exons = [(e.start, e.end)
                      for e in db.children(tx, featuretype="exon", order_by="start")]
+            # Keep only transcripts with an exon that actually overlaps the plotted
+            # window. gffutils returns any transcript of an overlapping GENE, so
+            # without this a transcript whose exons all lie outside the region is
+            # listed as a label with no boxes drawn beneath it.
+            exons = [e for e in exons if e[1] >= region_start and e[0] <= region_end]
             if exons:
                 results.append((tx_name, tx_type, exons))
             if len(results) >= max_tx:
@@ -218,9 +232,12 @@ def plot_two_panel(psi_df, junctions, transcript_data,
 
     n_junc = len(junctions)
     n_tx   = len(transcript_data)
-    panel_h = n_junc * 1.4 + 1.0
-    exon_h  = n_tx  * 0.8 + 0.5
-    fig_h   = panel_h * 2 + exon_h + 2.0
+    # Junctions are drawn 1.2 apart with ~0.9 of margin, so ~0.6 in of figure per
+    # junction keeps the aspect roughly square-ish per row. The old 1.4 left a
+    # small ATSE (2-3 junctions) sitting in more than half a panel of whitespace.
+    panel_h = n_junc * 0.6 + 0.8
+    exon_h  = n_tx  * 0.55 + 0.6
+    fig_h   = panel_h * 2 + exon_h + 1.2
 
     fig = plt.figure(figsize=(14, fig_h))
 
@@ -237,26 +254,30 @@ def plot_two_panel(psi_df, junctions, transcript_data,
     y2 = draw_junctions(ax_g2, junctions, g2_psi, cmap, norm,
                         sig_mask, region_start, region_end, direction=1)
     ax_g2.set_xlim(region_start, region_end + (region_end - region_start) * 0.18)
-    ax_g2.set_ylim(-0.5, y2 + 1.5)
+    # Tight to the drawn rows: the first junction sits at y=1.2 and each PSI label
+    # needs ~0.5 above its line, so anything wider than this is pure whitespace.
+    ax_g2.set_ylim(0.45, y2 + 0.85)
     ax_g2.set_ylabel(g2_label, fontsize=10, fontweight="bold")
     ax_g2.set_yticks([])
     ax_g2.spines[["top","right","left","bottom"]].set_visible(False)
-    ax_g2.axhline(0, color="black", lw=0.5)
+    # x is shared with the labelled exon panel at the bottom, so unlabelled tick
+    # stubs here just read as debris between the panels.
+    ax_g2.tick_params(axis="x", length=0, labelbottom=False)
 
     # ── Panel: group 1 (young) ───────────────────────────────────────
     g1_psi = psi_df[g1_label]
     y1 = draw_junctions(ax_g1, junctions, g1_psi, cmap, norm,
                         sig_mask, region_start, region_end, direction=1)
-    ax_g1.set_ylim(-0.5, y1 + 1.5)
+    ax_g1.set_ylim(0.45, y1 + 0.85)
     ax_g1.set_ylabel(g1_label, fontsize=10, fontweight="bold")
     ax_g1.set_yticks([])
     ax_g1.spines[["top","right","left","bottom"]].set_visible(False)
-    ax_g1.axhline(0, color="black", lw=0.5)
+    ax_g1.tick_params(axis="x", length=0, labelbottom=False)
 
     # ── Exon / transcript panel ──────────────────────────────────────
     draw_exons(ax_exon, transcript_data, region_start, region_end)
     ax_exon.set_xlim(region_start, region_end + (region_end - region_start) * 0.18)
-    ax_exon.set_ylim(-(len(transcript_data) * 0.7 + 1), 0.8)
+    ax_exon.set_ylim(-(len(transcript_data) * 0.7 + 0.3), 0.5)
     ax_exon.set_yticks([])
     ax_exon.set_xlabel(f"Genomic position ({chrom})", fontsize=10)
     ax_exon.spines[["top","right","left"]].set_visible(False)
@@ -289,7 +310,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--cluster",   required=True)
     ap.add_argument("--condition", required=True)
-    ap.add_argument("--analysis",  required=True, choices=["age_ds","celltype_ds"])
+    ap.add_argument("--analysis",  required=True,
+                    choices=["pairwise_ds", "age_ds", "celltype_ds"])
+    ap.add_argument("--group-col", default=None,
+                    help="obs/metadata column holding the group labels for pairwise_ds "
+                         "(default: tissue_cell_type; use broad_cell_type for Allen)")
     ap.add_argument("--lc-dir",    required=True)
     ap.add_argument("--junc-map",  default=None)
     ap.add_argument("--db",        default=DEFAULT_DB)
@@ -304,7 +329,20 @@ def main():
     junc_map  = args.junc_map or os.path.join(args.lc_dir, "junction_atse_map.tsv")
     meta_path = os.path.join(args.lc_dir, "sample_metadata.csv")
 
-    if args.analysis == "age_ds":
+    if args.analysis == "pairwise_ds":
+        # `condition` is the pair directory name, "<group_1>__vs__<group_2>". Group
+        # labels there are sanitised (lc_utils.safe_name); sample_metadata.csv keeps the
+        # originals, so --group1/--group2 take the ORIGINAL names ("Heart_ENDOTHELIAL CELL").
+        sub_dir   = os.path.join(args.lc_dir, "by_pair", args.condition)
+        group_col = args.group_col or "tissue_cell_type"
+        if not (args.group1 and args.group2):
+            if "__vs__" not in args.condition:
+                ap.error("--group1 and --group2 required when --condition is not "
+                         "'<group_1>__vs__<group_2>'")
+            g1, g2 = args.condition.split("__vs__")
+        else:
+            g1, g2 = args.group1, args.group2
+    elif args.analysis == "age_ds":
         sub_dir   = os.path.join(args.lc_dir, "by_celltype", args.condition)
         group_col = "age_group"
         g1 = args.group1 or "young"

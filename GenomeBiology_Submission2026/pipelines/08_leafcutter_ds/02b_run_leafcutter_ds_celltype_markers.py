@@ -2,6 +2,24 @@
 """
 Step 08-02b: Run LeafCutter DS for cell-type marker splicing events.
 
+!! SUPERSEDED — DO NOT RE-RUN. Use 02c_run_leafcutter_ds_pairwise_celltypes.py. !!
+
+Kept for provenance only. Two independent problems:
+
+  1. It writes group labels straight from `broad_cell_type`, which contains spaces
+     ("ENDOTHELIAL CELL", "B CELL"). LeafCutter parses the groups file
+     whitespace-separated, so sample names truncated, "B CELL" and "T CELL" both
+     became "CELL", and covariates shifted between columns. See lc_utils for the full
+     account. Its 2026-06-20 output under $WD/LEAFCUTTER_DS/by_tissue/ is corrupted
+     and 03_collect_ds_results.py flags it as `suspect`.
+  2. It assumes LeafCutter handles >2 conditions natively. LeafCutter2's own help says
+     "currently only two groups, i.e. pairwise, supported"; the multi-group form gives
+     an omnibus p-value plus one-vs-baseline coefficients, which does not match
+     LeafletFA's pairwise ΔPSI.
+
+02c fixes both: sanitised labels validated against LeafCutter's own parser before
+submission, and genuinely pairwise contrasts.
+
 Comparison: cell type A vs cell type B within tissue, with age_group + sex
 as covariates. This identifies junctions that are differentially spliced
 between cell types, controlling for age — complementary to the age DS analysis

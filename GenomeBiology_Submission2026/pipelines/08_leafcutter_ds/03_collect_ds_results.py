@@ -2,14 +2,27 @@
 """
 Step 08-03: Collect and summarize LeafCutter DS results across all completed runs.
 
-Reads all ds_results_cluster_significance.txt + ds_results_effect_sizes.txt files
-from both the age DS (by_celltype/) and cell-type marker DS (by_tissue/) outputs,
+Reads all ds_results_cluster_significance.txt + ds_results_effect_sizes.txt files,
 merges them, and writes a single ranked summary TSV for easy access to top hits.
+
+Scans three layouts:
+  by_pair/<A>__vs__<B>/   pairwise cell-type DS from 02c   -> analysis "pairwise_ds"
+  by_celltype/<CT>/       age DS from 02                   -> analysis "age_ds"
+  by_tissue/<TISSUE>/     multi-group cell-type DS from 02b -> analysis "celltype_ds"
+
+The by_celltype/ and by_tissue/ outputs from 2026-06-20 are CORRUPTED — see lc_utils
+for the whitespace-parsing bug that merged distinct cell types and truncated sample
+names. They are still scanned so a re-run of 02/02b can be collected, but anything
+carrying the tell-tale signature (a bare "CELL" group, or a psi_Control column from
+the nonexistent default baseline) is flagged in a `suspect` column rather than
+silently ranked alongside good results.
 
 Output columns
 --------------
-analysis       : "age_ds" or "celltype_ds"
-condition      : tissue_cell_type (age_ds) or tissue (celltype_ds)
+analysis       : "pairwise_ds", "age_ds" or "celltype_ds"
+condition      : contrast name (pairwise_ds) / tissue_cell_type (age_ds) / tissue (celltype_ds)
+group_1,group_2: the two contrasted groups (pairwise_ds only)
+suspect        : non-empty if this run shows the 2026-06-20 corruption signature
 cluster        : ATSE cluster ID (e.g. chr11:ENSMUSG00000018381.15_atse_3_-)
 gene_id        : parsed from cluster
 atse_id        : parsed from cluster
@@ -56,7 +69,42 @@ def parse_cluster_id(cluster):
         return "", "", cluster, ""
 
 
-def load_run(sig_path, ef_path, condition, analysis):
+def corruption_signature(ef_columns, groups_path=None):
+    """Classify a run as corrupted, merely mislabelled, or clean.
+
+    Returns (suspect, warning).
+
+    `suspect` — the run's groups are wrong, so its RESULTS are wrong. Both fingerprints
+    are direct consequences of LeafCutter's `sep='\\s+'` splitting labels that contain
+    spaces (see lc_utils):
+      * a bare `CELL` group — what "B CELL", "T CELL", "ENDOTHELIAL CELL" all collapse to
+      * a groups file that parses ragged — covariates land in different columns per row
+
+    `warning` — cosmetic only. A `psi_Control` column means `--baseline_group` was left
+    at its default, so LeafCutter named the reference level "Control" even though it
+    silently used the alphabetically-first real group. The test is valid; the column
+    name and hence the SIGN convention of deltapsi is not self-describing. 02c always
+    passes `-0` explicitly, so new runs never show this.
+    """
+    suspect, warning = [], []
+    cols = set(ef_columns)
+
+    bare = [c for c in cols if c.split("_", 1)[-1] == "CELL"]
+    if bare:
+        suspect.append(f"bare 'CELL' group ({', '.join(sorted(bare)[:3])})")
+
+    if groups_path and os.path.exists(groups_path):
+        parsed = pd.read_table(groups_path, header=None, sep=r"\s+")
+        if parsed.isna().any().any():
+            suspect.append("groups file parses ragged (covariates shifted)")
+
+    if "psi_Control" in cols:
+        warning.append("baseline left at default; deltapsi sign convention unlabelled")
+
+    return "; ".join(suspect), "; ".join(warning)
+
+
+def load_run(sig_path, ef_path, condition, analysis, group_1="", group_2=""):
     """Load and merge significance + effect sizes for one run."""
     sig = pd.read_csv(sig_path, sep="\t")
     ef  = pd.read_csv(ef_path, sep="\t")
@@ -89,12 +137,17 @@ def load_run(sig_path, ef_path, condition, analysis):
     merged = sig.merge(ef_max, on="cluster", how="left")
     merged["analysis"]  = analysis
     merged["condition"] = condition
+    merged["group_1"]   = group_1
+    merged["group_2"]   = group_2
+    merged["suspect"], merged["warning"] = corruption_signature(
+        ef.columns, os.path.join(os.path.dirname(sig_path), "groups.txt"))
 
     # Rename for cleaner output
     merged = merged.rename(columns={"p": "p_raw", "p.adjust": "p_adjust",
                                      "p_num": "p_float", "p_adjust_num": "p_adjust_float"})
 
-    keep = ["analysis", "condition", "cluster", "gene_id", "atse_id",
+    keep = ["analysis", "condition", "group_1", "group_2", "suspect", "warning",
+            "cluster", "gene_id", "atse_id",
             "chrom", "strand", "status", "p_raw", "p_adjust",
             "max_abs_dpsi"] + [c for c in merged.columns if c.startswith("mean_deltapsi")]
     keep = [c for c in keep if c in merged.columns]
@@ -114,40 +167,51 @@ def main():
 
     all_dfs = []
     total_sig = 0
+    n_suspect = 0
 
-    # ── Age DS (by_celltype) ──────────────────────────────────────────────────
-    print("[age_ds] Scanning by_celltype/ ...")
-    for sig_path in sorted(glob.glob(
-            os.path.join(args.lc_dir, "by_celltype", "*", "ds_results_cluster_significance.txt"))):
-        ef_path = sig_path.replace("cluster_significance", "effect_sizes")
-        if not os.path.exists(ef_path):
-            continue
-        condition = os.path.basename(os.path.dirname(sig_path))
-        df, padj = load_run(sig_path, ef_path, condition, "age_ds")
-        n_sig = (padj < args.padj_cutoff).sum()
-        n_dpsi = ((padj < args.padj_cutoff) & (df["max_abs_dpsi"].fillna(0) > args.dpsi_cutoff)).sum()
-        print(f"  {condition:<45} sig={n_sig:>5}  |dPSI|>{args.dpsi_cutoff}={n_dpsi:>5}")
-        total_sig += n_dpsi
-        all_dfs.append(df[padj < args.padj_cutoff])
+    def scan(subdir, analysis, split_pair=False):
+        """Collect every completed run under one layout directory."""
+        nonlocal total_sig, n_suspect
+        pattern = os.path.join(args.lc_dir, subdir, "*",
+                               "ds_results_cluster_significance.txt")
+        found = sorted(glob.glob(pattern))
+        print(f"\n[{analysis}] Scanning {subdir}/ ... ({len(found)} completed runs)")
+        for sig_path in found:
+            ef_path = sig_path.replace("cluster_significance", "effect_sizes")
+            if not os.path.exists(ef_path):
+                continue
+            condition = os.path.basename(os.path.dirname(sig_path))
+            g1, g2 = condition.split("__vs__") if split_pair and "__vs__" in condition \
+                     else ("", "")
+            df, padj = load_run(sig_path, ef_path, condition, analysis, g1, g2)
+            n_sig = (padj < args.padj_cutoff).sum()
+            n_dpsi = ((padj < args.padj_cutoff)
+                      & (df["max_abs_dpsi"].fillna(0) > args.dpsi_cutoff)).sum()
+            flag = df["suspect"].iloc[0] if len(df) else ""
+            warn = df["warning"].iloc[0] if len(df) else ""
+            if flag:
+                n_suspect += 1
+            print(f"  {condition:<55} sig={n_sig:>5}  "
+                  f"|dPSI|>{args.dpsi_cutoff}={n_dpsi:>5}"
+                  f"{'  ** SUSPECT' if flag else ''}")
+            if flag:
+                print(f"      CORRUPT: {flag}")
+            if warn:
+                print(f"      note:    {warn}")
+            total_sig += n_dpsi
+            all_dfs.append(df[padj < args.padj_cutoff])
 
-    # ── Cell-type DS (by_tissue) ──────────────────────────────────────────────
-    print("\n[celltype_ds] Scanning by_tissue/ ...")
-    for sig_path in sorted(glob.glob(
-            os.path.join(args.lc_dir, "by_tissue", "*", "ds_results_cluster_significance.txt"))):
-        ef_path = sig_path.replace("cluster_significance", "effect_sizes")
-        if not os.path.exists(ef_path):
-            continue
-        condition = os.path.basename(os.path.dirname(sig_path))
-        df, padj = load_run(sig_path, ef_path, condition, "celltype_ds")
-        n_sig = (padj < args.padj_cutoff).sum()
-        n_dpsi = ((padj < args.padj_cutoff) & (df["max_abs_dpsi"].fillna(0) > args.dpsi_cutoff)).sum()
-        print(f"  {condition:<45} sig={n_sig:>5}  |dPSI|>{args.dpsi_cutoff}={n_dpsi:>5}")
-        total_sig += n_dpsi
-        all_dfs.append(df[padj < args.padj_cutoff])
+    scan("by_pair",     "pairwise_ds", split_pair=True)   # 02c — the current analysis
+    scan("by_celltype", "age_ds")                         # 02
+    scan("by_tissue",   "celltype_ds")                    # 02b — superseded by 02c
 
     if not all_dfs:
         print("\nNo completed runs found.")
         return
+
+    if n_suspect:
+        print(f"\n  WARNING: {n_suspect} run(s) carry the 2026-06-20 corruption "
+              f"signature and are flagged in the `suspect` column. Do not quote them.")
 
     # ── Combine and rank ──────────────────────────────────────────────────────
     combined = pd.concat(all_dfs, ignore_index=True)
