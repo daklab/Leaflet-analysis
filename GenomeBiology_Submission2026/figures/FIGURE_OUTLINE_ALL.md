@@ -89,7 +89,35 @@ size) while **mean-impute tracks the effect** (−0.121 → 0.556). Neither reco
 LeafletFA claim rests on doing both — separating cells *and* recovering ΔΨ — which neither NMF
 variant does.
 
-### 2b — Imputation on held-out cells ⏳ fixed-entry-set rerun in flight (`19414852`)
+### 2b — Imputation: the headline is the label-oracle comparison
+
+**LeafletFA's learned φ carries more per-cell splicing information than the ground-truth cell-type
+annotation does.** The cell-type mean predicts each entry from its cell's annotated type — a label
+the model never sees — and LeafletFA beats it at every coverage level, by a margin that *widens* as
+data gets scarcer:
+
+| % reads dropped | LeafletFA | cell-type mean (uses labels) | NMF-tr mean-imp | naive | ratio |
+|---|---|---|---|---|---|
+| 10 | 0.0501 | 0.0378 | 0.0419 | 0.0000 | 1.33× |
+| 50 | 0.0523 | 0.0409 | 0.0416 | 0.0000 | 1.28× |
+| 90 | 0.0540 | 0.0421 | 0.0376 | 0.0000 | 1.28× |
+| 99 | 0.0481 | 0.0297 | 0.0271 | 0.0000 | 1.62× |
+| 100 | 0.0249 | 0.0137 | 0.0151 | 0.0000 | **1.81×** |
+
+Measured on `lost_to_downsampling`, where entries are unobserved **by definition** at every level, so
+no method can pass an observed value through and the comparison is fair all along the axis. (That
+entry set is still a moving population — fine for a head-to-head at a fixed level, not for reading
+the column as a coverage curve. Use `fixed_lost_at_hardest` for the curve.)
+
+**Absolute values are small (0.02–0.05) and should be reported as such.** The ceiling on this metric
+is 0.736 (`A27_imputation_ceiling.py`, two independent estimates agreeing to 0.01), but that ceiling
+is only reachable by a predictor that sees the entry's own reads — it establishes that the target is
+not noise-saturated, not that a blind method should reach it. Every blind predictor tried, including
+the label oracle, lands at 0.014–0.054. The likely reading is that per-cell splicing at a junction is
+largely idiosyncratic rather than a function of the cell's global state; LeafletFA extracts more of
+whatever *is* shared than the alternatives, including the annotation.
+
+### 2b panels ⏳ fixed-entry-set rerun in flight (`19414852`)
 
 | panel | content | status |
 |---|---|---|
