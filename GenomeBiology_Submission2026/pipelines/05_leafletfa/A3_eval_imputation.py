@@ -1178,7 +1178,25 @@ def main():
     if not h5mu_files:
         print(f"ERROR: no h5mu files: {pattern}")
         sys.exit(1)
-    print(f"\nFound {len(h5mu_files)} resampled test files")
+
+    # One file per level, or the run silently evaluates two datasets as if they were one.
+    # $WD/MODEL_INPUT/20260526/resampled holds FOURTEEN files: the seven combined levels and seven
+    # `..._test_30_70_TMS_ONLY_...` counterparts. Both match `RESAMPLED_<n>_PERCENT_test_*`, and the
+    # sort key is only the percentage, so a directory containing both yields two entries per level.
+    # A3 would then loop 14 times, write two rows per downsampling_pct, and every figure that groups
+    # on downsampling_pct would average the combined dataset with the TMS-only one.
+    _by_pct = {}
+    for p_ in h5mu_files:
+        _by_pct.setdefault(int(re.search(r"RESAMPLED_(\d+)_PERCENT", p_).group(1)), []).append(p_)
+    _dupes = {k: v for k, v in _by_pct.items() if len(v) > 1}
+    if _dupes:
+        print("ERROR: more than one h5mu per downsampling level -- refusing to run.")
+        for k, v in sorted(_dupes.items()):
+            print(f"  {k}%: " + "  ".join(os.path.basename(x) for x in v))
+        print("  Point resampled_dir at a directory holding exactly one file per level "
+              "(the eval scripts symlink the combined set into <out>/rs_all for this reason).")
+        sys.exit(1)
+    print(f"\nFound {len(h5mu_files)} resampled test files, one per level")
 
     # Compute HVJ once from the lowest-dropout file
     hvj_idx = compute_hvj_indices(h5mu_files[0], n_hvj)

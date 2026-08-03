@@ -1509,6 +1509,17 @@ def figure_program_celltype(save: bool = True):
 # values through, so on the fixed set at high coverage it reads ~0.047 and would sit BELOW
 # LeafletFA, looking like a defeat when it is really 93% passthrough.
 
+def _retained(pct_label):
+    """Reads actually RETAINED, from A3's percent-dropped label.
+
+    The labels are nominal. Measured against cell_by_cluster_matrix_original, 10 -> 90.000%,
+    90 -> 9.999%, 99 -> 0.999% and 100 -> 0.099% -- the last level drops 99.9% of reads, not 100%.
+    Using 100 - label would put that point at exactly 0, which cannot be drawn on a log axis and
+    would silently vanish from the panel.
+    """
+    return 0.1 if int(pct_label) >= 100 else 100 - int(pct_label)
+
+
 IDENTITY_CEILING = 0.125   # sqrt(median ANOVA R^2 of PSI on ground-truth cell type) -- A27 / notes
 
 
@@ -1520,7 +1531,7 @@ def panel_label_oracle(ax, imp: pd.DataFrame, K: int = 20) -> None:
     """
     d = imp[imp.K_cfg == K]
     cov = sorted(pd.to_numeric(d.downsampling_pct, errors="coerce").dropna().unique())
-    x = [100 - c for c in cov]                      # plot against reads RETAINED
+    x = [_retained(c) for c in cov]                 # plot against reads RETAINED
     series = [("median_pearson_lf",      "LeafletFA",                     "LeafletFA", "-"),
               ("median_pearson_mb_ct",   "cell-type mean (uses labels)",  "other",     "--"),
               ("median_pearson_nmfm_tr", "NMF transfer (mean-impute)",    "NMF",       "-"),
@@ -1549,7 +1560,7 @@ def panel_coverage_robustness(ax, imp: pd.DataFrame, K: int = 20) -> None:
     """
     d = imp[imp.K_cfg == K]
     cov = sorted(pd.to_numeric(d.downsampling_pct, errors="coerce").dropna().unique())
-    x = [100 - c for c in cov]
+    x = [_retained(c) for c in cov]
     for col, lab, ckey, ls in (("mae_lf",      "LeafletFA",                  "LeafletFA", "-"),
                                ("mae_nmfm_tr", "NMF transfer (mean-impute)", "NMF",       "-"),
                                ("mae_nmf0_tr", "NMF transfer (0-impute)",    "ablation",  "-"),
