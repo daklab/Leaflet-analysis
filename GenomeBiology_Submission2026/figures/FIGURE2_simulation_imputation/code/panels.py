@@ -166,18 +166,41 @@ def _load_heldout(kind: str) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def load_imputation() -> pd.DataFrame:
-    """Imputation eval, preferring the full coverage sweep.
+def load_imputation(kind: str = "04e_allcov", entry_set: str = "all_covered",
+                    dataset: str = "all") -> pd.DataFrame:
+    """Imputation eval, filtered to ONE entry set and ONE dataset scope.
 
-    The first eval pass symlinked only the 10%-resampled file, so `04e_out.csv` holds a single
-    coverage level and cannot produce a downsampling curve. `04e_allcov.csv` is the re-run over all
-    seven levels (10/25/50/75/90/99/100%); use it when present and fall back otherwise.
+    THE FILTERING IS NOT OPTIONAL. A3 writes several rows per (task, coverage level): one per
+    entry set for `dataset == "all"`, plus a per-dataset breakdown. Without filtering, a panel that
+    groups only on K and coverage silently averages
+
+        all / all_covered            0.0709      <- 95.7M entries
+        all / lost_to_downsampling   0.0504      <-  6.3M entries, a different question
+        allen_brain_exons / all_covered  0.0318  <- a SUBSET of row 1, double counted
+        tabula_muris_senis / all_covered 0.0426  <- likewise
+
+    into 0.0489, which is not a quantity. Every imputation panel did exactly that before
+    2026-08-02.
+
+    entry_set: "all_covered" | "lost_to_downsampling" | "fixed_lost_at_hardest"
+        `fixed_lost_at_hardest` holds the SAME entries at every coverage level and is the one to
+        read as a curve; the other two are a moving population. See REPRODUCE_ALL.md B3b.
+    kind: "04e_allcov" (original) or "04e_allcov_fixedset" (the run that adds the fixed set).
     """
-    try:
-        return _load_heldout("04e_allcov")
-    except FileNotFoundError:
-        print("  (04e_allcov.csv not found — falling back to the single-coverage 04e_out.csv)")
-        return _load_heldout("04e")
+    d = _load_heldout(kind)
+    if "entry_set" in d.columns:
+        avail = sorted(d.entry_set.dropna().unique())
+        if entry_set not in avail:
+            raise ValueError(f"entry_set={entry_set!r} not in {kind}; available: {avail}")
+        d = d[d.entry_set == entry_set]
+    if "dataset" in d.columns:
+        d = d[d.dataset == dataset]
+    # exactly one row per (model, coverage level) or the mean below is averaging unlike things
+    dup = d.groupby(["task", "downsampling_pct"]).size()
+    if (dup > 1).any():
+        raise ValueError(f"{kind}/{entry_set}/{dataset}: {int((dup > 1).sum())} (task, level) "
+                         f"pairs have >1 row after filtering -- a panel would average them")
+    return d
 
 
 def load_structure() -> pd.DataFrame:
