@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """How high CAN the per-junction imputation correlation go? Two ceilings, both measured.
 
-    A27_imputation_ceiling.py <h5mu> <out_csv> [n_hvj=3000] [min_cells=20] [bb_conc=1.97]
+    A40_imputation_ceiling.py <h5mu> <out_csv> [n_hvj=3000] [min_cells=20] [bb_conc=1.97]
 
 `median_pearson_lf` on the fixed entry set reads ~0.070. That is only interpretable against a
 ceiling, and the metric has two distinct ones stacked on top of each other.
