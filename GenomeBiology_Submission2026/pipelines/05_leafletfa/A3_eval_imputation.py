@@ -904,7 +904,9 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
           f"lost_to_downsampling={int(lost_mask.sum()):,} "
           f"({100.0*lost_mask.sum()/max(cov_mask.sum(),1):.1f}% of covered)")
 
-    def compute_metrics_for_mask(cell_mask, label_suffix="", entry_mask=None):
+    _perjunc = {}          # entry_set -> per-junction r and ATSE-level n_cells
+
+    def compute_metrics_for_mask(cell_mask, label_suffix="", entry_mask=None, tag=None):
         """Compute all metrics for a boolean cell subset over a given entry set."""
         em    = cov_mask if entry_mask is None else entry_mask
         cm    = em[cell_mask]            # (n_subset × n_hvj) entry mask
@@ -920,6 +922,13 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
         ori   = ori_hvj[cell_mask]
 
         r_lf_p,    r_lf_s    = per_junction_correlations(lf,    ori, cm, min_cells_per_junc)
+        if tag is not None:
+            # Keep the full per-junction vector, not just its median. Without it, the association
+            # between a junction's r and how many cells its ATSE was covered in cannot be recovered
+            # after the fact -- it would need another frozen-globals E-step. n_cells is ATSE-level,
+            # since cm derives from cov_mask = cell_by_cluster_matrix_original > 0.
+            _perjunc[tag] = dict(r_lf=r_lf_p.astype(np.float32),
+                                 n_cells=cm.sum(axis=0).astype(np.int32))
         r_lf_bb_p, r_lf_bb_s = per_junction_correlations(lf_bb, ori, cm, min_cells_per_junc)
         r_mb_p,    r_mb_s    = per_junction_correlations(mb,    ori, cm, min_cells_per_junc)
         r_mbct_p,  r_mbct_s  = per_junction_correlations(mb_ct, ori, cm, min_cells_per_junc)
@@ -1001,7 +1010,7 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
 
     # All cells combined
     all_mask = np.ones(N, dtype=bool)
-    m_all = compute_metrics_for_mask(all_mask)
+    m_all = compute_metrics_for_mask(all_mask, tag="all_covered")
     print(f"  [all pearson]   lf={m_all['median_pearson_lf']:.4f}  lf_bb={m_all['median_pearson_lf_bb']:.4f}  "
           f"mb={m_all['median_pearson_mb']:.4f}  mb_ct={m_all['median_pearson_mb_ct']:.4f}  "
           f"nmf0={m_all['median_pearson_nmf0']:.4f}  nmfm={m_all['median_pearson_nmfm']:.4f}  "
@@ -1023,7 +1032,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
 
     # THE COMPARABLE-ACROSS-COVERAGE SET: the same entries at every level, so the curve is a curve.
     if fixed_lost_mask is not None and fixed_lost_mask.sum() > 0:
-        m_fx = compute_metrics_for_mask(all_mask, entry_mask=fixed_lost_mask)
+        m_fx = compute_metrics_for_mask(all_mask, entry_mask=fixed_lost_mask,
+                                        tag="fixed_lost_at_hardest")
         print(f"\n  === FIXED-ENTRY-SET imputation (same entries at every coverage level) ===")
         print(f"  [pearson]  lf={m_fx['median_pearson_lf']:.4f}  lf_bb={m_fx['median_pearson_lf_bb']:.4f}  "
               f"nmf0_tr={m_fx['median_pearson_nmf0_tr']:.4f}  nmfm_tr={m_fx['median_pearson_nmfm_tr']:.4f}  "
@@ -1035,7 +1045,8 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                      "psi_hvj_median_std": psi_hvj_median_std,
                      **m_fx})
     if lost_mask.sum() > 0:
-        m_lost = compute_metrics_for_mask(all_mask, entry_mask=lost_mask)
+        m_lost = compute_metrics_for_mask(all_mask, entry_mask=lost_mask,
+                                          tag="lost_to_downsampling")
         print(f"\n  === LOST-ENTRY imputation (no passthrough possible) ===")
         print(f"  [pearson]  lf={m_lost['median_pearson_lf']:.4f}  lf_bb={m_lost['median_pearson_lf_bb']:.4f}  "
               f"nmfm={m_lost['median_pearson_nmfm']:.4f}  nmf0={m_lost['median_pearson_nmf0']:.4f}  "
@@ -1061,7 +1072,7 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
                      "psi_hvj_median_std": psi_hvj_median_std,
                      **m_ds})
 
-    return rows
+    return rows, _perjunc
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
@@ -1210,7 +1221,7 @@ def main():
         print(f"\n{'='*60}")
         print(f"Downsampling: {pct}% dropped  ({fname})")
 
-        rows = evaluate_one_level(
+        rows, perjunc = evaluate_one_level(
             h5mu_path, psi, psi_tensor, hvj_idx, K,
             dir_conc, bb_conc, junc_prior, pi, alpha_pi,
             chunk_size, num_epochs, patience, min_atse, min_cells_per_junc,
@@ -1248,6 +1259,13 @@ def main():
         # below, only after every level has succeeded -- so "the file exists" still means "the run
         # finished". The .partial is written via a temp + rename so it is never half-written, and is
         # removed on success.
+        if perjunc:
+            _pj = output_csv.replace(".csv", f"_perjunc_{pct}.npz")
+            np.savez_compressed(_pj, **{f"{k}__{m}": v for k, d_ in perjunc.items()
+                                        for m, v in d_.items() for k in [k]})
+            print(f"  [per-junction] {len(perjunc)} entry set(s) -> {os.path.basename(_pj)}",
+                  flush=True)
+
         _part, _tmp = output_csv + ".partial", output_csv + ".tmp"
         pd.DataFrame(results).to_csv(_tmp, index=False)
         os.replace(_tmp, _part)

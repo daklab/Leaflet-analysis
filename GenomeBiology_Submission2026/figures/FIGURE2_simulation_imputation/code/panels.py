@@ -1491,3 +1491,100 @@ def figure_program_celltype(save: bool = True):
     if save:
         th.save(fig, f"{_OUT}/FIG2_supp_program_celltype")
     return fig
+
+
+# ── Figure 2 E/F: imputation ─────────────────────────────────────────────────
+# Two panels, deliberately measuring different things on different entry sets.
+#
+# 2E asks "does the learned phi carry more per-cell splicing information than the ground-truth
+#    cell-type label?" and is drawn on `lost_to_downsampling`, where entries are unobserved BY
+#    DEFINITION at every level, so no method can pass an observed value through and the label
+#    oracle is a fair comparator all along the axis.
+#
+# 2F asks "how does accuracy hold up as coverage falls?" and MUST use `fixed_lost_at_hardest`,
+#    the only entry set whose membership does not change with coverage. Reading the 2E entry set
+#    as a curve would be reading a moving population.
+#
+# The floor in 2F is `naive` (junction mean broadcast to every cell). NOT `mb`: mb passes observed
+# values through, so on the fixed set at high coverage it reads ~0.047 and would sit BELOW
+# LeafletFA, looking like a defeat when it is really 93% passthrough.
+
+IDENTITY_CEILING = 0.125   # sqrt(median ANOVA R^2 of PSI on ground-truth cell type) -- A27 / notes
+
+
+def panel_label_oracle(ax, imp: pd.DataFrame, K: int = 20) -> None:
+    """2E -- LeafletFA vs the cell-type-label oracle, across coverage.
+
+    `imp` must already be filtered to entry_set="lost_to_downsampling", dataset="all"
+    (load_imputation does this and refuses to return mixed rows).
+    """
+    d = imp[imp.K_cfg == K]
+    cov = sorted(pd.to_numeric(d.downsampling_pct, errors="coerce").dropna().unique())
+    x = [100 - c for c in cov]                      # plot against reads RETAINED
+    series = [("median_pearson_lf",      "LeafletFA",                     "LeafletFA", "-"),
+              ("median_pearson_mb_ct",   "cell-type mean (uses labels)",  "other",     "--"),
+              ("median_pearson_nmfm_tr", "NMF transfer (mean-impute)",    "NMF",       "-"),
+              ("median_pearson_naive",   "junction mean (floor)",         "null",      ":")]
+    for col, lab, ckey, ls in series:
+        if col not in d:
+            continue
+        m = [_ms(d[d.downsampling_pct == c], col)[0] for c in cov]
+        e = [_ms(d[d.downsampling_pct == c], col)[1] for c in cov]
+        ax.errorbar(x, m, yerr=e, fmt="o", ls=ls, ms=3.5, capsize=2, lw=1.4,
+                    label=lab, color=th.METHOD_COLORS[ckey])
+    ax.axhline(IDENTITY_CEILING, color=th.GRID, lw=0.9, ls=(0, (4, 3)), zorder=0)
+    ax.text(0.99, IDENTITY_CEILING, " what cell identity can explain", transform=
+            ax.get_yaxis_transform(), ha="right", va="bottom", fontsize=th.PT["annot"],
+            color=th.GRID)
+    ax.set_xscale("log"); ax.set_xticks([1, 10, 100]); ax.set_xticklabels(["1", "10", "100"])
+    ax.set_xlabel("reads retained (%)")
+    ax.set_ylabel("median per-junction $r$\n(predicted vs observed $\\Psi$, across cells)")
+    th.despine(ax)
+
+
+def panel_coverage_robustness(ax, imp: pd.DataFrame, K: int = 20) -> None:
+    """2F -- MAE vs coverage on the FIXED entry set, pure-prediction methods only.
+
+    `imp` must be filtered to entry_set="fixed_lost_at_hardest".
+    """
+    d = imp[imp.K_cfg == K]
+    cov = sorted(pd.to_numeric(d.downsampling_pct, errors="coerce").dropna().unique())
+    x = [100 - c for c in cov]
+    for col, lab, ckey, ls in (("mae_lf",      "LeafletFA",                  "LeafletFA", "-"),
+                               ("mae_nmfm_tr", "NMF transfer (mean-impute)", "NMF",       "-"),
+                               ("mae_nmf0_tr", "NMF transfer (0-impute)",    "ablation",  "-"),
+                               ("mae_naive",   "junction mean (floor)",      "null",      ":")):
+        if col not in d:
+            continue
+        m = [_ms(d[d.downsampling_pct == c], col)[0] for c in cov]
+        e = [_ms(d[d.downsampling_pct == c], col)[1] for c in cov]
+        ax.errorbar(x, m, yerr=e, fmt="o", ls=ls, ms=3.5, capsize=2, lw=1.4,
+                    label=lab, color=th.METHOD_COLORS[ckey])
+    ax.set_xscale("log"); ax.set_xticks([1, 10, 100]); ax.set_xticklabels(["1", "10", "100"])
+    ax.set_xlabel("reads retained (%)")
+    ax.set_ylabel("MAE ($\\Psi$ units), fixed entry set")
+    th.despine(ax)
+
+
+def figure_imputation_panels(save: bool = True, K: int = 20):
+    """FIG2_EF -- the two imputation panels, each on the entry set it requires."""
+    th.apply_theme()
+    e = load_imputation(entry_set="lost_to_downsampling")
+    try:
+        f = load_imputation(kind="04e_allcov_fixedset", entry_set="fixed_lost_at_hardest")
+    except (FileNotFoundError, ValueError) as err:
+        f = None
+        print(f"  (2F skipped -- the fixed-entry-set run has not landed: {err})")
+    fig, axes = plt.subplots(1, 2 if f is not None else 1,
+                             figsize=th.figsize("double", 3.1), squeeze=False)
+    panel_label_oracle(axes[0][0], e, K=K)
+    axes[0][0].legend(frameon=False, fontsize=th.PT["annot"], loc="lower left")
+    th.panel_label(axes[0][0], "E")
+    if f is not None:
+        panel_coverage_robustness(axes[0][1], f, K=K)
+        axes[0][1].legend(frameon=False, fontsize=th.PT["annot"], loc="upper left")
+        th.panel_label(axes[0][1], "F")
+    fig.tight_layout()
+    if save:
+        th.save(fig, f"{_OUT}/FIG2_EF_imputation")
+    return fig
