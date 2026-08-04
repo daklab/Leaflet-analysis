@@ -174,6 +174,16 @@ def main():
     # the first 24 runs discarded psi/phi and are unusable for the seed question, which is the
     # property the simplex is meant to fix. loc/scale rather than point estimates so the posterior
     # width is recoverable too.
+    # bb_conc is the overdispersion the model learned. On DM-generated sims we know the truth
+    # (--dm-conc), so recovering it is a direct check the likelihood is doing what it claims.
+    # It is a guide site, not returned by any accessor, so read it out of the param store.
+    try:
+        _med = mod._median()
+        conc_hat = float(_med["bb_conc"]) if "bb_conc" in _med else float("nan")
+    except Exception:
+        conc_hat = float("nan")
+    print(f"[4b] learned bb_conc = {conc_hat:.3f}", flush=True)
+
     loc, scale = mod.psi_loc_scale()
     fit_out = os.path.join(args.out, f"fit_{tag}_{cell}_seed{args.seed}.npz")
     np.savez_compressed(
@@ -186,7 +196,7 @@ def main():
         phi=phi.astype(np.float32),
         event_id=np.asarray(uq_ev, dtype=object), inv_ev=inv_ev.astype(np.int32),
         likelihood=args.likelihood, psi_parameterization=args.psi_parameterization,
-        seed=args.seed, steps=args.steps, frac_valid=frac_valid,
+        seed=args.seed, steps=args.steps, frac_valid=frac_valid, bb_conc=conc_hat,
         a_e_dev_max=a_max, a_e_dev_median=a_med)
     print(f"[5] fit saved -> {os.path.basename(fit_out)}", flush=True)
 
