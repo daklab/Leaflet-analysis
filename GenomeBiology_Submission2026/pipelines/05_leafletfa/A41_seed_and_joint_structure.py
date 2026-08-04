@@ -51,6 +51,20 @@ def load_fit(path):
                 seed=int(z["seed"]), scale=z["psi_scale"])
 
 
+def _safe_r(a, b, tol=1e-8):
+    """Correlation, but NaN when either side is constant.
+
+    Under the simplex every within-ATSE sum is exactly 1, so the 'sum correlation' is a
+    correlation between two constant vectors -- undefined, and numpy returns whatever floating
+    point noise happens to be there (measured 0.59-0.86, which reads as a real, mediocre
+    agreement when in fact the quantity is perfectly pinned). Report NaN and use `sum_max_dev`
+    instead for that case.
+    """
+    if np.std(a) < tol or np.std(b) < tol:
+        return float("nan")
+    return float(np.corrcoef(a, b)[0, 1])
+
+
 def split_psi(psi, inv, n_atse):
     """psi -> (within-ATSE sum, composition). The sum is the unidentified direction."""
     s = np.zeros((psi.shape[0], n_atse), dtype=np.float64)
@@ -74,7 +88,15 @@ def tv_stat(psi, phi, c1, c2, inv, n_atse):
 
 
 def observed_within_event_corr(junc, clus, inv, n_atse, min_cells=200, max_events=400, seed=0):
-    """Correlation between two junctions of the same ATSE, across cells with coverage."""
+    """Correlation between two junctions of the same ATSE, on RATIOS y_j / N_e.
+
+    Must be ratios, not raw counts. Junctions of one event compete for a fixed total, so they
+    are negatively correlated -- but only CONDITIONAL on coverage. On raw counts a deep cell has
+    high counts on every junction and a shallow one low on every junction, and that shared
+    sequencing depth swamps the competition entirely: measured +0.84 on these sims, which made
+    the comparison against the model's compositional prediction meaningless. On ratios the same
+    data gives -0.81 against the DM's implied -0.80.
+    """
     rng = np.random.default_rng(seed)
     out = []
     events = rng.permutation(n_atse)[:max_events]
@@ -85,8 +107,10 @@ def observed_within_event_corr(junc, clus, inv, n_atse, min_cells=200, max_event
         cov = clus[:, cols[0]] > 0
         if cov.sum() < min_cells:
             continue
+        Ne = clus[cov, cols[0]]
         for i, j in itertools.combinations(range(len(cols)), 2):
-            a, b = junc[cov, cols[i]], junc[cov, cols[j]]
+            a = junc[cov, cols[i]] / Ne
+            b = junc[cov, cols[j]] / Ne
             if a.std() < 1e-8 or b.std() < 1e-8:
                 continue
             out.append((e, cols[i], cols[j], float(np.corrcoef(a, b)[0, 1])))
@@ -153,16 +177,21 @@ def main():
                 ov = {t: len(np.intersect1d(np.argsort(-t1)[:t], np.argsort(-t2)[:t])) / t
                       for t in args.top}
             rows.append(dict(sim=sim, cell=cell, pair=f"{s1}-{s2}", psi_r=psi_r,
-                             sum_r=float(np.corrcoef(sa.ravel(), sb.ravel())[0, 1]),
+                             sum_r=_safe_r(sa.ravel(), sb.ravel()),
+                             sum_max_dev=float(max(np.abs(sa - 1).max(),
+                                                   np.abs(sb - 1).max())),
                              comp_r=float(np.corrcoef(ca[:, mult].ravel(),
                                                       cb[:, mult].ravel())[0, 1]),
                              tv_r=tv_r, **{f"top{t}": ov[t] for t in args.top}))
     S = pd.DataFrame(rows)
     if len(S):
         print("1. CROSS-SEED AGREEMENT (higher is better; mean over seed pairs)")
-        cols = ["psi_r", "sum_r", "comp_r", "tv_r"] + [f"top{t}" for t in args.top]
+        cols = (["psi_r", "sum_r", "sum_max_dev", "comp_r", "tv_r"]
+                + [f"top{t}" for t in args.top])
         print(S.groupby(["sim", "cell"])[cols].mean().round(4).to_string())
-        print("\n   sum_r  the unidentified within-ATSE scale -- the simplex should pin this to 1")
+        print("\n   sum_r  NaN under the simplex BY DESIGN: every sum is exactly 1, so the")
+        print("          correlation is between two constants and is undefined. Read sum_max_dev")
+        print("          instead -- 0 means perfectly pinned.")
         print("   comp_r the biology; tv_r the DS statistic; topN the overlap of the calls\n")
         S.to_csv(os.path.join(args.dir, "a41_cross_seed.tsv"), sep="\t", index=False)
 
@@ -189,7 +218,12 @@ def main():
             fit = load_fit(gg.path.iloc[0])
             mu = fit["phi"] @ fit["psi"]
             pm = mu.mean(0)
-            imp = (implied_corr_dm(pm[O.j1.values], pm[O.j2.values])
+            # normalise to the composition within each event before using the DM formula --
+            # implied_corr_dm expects probabilities that sum to 1 over the event
+            tot = np.zeros(n_atse)
+            np.add.at(tot, fit["inv"], pm)
+            pc = pm / np.clip(tot[fit["inv"]], 1e-12, None)
+            imp = (implied_corr_dm(pc[O.j1.values], pc[O.j2.values])
                    if fit["lik"] == "dirichletmultinomial" else np.zeros(len(O)))
             jrows.append(dict(sim=sim, cell=cell, n_pairs=len(O),
                               observed_mean_corr=float(O.obs_corr.mean()),

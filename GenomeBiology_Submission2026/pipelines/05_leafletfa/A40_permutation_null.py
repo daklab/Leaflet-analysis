@@ -155,10 +155,22 @@ def main():
     ap.add_argument("--no-stratify", dest="stratify", action="store_false")
     ap.add_argument("--n-strata", type=int, default=10)
     ap.add_argument("--rounds", type=int, default=5)
+    ap.add_argument("--pool-contrasts", dest="pool_contrasts", action="store_true", default=True,
+                    help="pool the null across contrasts after normalising by |dphi|_1. Needed "
+                         "for p-value resolution: per-contrast draws floor the top-ranked events "
+                         "at q=1.0 under BH.")
+    ap.add_argument("--no-pool-contrasts", dest="pool_contrasts", action="store_false")
     ap.add_argument("--gate-only", action="store_true",
                     help="run one permuted refit, report the gate, and stop")
-    ap.add_argument("--dphi-tol", type=float, default=0.15,
-                    help="max relative change in |dphi|_1 allowed by the gate")
+    ap.add_argument("--dphi-tol", type=float, default=0.35,
+                    help="max relative change in |dphi|_1 allowed by the gate. Calibrated against "
+                         "the model's OWN seed-to-seed variability, not picked: three unpermuted "
+                         "fits of the same data differing only by seed give |dphi|_1 relative "
+                         "changes of median 0.128 and max 0.346. A tighter tolerance measures "
+                         "optimiser noise rather than permutation damage -- the first run used "
+                         "0.15 and failed a permutation that had in fact moved dphi LESS "
+                         "(median 0.076, max 0.197) than two unpermuted refits differ from "
+                         "each other.")
     ap.add_argument("--tv-tol", type=float, default=0.35,
                     help="max relative gap between permuted-null and true-null median TV")
     args = ap.parse_args()
@@ -280,10 +292,34 @@ def main():
                 return
 
     # ── empirical p -> BH -> realised FDP ──────────────────────────────────────────────
+    # RESOLUTION. The smallest empirical p a null of n draws can produce is 1/(n+1), and BH needs
+    # p <= alpha/n_atse for the TOP-ranked event. With 5 rounds x 20% that is 4,265 draws per
+    # contrast, min p 2.3e-4, against a required 1.2e-5 -- so the highest-ranked ATSEs would floor
+    # at q = 1.0 and the run would return zeros that look like a bug rather than a result.
+    #
+    # Pooling the null across contrasts multiplies the draws by the number of contrasts. But null
+    # TV scales with |dphi|_1, which differs per contrast, so raw pooling mixes scales. Normalise
+    # each contrast's null by its own |dphi|_1, pool, then rescale to the target contrast.
+    if args.pool_contrasts and len(pairs) > 1:
+        unit = np.concatenate([np.concatenate(null_tv[n]) / max(dphi_ref[n], 1e-12)
+                               for n, _, _, _ in pairs])
+        unit.sort()
+        print(f"[4] pooled null: {len(unit):,} draws across {len(pairs)} contrasts "
+              f"(min achievable p = {1/(len(unit)+1):.2e}); "
+              f"per-contrast would have been {len(np.concatenate(null_tv[pairs[0][0]])):,}",
+              flush=True)
+    else:
+        unit = None
+
     rows = []
     for name, c1, c2, is_null in pairs:
-        pool = np.concatenate(null_tv[name])
-        pv = (1.0 + (pool[None, :] >= obs_tv[name][:, None]).sum(1)) / (len(pool) + 1.0)
+        if unit is not None:
+            pool = unit * dphi_ref[name]          # back to this contrast's scale
+        else:
+            pool = np.sort(np.concatenate(null_tv[name]))
+        # searchsorted rather than a [n_atse x n_draws] broadcast, which would be 182M booleans
+        idx = np.searchsorted(pool, obs_tv[name], side="left")
+        pv = (1.0 + (len(pool) - idx)) / (len(pool) + 1.0)
         q = bh(pv)
         for a in args.alphas:
             sel_emp = q <= a
@@ -294,7 +330,7 @@ def main():
                                  n_false=int((sel & is_null).sum()),
                                  realised_fdp=(int((sel & is_null).sum()) / n) if n else np.nan,
                                  power=float((sel & ~is_null).sum() / max((~is_null).sum(), 1)),
-                                 n_null_draws=len(pool)))
+                                 n_null_draws=len(pool), pooled=bool(unit is not None)))
     R = pd.DataFrame(rows)
     out = os.path.join(args.out, f"a40_{tag}.tsv")
     R.to_csv(out, sep="\t", index=False)
