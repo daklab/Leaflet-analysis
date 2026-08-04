@@ -293,6 +293,82 @@ def simulate_counts(clus, phi, psi_j, rng, bb_conc=np.inf):
     return junc, cl
 
 
+def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1000):
+    """Draw one count VECTOR per (cell, ATSE), so sum_j y_j == N_e EXACTLY.
+
+    The Binomial/Beta-Binomial arm above draws each junction independently against the shared
+    ATSE total, so the junctions of a cassette sum to that total only IN EXPECTATION. Real data
+    is not like that: on the mouse atlas `cell_by_cluster_matrix[c, j]` is exactly the sum of its
+    event's junction counts, to the read. A Dirichlet-multinomial likelihood is only defined when
+    the count vector sums to its total, so testing it on independently-drawn counts means testing
+    it out of its own family.
+
+    This arm generates the compositional case:
+
+        p ~ the true composition for this cell,  p_j = (phi_c . psi_:,j) renormalised in the event
+        q ~ Dirichlet(dm_conc * p)      overdispersion; dm_conc = inf collapses to q = p
+        y ~ Multinomial(N_e, q)
+
+    Two vectorisation tricks, because numpy's samplers do not broadcast the way we need:
+      * `rng.dirichlet` takes ONE alpha vector, not one per row. Drawing Gammas with shape alpha
+        and normalising is the same distribution and vectorises over every (cell, event) at once.
+      * `rng.multinomial` takes ONE n, not one per row. The stick-breaking form -- a chain of
+        Binomials on the remaining count and the renormalised probability -- is exact and
+        vectorises.
+
+    `dm_conc = inf` short-circuits the Dirichlet draw, mirroring how `bb_conc = inf` short-circuits
+    to the Binomial in `simulate_counts`, so the two arms stay structurally parallel.
+    """
+    N, J = phi.shape[0], psi_j.shape[1]
+    sizes = np.bincount(col_event)
+    if sizes.min() != sizes.max():
+        raise ValueError(f"expects fixed-size events (cassettes); got sizes "
+                         f"{sizes.min()}-{sizes.max()}")
+    m = int(sizes[0])
+    # columns grouped by event: [A, m]. stable sort keeps within-event column order.
+    cols = np.argsort(col_event, kind="stable").reshape(-1, m)
+    A = cols.shape[0]
+    clus_d = np.asarray(clus.todense())
+    N_e_all = clus_d[:, cols[:, 0]].astype(np.int64)          # [N, A]
+    print(f"  {A:,} events x {m} junctions; coverage: "
+          f"{100*(N_e_all > 0).mean():.1f}% of (cell, event) pairs have reads")
+    if np.isinf(dm_conc):
+        print("  emission: MULTINOMIAL (dm_conc = inf; no overdispersion beyond multinomial)")
+    else:
+        print(f"  emission: DIRICHLET-MULTINOMIAL (conc={dm_conc:g})")
+
+    junc = np.zeros((N, J), dtype=np.int64)
+    for a0 in range(0, N, chunk):                              # chunk cells to cap peak memory
+        a1 = min(a0 + chunk, N)
+        mu = phi[a0:a1] @ psi_j                                # [c, J]
+        P = mu[:, cols]                                        # [c, A, m]
+        P = np.clip(P, 1e-12, None)
+        P /= P.sum(2, keepdims=True)                           # the TRUE composition per cell
+        if not np.isinf(dm_conc):
+            g = rng.gamma(dm_conc * P)                         # Dirichlet via normalised Gammas
+            P = g / np.clip(g.sum(2, keepdims=True), 1e-300, None)
+        rem = N_e_all[a0:a1].copy()                            # [c, A]
+        left = np.ones_like(P[:, :, 0])
+        blk = np.zeros(P.shape, dtype=np.int64)
+        for t in range(m - 1):
+            q = np.clip(P[:, :, t] / np.clip(left, 1e-12, None), 0.0, 1.0)
+            x = rng.binomial(rem, q)
+            blk[:, :, t] = x
+            rem -= x
+            left -= P[:, :, t]
+        blk[:, :, m - 1] = rem                                 # last junction closes the sum
+        junc[a0:a1][:, cols.ravel()] = blk.reshape(a1 - a0, -1)
+
+    gap = int(np.abs(junc[:, cols].sum(2) - N_e_all).max())
+    if gap != 0:
+        raise AssertionError(f"compositional emission failed: max |sum_j y_j - N_e| = {gap}")
+    print(f"  identity sum_j y_j == N_e: max gap {gap} (exact, by construction)")
+
+    junc_sp = sp.csr_matrix(junc)
+    junc_sp.eliminate_zeros()
+    return junc_sp, sp.csr_matrix(clus_d)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--splice", default=MOUSE_SPLICE)
@@ -305,6 +381,17 @@ def main():
                     help="Beta-Binomial concentration. 'inf' (default) = plain Binomial, no "
                          "overdispersion. Finite values (e.g. 1, 5, 20, 100) add overdispersion; "
                          "smaller = more. conc=inf short-circuits to the Binomial path exactly.")
+    ap.add_argument("--emission", default="binomial",
+                    choices=["binomial", "dirichletmultinomial"],
+                    help="'binomial' (default) draws each junction independently against the "
+                         "shared ATSE total (with --bb-conc controlling overdispersion), so the "
+                         "junctions sum to that total only IN EXPECTATION. "
+                         "'dirichletmultinomial' draws one count VECTOR per (cell, ATSE), so the "
+                         "sum is EXACT -- which is what the real atlas looks like and what a "
+                         "Dirichlet-multinomial likelihood requires.")
+    ap.add_argument("--dm-conc", default="50",
+                    help="Dirichlet-multinomial concentration when --emission is "
+                         "dirichletmultinomial. 'inf' collapses to a plain Multinomial.")
     ap.add_argument("--phi-conc", type=float, default=20.0)
     ap.add_argument("--beta-a", type=float, default=0.5, help="Beta prior on skip usage")
     ap.add_argument("--beta-b", type=float, default=0.5)
@@ -315,6 +402,8 @@ def main():
 
     bb_conc = float("inf") if str(args.bb_conc).lower() in ("inf", "infinity", "none") \
         else float(args.bb_conc)
+    dm_conc = float("inf") if str(args.dm_conc).lower() in ("inf", "infinity", "none") \
+        else float(args.dm_conc)
     rng = np.random.default_rng(args.seed)
     os.makedirs(args.outdir, exist_ok=True)
 
@@ -328,10 +417,20 @@ def main():
     psi_j, psi_skip, is_diff, delta, events = draw_psi(
         adata, args.K, args.frac_differential, rng, args.effect, args.beta_a, args.beta_b)
 
-    emission = "binomial" if np.isinf(bb_conc) else "betabinomial"
-    print(f"\n=== 4. simulate counts ({emission}) ===")
     clus_real = sp.csr_matrix(adata.layers["cell_by_cluster_matrix"])
-    junc_sim, clus_sim = simulate_counts(clus_real, phi, psi_j, rng, bb_conc=bb_conc)
+    if args.emission == "dirichletmultinomial":
+        emission = "multinomial" if np.isinf(dm_conc) else "dirichletmultinomial"
+        print(f"\n=== 4. simulate counts ({emission}) ===")
+        # rebuild the junction -> event index; draw_psi computes it internally but does not return it
+        ev_all = adata.var["event_id"].astype(str).values
+        ev_idx = {e: i for i, e in enumerate(events)}
+        col_event = np.array([ev_idx[e] for e in ev_all])
+        junc_sim, clus_sim = simulate_counts_dm(clus_real, phi, psi_j, col_event, rng,
+                                                dm_conc=dm_conc)
+    else:
+        emission = "binomial" if np.isinf(bb_conc) else "betabinomial"
+        print(f"\n=== 4. simulate counts ({emission}) ===")
+        junc_sim, clus_sim = simulate_counts(clus_real, phi, psi_j, rng, bb_conc=bb_conc)
 
     print("\n=== 5. PSI layers (same centering as the real pipeline) ===")
     ratio, ratio_centered = compute_psi_layers(junc_sim, clus_sim)
@@ -352,6 +451,7 @@ def main():
     out.uns["sim_params"] = json.dumps(dict(
         tissue=args.tissue, K=args.K, frac_differential=args.frac_differential,
         effect=args.effect, emission=emission, bb_conc=(None if np.isinf(bb_conc) else bb_conc),
+        dm_conc=(None if np.isinf(dm_conc) else dm_conc),
         phi_conc=args.phi_conc,
         beta_a=args.beta_a, beta_b=args.beta_b,
         min_cells_per_junction=args.min_cells_per_junction, seed=args.seed,
@@ -368,7 +468,10 @@ def main():
     print(f"  differential junctions: {int(is_diff.sum()):,} / {len(is_diff):,} "
           f"({n_atse:,} cassettes)")
 
-    etag = "binom" if np.isinf(bb_conc) else f"bb{bb_conc:g}"
+    if args.emission == "dirichletmultinomial":
+        etag = "multinom" if np.isinf(dm_conc) else f"dm{dm_conc:g}"
+    else:
+        etag = "binom" if np.isinf(bb_conc) else f"bb{bb_conc:g}"
     tag = f"{args.tissue.lower()}_K{args.K}_{etag}_eff{args.effect}_frac{args.frac_differential:g}_seed{args.seed}"
     path = os.path.join(args.outdir, f"sim_{tag}.h5ad")
     tmp = path + ".tmp"

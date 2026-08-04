@@ -170,6 +170,26 @@ def main():
                                  frac_valid=frac_valid,
                                  n_saturated=int((prob >= 0.999).sum())))
 
+    # SAVE THE FIT. Without this, cross-seed agreement cannot be computed after the fact --
+    # the first 24 runs discarded psi/phi and are unusable for the seed question, which is the
+    # property the simplex is meant to fix. loc/scale rather than point estimates so the posterior
+    # width is recoverable too.
+    loc, scale = mod.psi_loc_scale()
+    fit_out = os.path.join(args.out, f"fit_{tag}_{cell}_seed{args.seed}.npz")
+    np.savez_compressed(
+        fit_out,
+        psi_mean=psi_point.astype(np.float32),
+        psi_loc=(np.asarray(loc.cpu().numpy() if hasattr(loc, "cpu") else loc, dtype=np.float32)
+                 if loc is not None else np.zeros(0, dtype=np.float32)),
+        psi_scale=(np.asarray(scale.cpu().numpy() if hasattr(scale, "cpu") else scale,
+                              dtype=np.float32) if scale is not None else np.zeros(0, np.float32)),
+        phi=phi.astype(np.float32),
+        event_id=np.asarray(uq_ev, dtype=object), inv_ev=inv_ev.astype(np.int32),
+        likelihood=args.likelihood, psi_parameterization=args.psi_parameterization,
+        seed=args.seed, steps=args.steps, frac_valid=frac_valid,
+        a_e_dev_max=a_max, a_e_dev_median=a_med)
+    print(f"[5] fit saved -> {os.path.basename(fit_out)}", flush=True)
+
     R = pd.DataFrame(rows)
     out = os.path.join(args.out, f"a36_{tag}_{cell}_seed{args.seed}.tsv")
     R.to_csv(out, sep="\t", index=False)

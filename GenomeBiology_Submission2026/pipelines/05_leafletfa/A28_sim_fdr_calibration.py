@@ -86,13 +86,48 @@ def read_h5ad_bits(path):
     return junc, clus, prog, ev, true_psi, atse_ids
 
 
-def score_contrast(psi_s, phi, cells_1, cells_2, inv_ev, n_atse, delta):
+def check_tv_wellformed(d, tv, inv_ev, n_atse, label="", tol_sum=1e-4, verbose=True):
+    """Assert TV is actually a total variation. Cheap, and would have caught three real bugs.
+
+    TV = 0.5 * sum_j |Delta_j| is the total variation distance between the mean junction usage of
+    two groups. That interpretation requires psi to be a composition within each ATSE. Two ways it
+    silently stops being one:
+
+      1. sum_j Delta_j must be EXACTLY 0 per ATSE, because Delta is the difference of two
+         compositions and dphi itself sums to zero. It is non-zero when psi's within-event scale
+         differs ACROSS PROGRAMS -- the gauge direction where seeds disagree (sum r 0.51-0.66 vs
+         composition r 0.95-0.96), and the direction the simplex removes.
+      2. TV must lie in [0, 1]. Nothing in the code enforced this, so an inflated psi could push
+         TV past 1 and be compared against delta=0.10 as if nothing were wrong.
+
+    Reports rather than raises: the released Beta-psi fits legitimately violate (1), and the point
+    is that it becomes visible rather than that the run dies. Returns a dict of the diagnostics.
+    """
+    idx = torch.as_tensor(inv_ev.astype(np.int64))
+    dsum = torch.zeros((d.shape[0], n_atse), dtype=torch.float32).index_add_(1, idx, d)
+    max_abs_sum = float(dsum.abs().max())
+    tv_min, tv_max = float(tv.min()), float(tv.max())
+    bad_sum = int((dsum.abs() > tol_sum).float().mean(0).gt(0.5).sum())
+    out = dict(max_abs_delta_sum=max_abs_sum, frac_atse_sum_violating=bad_sum / max(n_atse, 1),
+               tv_min=tv_min, tv_max=tv_max)
+    if verbose and (max_abs_sum > tol_sum or tv_max > 1.0 or tv_min < 0.0):
+        print(f"  [TV CHECK{(' ' + label) if label else ''}] "
+              f"max|sum_j Delta_j| = {max_abs_sum:.3e} (should be ~0; non-zero means per-program "
+              f"psi scale mismatch, so TV is not a total variation); "
+              f"{100*bad_sum/max(n_atse,1):.1f}% of ATSEs violating; "
+              f"TV range [{tv_min:.4f}, {tv_max:.4f}] (should be within [0, 1])", flush=True)
+    return out
+
+
+def score_contrast(psi_s, phi, cells_1, cells_2, inv_ev, n_atse, delta, check=True, label=""):
     """Per-sample ATSE total variation for one contrast. psi_s is [S, K, J]."""
     dphi = torch.as_tensor((phi[cells_1].mean(0) - phi[cells_2].mean(0)).astype(np.float32))
     d = torch.einsum("k,skj->sj", dphi, psi_s)                # [S, J]
     tv = torch.zeros((psi_s.shape[0], n_atse), dtype=torch.float32)
     tv.index_add_(1, torch.as_tensor(inv_ev.astype(np.int64)), d.abs())
     tv = 0.5 * tv
+    if check:
+        check_tv_wellformed(d, tv, inv_ev, n_atse, label=label)
     # Jeffreys count, not the raw proportion. S/S records prob_de = 1 exactly, so 1 - prob_de
     # is 0 and the Bayesian-FDP rule reports zero expected false discoveries over a top set that
     # actually contains ~2% false ones. (n_exceed + 0.5)/(S + 1) caps prob_de below 1 and floors
