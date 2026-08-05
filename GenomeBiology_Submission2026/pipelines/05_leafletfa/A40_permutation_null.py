@@ -115,7 +115,7 @@ def fit_and_score(junc, clus, ev, K, args, seed, label):
     n_atse = len(uq_ev)
     pyro.clear_param_store()
     t0 = time.time()
-    mod = LeafletFAMinibatch(junc, clus, K=K, device="cpu",
+    mod = LeafletFAMinibatch(junc, clus, K=K, device=getattr(args, "device", "cpu"),
                              likelihood=args.likelihood,
                              psi_parameterization=args.psi_parameterization,
                              event_id=ev)
@@ -146,6 +146,9 @@ def main():
     ap.add_argument("--alphas", type=float, nargs="+",
                     default=[0.001, 0.005, 0.01, 0.02, 0.05, 0.10, 0.20])
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--device", default="cpu",
+                    help="cuda makes each round minutes rather than ~23 min, which is what makes "
+                         "5 permuted rounds plus a reference fit affordable at all.")
     # --- the knobs the gate tells you to move ---
     ap.add_argument("--frac-permuted", type=float, default=0.10,
                     help="fraction of ATSEs permuted per round. LOWER this if the gate says the "
