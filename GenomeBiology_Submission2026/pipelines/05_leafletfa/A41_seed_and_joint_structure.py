@@ -171,8 +171,14 @@ def main():
                 tv_r = np.nan
                 ov = {t: np.nan for t in args.top}
             else:
+                # phi MUST be reordered by the same permutation as psi. tv_stat computes
+                # (phi[c1].mean - phi[c2].mean) @ psi, so mixing b's program order in phi with
+                # a's order in psi pairs every element with the wrong program and the resulting
+                # correlation is meaningless. This was measuring nothing, not measuring poor
+                # agreement.
+                bphi = b["phi"][:, perm]
                 t1 = tv_stat(a["psi"], a["phi"], c1, c2, a["inv"], n_atse)
-                t2 = tv_stat(bp, b["phi"], c1, c2, b["inv"], n_atse)
+                t2 = tv_stat(bp, bphi, c1, c2, b["inv"], n_atse)
                 tv_r = float(np.corrcoef(t1, t2)[0, 1])
                 ov = {t: len(np.intersect1d(np.argsort(-t1)[:t], np.argsort(-t2)[:t])) / t
                       for t in args.top}

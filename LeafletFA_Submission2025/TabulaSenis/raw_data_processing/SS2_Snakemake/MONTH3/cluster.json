@@ -1,8 +1,0 @@
-{
-    "__default__": {
-        "cpus": 1,
-        "mem": "16000",
-        "time": "1-00:00",
-        "job-name": "TabSen3MO_job"
-    }
-}

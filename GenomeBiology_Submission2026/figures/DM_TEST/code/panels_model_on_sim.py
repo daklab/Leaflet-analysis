@@ -145,7 +145,13 @@ def main():
                 th.panel_label(ax, "b")
     fig.text(0.5, 0.965, "open circles = true $\\psi$;  bars = recovered",
              ha="center", fontsize=th.PT["annot"], color=th.INK)
-    th.save(fig, os.path.join(args.out, f"model_examples_{lik[:2]}{par[:2]}_seed{seed}"))
+    # the sim tag MUST be in the filename: without it the two effect sizes write to the same
+    # path and silently overwrite each other. Dots become 'p' because leaflet_theme.save() uses
+    # Path.with_suffix(), which truncates a stem at its last dot.
+    simtag = os.path.basename(args.sim).replace(".h5ad", "").replace("sim_heart_K5_", "") \
+                                       .replace("_frac0.3_seed0", "").replace(".", "p")
+    stem = f"{simtag}_{lik[:2]}{par[:2]}_seed{seed}"
+    th.save(fig, os.path.join(args.out, f"model_examples_{stem}"))
     plt.close(fig)
 
     # ── c / d / e: the population view ─────────────────────────────────────────────────
@@ -191,7 +197,7 @@ def main():
     th.panel_label(ax2[2], "e")
 
     fig2.tight_layout()
-    th.save(fig2, os.path.join(args.out, f"model_population_{lik[:2]}{par[:2]}_seed{seed}"))
+    th.save(fig2, os.path.join(args.out, f"model_population_{stem}"))
     plt.close(fig2)
 
     print(f"[2] panels -> {args.out}")

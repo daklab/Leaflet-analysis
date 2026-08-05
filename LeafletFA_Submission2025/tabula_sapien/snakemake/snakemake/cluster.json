@@ -1,8 +1,0 @@
-{
-    "__default__": {
-        "cpus": 8,
-        "mem": "64000",
-        "time": "1-00:00",
-        "job-name": "TabSap_j"
-    }
-}

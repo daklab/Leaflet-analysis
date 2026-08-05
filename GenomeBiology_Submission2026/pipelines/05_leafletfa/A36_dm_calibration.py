@@ -88,11 +88,20 @@ def main():
                     default=[0.001, 0.005, 0.01, 0.02, 0.05, 0.10, 0.20])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--report-denominator-gap", action="store_true")
+    ap.add_argument("--device", default="cpu",
+                    help="cpu or cuda. Measured on an L40S: 74 ms/step against ~1,240 ms/step on "
+                         "4 CPU threads, i.e. a 3000-step fit is 3.7 min instead of 62-118 min. "
+                         "The bottleneck is lgamma over [B, J], which is exactly what a GPU is for.")
+    ap.add_argument("--psi-logit-prior-sd", type=float, default=1.0,
+                    help="prior sd on the softmax logits. LeafCutter's beta has a free scale, so "
+                         "its effective prior is weak; Normal(0,1) is not flat.")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
 
     tag = os.path.basename(args.sim).replace(".h5ad", "")
     cell = f"{args.likelihood}_{args.psi_parameterization}"
+    if args.psi_logit_prior_sd != 1.0:
+        cell += f"_sd{args.psi_logit_prior_sd:g}"
     junc, clus, prog, ev, true_psi, atse_ids = read_h5ad_bits(args.sim)
     uq_ev, inv_ev = np.unique(ev, return_inverse=True)
     n_atse = len(uq_ev)
@@ -111,9 +120,10 @@ def main():
 
     pyro.clear_param_store()
     t0 = time.time()
-    mod = LeafletFAMinibatch(junc, clus, K=args.K, device="cpu",
+    mod = LeafletFAMinibatch(junc, clus, K=args.K, device=args.device,
                              likelihood=args.likelihood,
                              psi_parameterization=args.psi_parameterization,
+                             psi_logit_prior_sd=args.psi_logit_prior_sd,
                              event_id=ev)
     mod.fit(num_steps=args.steps, subsample_size=min(args.batch, junc.shape[0]),
             lr=args.lr, gamma=args.gamma, seed=args.seed, verbose=False)

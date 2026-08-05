@@ -45,7 +45,13 @@ def main():
                     help="discard fits trained for fewer steps than this (dry runs)")
     args = ap.parse_args()
 
-    files = sorted(glob.glob(os.path.join(args.dir, "a36_*.tsv")))
+    # A37 used to write its summary as a36_factorial_summary.tsv INTO the directory it globs,
+    # so a second run read its own output back in as an extra "result file". Means happened to
+    # survive (the summary duplicates every row uniformly), but a stale summary from a different
+    # run would have silently corrupted them. Summary now lives outside the a36_*.tsv namespace,
+    # and anything that is not a per-cell result is excluded here as well.
+    files = sorted(f for f in glob.glob(os.path.join(args.dir, "a36_*.tsv"))
+                   if "_summary" not in os.path.basename(f))
     if not files:
         print(f"no a36_*.tsv under {args.dir}")
         return
@@ -66,9 +72,18 @@ def main():
     else:
         print("  WARNING: no `steps` column -- results predate the fit-settings guard, "
               "cannot verify these are full runs")
-    have = D.groupby(["sim", "cell"]).seed.nunique()
-    print(f"cells present: {D.cell.nunique()} | seeds per (sim, cell): "
-          f"{have.min()}-{have.max()}\n")
+    have = D.groupby(["sim", "cell"]).seed.apply(lambda s: sorted(s.unique()))
+    print(f"cells present: {D.cell.nunique()}")
+    incomplete = False
+    for (sim, cell), seeds in have.items():
+        flag = "" if len(seeds) >= 3 else "   <-- INCOMPLETE"
+        if flag:
+            incomplete = True
+        print(f"    {sim.replace('sim_heart_K5_binom_', '')[:14]:<14} {cell:<30} "
+              f"seeds {seeds}{flag}")
+    if incomplete:
+        print("  NOTE: cells above are averaged over fewer seeds than the others.")
+    print()
 
     for sim, Dsim in D.groupby("sim"):
         print("=" * 84)
@@ -135,7 +150,7 @@ def main():
   collapses is undertrained, not calibrated -- which is why the disqualification rule above
   cuts anything below half the baseline's power.""")
 
-    out = os.path.join(args.dir, "a36_factorial_summary.tsv")
+    out = os.path.join(args.dir, "factorial_summary_all_cells.tsv")
     D.to_csv(out, sep="\t", index=False)
     print(f"\n-> {out}")
 
