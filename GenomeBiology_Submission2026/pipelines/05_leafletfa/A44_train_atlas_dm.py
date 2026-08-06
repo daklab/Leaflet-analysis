@@ -110,6 +110,10 @@ def main():
                     help="floor/ceiling on psi inside the softmax. psi is PINNED at this value from "
                          "step 125 on the atlas, so the logits keep growing against a hard boundary "
                          "where the gradient is zero.")
+    ap.add_argument("--checkpoint-every", type=int, default=2000,
+                    help="write a usable fit to checkpoint.npz every N steps. A wall-clock timeout "
+                         "otherwise destroys the whole run: one fit was killed at 8h at step 10,000 "
+                         "with zero restarts, purely for landing on a 5x slower node. 0 disables.")
     ap.add_argument("--clip-norm", type=float, default=10.0,
                     help="ClippedAdam gradient-norm clip. 10.0 over ~2.5M parameters is loose.")
     ap.add_argument("--wandb-project", default="LeafletFA-mouse-atlas")
@@ -158,11 +162,25 @@ def main():
                            conc_per_atse=not args.global_conc,
                            dm_alpha_floor=args.dm_alpha_floor, phi_floor=args.phi_floor,
                            clip=args.psi_clip)
+    ck_path = os.path.join(out_dir, "checkpoint.npz")
+
+    def _checkpoint(step, psi_now, phi_now, tr):
+        """Persist a usable fit mid-run. Cheap relative to a 2.5-hour job and it makes a timeout
+        cost minutes rather than everything."""
+        if not args.checkpoint_every or step % args.checkpoint_every or step == 0:
+            return
+        np.savez_compressed(ck_path, psi_mean=psi_now.astype(np.float32),
+                            phi=phi_now.astype(np.float32), step=step,
+                            psi_contrast=tr["psi_contrast"], n_live=tr["n_live"],
+                            conc_median=tr["conc_median"], K=args.K, seed=args.seed)
+        print(f"  [checkpoint] step {step:,} -> checkpoint.npz "
+              f"(psi_contrast {tr['psi_contrast']:.5f}, {tr['n_live']} live)", flush=True)
+
     L = m.fit(num_steps=args.steps, subsample_size=min(args.batch, N), lr=args.lr,
               gamma=args.gamma, seed=args.seed, verbose=True, log_every=100,
               early_stop=not args.no_early_stop, patience=12, min_delta_rel=1e-5,
               track_every=args.track_every, max_nan_restarts=args.max_nan_restarts,
-              clip_norm=args.clip_norm)
+              clip_norm=args.clip_norm, on_track=_checkpoint)
     train_s = time.time() - t0
     finished = int(getattr(m, "stopped_step", args.steps))
     nan_hit = finished < args.steps and not getattr(m, "stopped_early", False)
