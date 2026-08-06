@@ -106,6 +106,11 @@ def main():
                     help="floor phi away from the simplex corners. 19 of 1.3M phi entries sit below "
                          "1e-6 on the atlas, and exactly 18 phi entries were non-finite at the "
                          "divergence -- the same cells. Their transform gradient scales as 1/phi.")
+    ap.add_argument("--conc-min", type=float, default=1e-3,
+                    help="lower bound on the per-ATSE concentration. It collapses 0.975 -> 0.518 by "
+                         "step 1,600 on the atlas, before structure forms, and 67%% of events end "
+                         "below 1 -- where the DM barely rewards loading on the right program. The "
+                         "released BetaBinomial fits sat at ~1.97 and separated cell types better.")
     ap.add_argument("--psi-clip", type=float, default=1e-4,
                     help="floor/ceiling on psi inside the softmax. psi is PINNED at this value from "
                          "step 125 on the atlas, so the logits keep growing against a hard boundary "
@@ -161,7 +166,7 @@ def main():
                            psi_logit_prior_sd=args.psi_logit_prior_sd, event_id=ev,
                            conc_per_atse=not args.global_conc,
                            dm_alpha_floor=args.dm_alpha_floor, phi_floor=args.phi_floor,
-                           clip=args.psi_clip)
+                           clip=args.psi_clip, conc_min=args.conc_min)
     ck_path = os.path.join(out_dir, "checkpoint.npz")
 
     def _checkpoint(step, psi_now, phi_now, tr):
@@ -267,6 +272,63 @@ def main():
     with open(os.path.join(out_dir, "result.json"), "w") as f:
         json.dump(res, f, indent=2)
 
+    # PHI UMAP coloured by held-out cell type, ported from A1_train_atlas.py. Purely diagnostic --
+    # does the splicing latent space carry cell-type structure -- and wrapped so a failure can never
+    # lose a finished fit. It belongs here rather than in a post-hoc script: rebuilding UMAPs by hand
+    # after the fact is how the phi concentration regression went unnoticed for a full day.
+    umap_png = None
+    try:
+        import scanpy as sc, anndata as ad
+        from sklearn.metrics import silhouette_score
+        sub = (np.sort(np.random.default_rng(0).choice(phi.shape[0], 20000, replace=False))
+               if phi.shape[0] > 20000 else np.arange(phi.shape[0]))
+        labels = None
+        with h5py.File(args.h5, "r") as _f:
+            if "broad_cell_type" in _f["obs"]:
+                _n = _f["obs"]["broad_cell_type"]
+                _c = np.array([x.decode() if isinstance(x, bytes) else x
+                               for x in _n["categories"][:]])
+                labels = _c[_n["codes"][:]][sub]
+        a = ad.AnnData(phi[sub].astype(np.float32))
+        a.obsm["X_phi"] = a.X.copy()
+        sc.pp.neighbors(a, use_rep="X_phi", n_neighbors=30, random_state=42)
+        sc.tl.umap(a, random_state=42)
+        um = a.obsm["X_umap"]
+        figu, axu = plt.subplots(figsize=(7, 7))
+        sil = np.nan
+        if labels is not None:
+            uniq = sorted(set(labels))
+            cmap = plt.colormaps.get_cmap("tab20" if len(uniq) > 10 else "tab10")
+            for i, ctl in enumerate(uniq):
+                mk = labels == ctl
+                axu.scatter(um[mk, 0], um[mk, 1], s=3, alpha=0.4,
+                            color=cmap(i / max(len(uniq) - 1, 1)), label=str(ctl))
+            axu.legend(markerscale=3, fontsize=5, ncol=2, loc="best")
+            # silhouette on the FULL phi, not the embedding -- scoring the embedding would measure
+            # UMAP as much as the model.
+            sil = float(silhouette_score(phi[sub], np.searchsorted(np.array(uniq), labels),
+                                         sample_size=5000, random_state=0))
+        else:
+            axu.scatter(um[:, 0], um[:, 1], s=3, alpha=0.4)
+        top3 = float(np.sort(phi.mean(0))[::-1][:3].sum())
+        axu.set_xlabel("UMAP 1"); axu.set_ylabel("UMAP 2")
+        axu.set_title(f"phi UMAP | K={args.K} seed={args.seed}, {len(sub):,} cells\n"
+                      f"silhouette(phi) {sil:.3f}   top-3 mass {top3:.2f}")
+        figu.tight_layout()
+        umap_png = os.path.join(out_dir, "phi_umap.png")
+        figu.savefig(umap_png, dpi=110); plt.close(figu)
+        res["silhouette_celltype"] = sil
+        res["top3_mass"] = top3
+        print(f"[4c] phi UMAP -> {umap_png}  silhouette(phi)={sil:.4f}  top-3 mass={top3:.3f}",
+              flush=True)
+    except Exception as e:
+        print(f"[4c] phi UMAP skipped: {e}", flush=True)
+
+    # result.json is written above, BEFORE the UMAP block runs, so re-dump it here or the
+    # silhouette and top-3 mass never reach the file.
+    with open(os.path.join(out_dir, "result.json"), "w") as _f:
+        json.dump(res, _f, indent=2)
+
     fig, ax = plt.subplots(figsize=(6, 3.4))
     ax.plot(L, lw=0.8)
     ax.set_yscale("log"); ax.set_xlabel("step"); ax.set_ylabel("-ELBO")
@@ -280,6 +342,8 @@ def main():
                 wandb.log({"neg_elbo": float(l)}, step=i)
         wandb.log({k: v for k, v in res.items() if isinstance(v, (int, float, bool))})
         wandb.log({"loss_curve": wandb.Image(os.path.join(out_dir, "loss_curve.png"))})
+        if umap_png:
+            wandb.log({"phi_umap": wandb.Image(umap_png)})
         wandb.finish()
     print(f"[5] wrote {out_dir}/", flush=True)
 

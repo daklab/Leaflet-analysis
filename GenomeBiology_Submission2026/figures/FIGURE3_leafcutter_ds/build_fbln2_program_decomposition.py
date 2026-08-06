@@ -39,8 +39,14 @@ import argparse
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 _ap = argparse.ArgumentParser()
 _ap.add_argument("--task", type=int, default=7, help="mb_run_<task>; 6/7/8=K30, 3/4/5=K20, 0/1/2=K10")
+_ap.add_argument("--fit", default=None,
+                 help="explicit fit.npz. Use this for the DM+simplex fits, whose psi is stored as "
+                      "psi_mean rather than psi. Without it the OLD BetaBinomial atlas fits are "
+                      "used, where psi does not sum to 1 within an ATSE (86%% valid) -- which is "
+                      "precisely the defect panel c is sensitive to.")
+_ap.add_argument("--tag", default=None, help="suffix for the output filename")
 _ARGS, _ = _ap.parse_known_args()
-FIT = f"{WD}/LEAFLETFA_MODELS/2026-07-26_atlas_FULL/mb_run_{_ARGS.task}/fit.npz"
+FIT = _ARGS.fit or f"{WD}/LEAFLETFA_MODELS/2026-07-26_atlas_FULL/mb_run_{_ARGS.task}/fit.npz"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
 REF = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                    "..", "FIGURE3_calibration", "reference_atse_Fbln2.json")
@@ -61,7 +67,9 @@ def cat(name, which):
 def main():
     T.apply_theme()
     z = np.load(FIT)
-    phi, psi = z["phi"], z["psi"]
+    # DM+simplex fits store the point estimate as psi_mean; the released BetaBinomial fits as psi.
+    phi = z["phi"]
+    psi = z["psi"] if "psi" in z.files else z["psi_mean"]
     K = psi.shape[0]
 
     tct = np.array([safe(x) for x in cat("tissue_cell_type", "obs")])
@@ -155,9 +163,12 @@ def main():
     T.despine(ax)
     T.panel_label(ax, "d", dx=-0.18)
 
-    _m = json.load(open(os.path.join(os.path.dirname(FIT), "result.json")))
+    _rj = os.path.join(os.path.dirname(FIT), "result.json")
+    _m = json.load(open(_rj)) if os.path.exists(_rj) else {}
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       f"FIG3_supp_Fbln2_program_decomposition_K{_m['K']}_seed{_m['seed']}")
+                       f"FIG3_supp_Fbln2_program_decomposition_"
+                       f"K{_m.get('K', psi.shape[0])}_seed{_m.get('seed', 0)}"
+                       f"{('_' + _ARGS.tag) if _ARGS.tag else ''}")
     for ext in ("pdf", "png"):
         fig.savefig(f"{out}.{ext}", dpi=300, bbox_inches="tight")
     print(f"saved -> {out}.pdf / .png\n")
