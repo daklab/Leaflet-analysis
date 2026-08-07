@@ -87,6 +87,14 @@ def main():
                          "pseudobulk. 'phi' = learned program loadings, LeafletFA's label-free claim.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--contrasts", type=int, default=0, help="0 = all")
+    ap.add_argument("--task", type=int, default=-1,
+                    help="run ONLY this contrast index, for a Slurm array. Without it every array "
+                         "task ran all 73 contrasts -- 73x redundant work, and the single surviving "
+                         "task then timed out at 16h doing serially what the array was meant to "
+                         "parallelise.")
+    ap.add_argument("--ntasks", type=int, default=0,
+                    help="total array size; with --task, contrasts are strided so any array size "
+                         "covers every contrast exactly once.")
     ap.add_argument("--min-cells", type=int, default=50)
     ap.add_argument("--max-atse", type=int, default=0)
     ap.add_argument("--steps", type=int, default=100)
@@ -119,6 +127,10 @@ def main():
     man = man[man.a1.notna() & man.a2.notna()]
     if args.contrasts:
         man = man.head(args.contrasts)
+    if args.task >= 0:
+        n = args.ntasks if args.ntasks > 0 else (args.task + 1)
+        man = man.iloc[args.task::n]          # stride, so every contrast is covered exactly once
+        print(f"[0] array task {args.task}/{n}: {len(man)} of the mappable contrasts", flush=True)
     print(f"[1] {len(man)} contrasts mappable; K={K}, {n_atse:,} ATSEs, design={args.design}",
           flush=True)
 
@@ -179,7 +191,8 @@ def main():
     if not rows_all:
         print("no contrasts scored"); return
     out = pd.concat(rows_all, ignore_index=True)
-    fp = os.path.join(args.out, f"a49_leafletfa_lrt_{args.design}.tsv")
+    suffix = f"_t{args.task}" if args.task >= 0 else ""
+    fp = os.path.join(args.out, f"a49_leafletfa_lrt_{args.design}{suffix}.tsv")
     out.to_csv(fp, sep="\t", index=False)
     print(f"\n[2] {len(out):,} rows over {out.contrast.nunique()} contrasts -> {fp}")
     s = out.groupby("contrast").apply(lambda d: (d["p.adjust"] <= args.alpha).sum())
