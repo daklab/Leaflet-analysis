@@ -106,6 +106,13 @@ def main():
                     help="floor phi away from the simplex corners. 19 of 1.3M phi entries sit below "
                          "1e-6 on the atlas, and exactly 18 phi entries were non-finite at the "
                          "divergence -- the same cells. Their transform gradient scales as 1/phi.")
+    ap.add_argument("--holdout-frac", type=float, default=0.0,
+                    help="fraction of cells held OUT of training and scored at the end. Everything "
+                         "reported so far has been TRAINING likelihood, which cannot detect "
+                         "overfitting -- and the old BetaBinomial has 79,768 unconstrained psi per "
+                         "program while the simplex model does not, so that comparison could "
+                         "flatter either one. This is how the concentration setting should be "
+                         "chosen, rather than on a single showcase ATSE.")
     ap.add_argument("--conc-min", type=float, default=1e-3,
                     help="lower bound on the per-ATSE concentration. It collapses 0.975 -> 0.518 by "
                          "step 1,600 on the atlas, before structure forms, and 67%% of events end "
@@ -155,10 +162,21 @@ def main():
     t0 = time.time()
     junc = read_all("cell_by_junction_matrix", args.h5, N, J)
     clus = read_all("cell_by_cluster_matrix", args.h5, N, J)
+    ho_idx = np.zeros(0, dtype=int)
+    if args.holdout_frac > 0:
+        _r = np.random.default_rng(12345)          # fixed, so every fit holds out the SAME cells
+        ho_idx = np.sort(_r.choice(N, int(round(args.holdout_frac * N)), replace=False))
+        keep = np.setdiff1d(np.arange(N), ho_idx)
+        junc_ho, clus_ho = junc[ho_idx].copy(), clus[ho_idx].copy()
+        junc, clus = junc[keep], clus[keep]
+        print(f"[2b] holding out {len(ho_idx):,} cells ({100*args.holdout_frac:.0f}%), "
+              f"training on {len(keep):,}. Seed is FIXED at 12345 so every fit is scored on the "
+              f"same cells and the numbers are comparable across runs.", flush=True)
     print(f"[2] loaded in {time.time()-t0:.0f}s ({junc.nbytes/1e9:.1f} GB each), "
           f"coverage {100*(clus>0).mean():.2f}%, observed rate {junc.sum()/max(clus.sum(),1):.4f}",
           flush=True)
 
+    N_train = junc.shape[0]
     pyro.clear_param_store()
     t0 = time.time()
     m = LeafletFAMinibatch(junc, clus, K=args.K, device=args.device,
@@ -181,7 +199,7 @@ def main():
         print(f"  [checkpoint] step {step:,} -> checkpoint.npz "
               f"(psi_contrast {tr['psi_contrast']:.5f}, {tr['n_live']} live)", flush=True)
 
-    L = m.fit(num_steps=args.steps, subsample_size=min(args.batch, N), lr=args.lr,
+    L = m.fit(num_steps=args.steps, subsample_size=min(args.batch, N_train), lr=args.lr,
               gamma=args.gamma, seed=args.seed, verbose=True, log_every=100,
               early_stop=not args.no_early_stop, patience=12, min_delta_rel=1e-5,
               track_every=args.track_every, max_nan_restarts=args.max_nan_restarts,
@@ -203,10 +221,10 @@ def main():
             x = x.detach().cpu().numpy()
         return np.asarray(x, np.float32)
     try:
-        med = m._median()
-        cv = med.get("bb_conc_atse", med.get("bb_conc"))
-        cv = cv.detach().cpu().numpy() if hasattr(cv, "detach") else np.asarray(cv)
-        conc_vec = np.atleast_1d(cv).astype(np.float32)
+        # the EFFECTIVE concentration -- clamped exactly as the model clamps it. Reading the raw
+        # guide median instead reported values below the floor the fit trained under (min 1.536
+        # under conc_min=2.0), which would mislead anything using the saved vector downstream.
+        conc_vec = m.concentration()
         conc = float(np.median(conc_vec))          # summary; the vector is saved in full
     except Exception:
         conc_vec, conc = np.zeros(0, np.float32), float("nan")
@@ -223,6 +241,43 @@ def main():
              f"min {conc_vec.min():.2f}" if conc_vec.size > 1 else f"conc {conc:.3f} (global)")
     print(f"[4] psi within-ATSE sum: median {np.median(S):.6f}, max dev "
           f"{np.abs(S-1).max():.2e}, valid {100*frac_valid:.2f}%  |  {cdesc}", flush=True)
+
+    # `res` is built further down, so these go into plain locals and are folded in there.
+    # Writing into `res` here raised 'referenced before assignment' and the guard on the
+    # downstream selector correctly refused to pick a setting from the missing numbers.
+    ho_model = ho_null = None
+    # HELD-OUT SCORING. phi is a local parameter, so a cell the model never saw has no loading.
+    # Rather than refit it (which would leak), score under the PRIOR-mean phi -- i.e. ask how well
+    # the learned psi alone explains unseen cells, against the same null and cell-type references.
+    # This measures the programs, not the per-cell encoding, which is the right target: psi is what
+    # transfers, phi is per-cell by construction.
+    if len(ho_idx):
+        try:
+            from leafletfa.dirichlet_multinomial import dm_log_prob as _dlp
+            yh = torch.from_numpy(junc_ho)
+            uq_h, inv_h = np.unique(ev, return_inverse=True)
+            ai_h = torch.as_tensor(inv_h, dtype=torch.long)
+            phibar = torch.from_numpy(phi.mean(0).astype(np.float32))
+            mu_m = torch.from_numpy((phi.mean(0) @ psi).astype(np.float32)).unsqueeze(0).expand(
+                yh.shape[0], -1).contiguous()
+            segm = torch.zeros(yh.shape[0], n_atse).index_add(1, ai_h, mu_m)
+            mu_m = (mu_m / segm[:, ai_h].clamp_min(1e-9)).clamp_min(1e-6)
+            # The null must be built from TRAINING counts. Building it from the held-out counts
+            # (yh.sum(0)) fits the baseline on the test set, so the model -- which only ever saw
+            # training data -- is compared against an oracle and every gain comes out negative.
+            # The ranking survived that error because all arms shared the handicap, but the
+            # absolute numbers were meaningless.
+            ytr = torch.from_numpy(junc)
+            tot = ytr.sum(0); segt = torch.zeros(n_atse).index_add(0, ai_h, tot)
+            mu_n = (tot / segt[ai_h].clamp_min(1e-9)).clamp_min(1e-6).unsqueeze(0).expand_as(mu_m).contiguous()
+            C = torch.tensor(2.0)
+            ho_model = float(_dlp(yh, mu_m, C, ai_h, n_atse).sum())
+            ho_null = float(_dlp(yh, mu_n, C, ai_h, n_atse).sum())
+            
+            print(f"[4d] held-out ({len(ho_idx):,} cells): model {ho_model:,.0f} "
+                  f"vs null {ho_null:,.0f}  gain {ho_model-ho_null:,.0f}", flush=True)
+        except Exception as e:
+            print(f"[4d] held-out scoring skipped: {e}", flush=True)
 
     tr = getattr(m, "trace", []) or []
     if tr:
@@ -263,6 +318,10 @@ def main():
                train_minutes=round(train_s / 60, 1), ms_per_step=round(1000*train_s/max(finished,1)),
                final_loss=float(L[-1]) if L else None, bb_conc=conc, frac_valid=frac_valid,
                n_cells=N, n_junctions=J, n_atse=int(n_atse), batch=args.batch, lr=args.lr,
+               heldout_logL_model=ho_model, heldout_logL_null=ho_null,
+               heldout_n=(int(len(ho_idx)) if len(ho_idx) else 0),
+               heldout_gain=((ho_model - ho_null) if (ho_model is not None and ho_null is not None)
+                             else None),
                n_nan_restarts=int(getattr(m, "n_nan_restarts", 0)),
                nan_steps=list(getattr(m, "nan_steps", [])),
                conc_per_atse=(not args.global_conc), dm_alpha_floor=args.dm_alpha_floor,
