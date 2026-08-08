@@ -192,6 +192,14 @@ def main():
         cost minutes rather than everything."""
         if not args.checkpoint_every or step % args.checkpoint_every or step == 0:
             return
+        # step-stamped, NOT overwritten. A single checkpoint.npz keeps only the last step, which
+        # threw away the free answer to "does phi keep concentrating after psi settles" -- the
+        # mid-training states had already been overwritten by the time the question came up.
+        ck_path_s = os.path.join(out_dir, f"checkpoint_step{step:06d}.npz")
+        np.savez_compressed(ck_path_s, psi_mean=psi_now.astype(np.float32),
+                            phi=phi_now.astype(np.float32), step=step,
+                            psi_contrast=tr["psi_contrast"], n_live=tr["n_live"],
+                            conc_median=tr["conc_median"], K=args.K, seed=args.seed)
         np.savez_compressed(ck_path, psi_mean=psi_now.astype(np.float32),
                             phi=phi_now.astype(np.float32), step=step,
                             psi_contrast=tr["psi_contrast"], n_live=tr["n_live"],
@@ -299,7 +307,31 @@ def main():
             for t in tr:
                 wandb.log({k: v for k, v in t.items() if k != "pi"}, step=t["step"])
 
+    # The POSTERIOR over phi, not just its mean. The model-based DS test (A51) computes
+    # Delta_j = dphi . psi_:,j and needs uncertainty in BOTH factors; saving only the point `phi`
+    # forced it to treat the group-mean difference as known exactly, propagating psi's uncertainty
+    # alone. These are AutoNormal's parameters in UNCONSTRAINED space -- phi is Dirichlet, so the
+    # transform is stick-breaking and the trailing dim is K-1, not K. ~10 MB at atlas scale.
+    phi_loc = phi_scale = np.zeros((0, 0), np.float32)
+    try:
+        _st = pyro.get_param_store()
+        if "AutoNormal.locs.phi" in _st and "AutoNormal.scales.phi" in _st:
+            phi_loc = to_np(_st["AutoNormal.locs.phi"].detach())
+            phi_scale = to_np(_st["AutoNormal.scales.phi"].detach())
+            print(f"[4e] saved q(phi): loc {phi_loc.shape}, scale {phi_scale.shape}", flush=True)
+        else:
+            print("[4e] WARNING: no q(phi) in the param store -- A51 cannot propagate phi "
+                  "uncertainty from this fit", flush=True)
+    except Exception as e:
+        print(f"[4e] q(phi) save failed: {e}", flush=True)
+    # and the whole store, so a missing derived quantity never costs another 3-hour fit
+    try:
+        pyro.get_param_store().save(os.path.join(out_dir, "param_store.pt"))
+    except Exception as e:
+        print(f"[4e] param store save failed: {e}", flush=True)
+
     np.savez_compressed(os.path.join(out_dir, "fit.npz"),
+                        phi_loc=phi_loc, phi_scale=phi_scale,
                         trace_step=np.array([t["step"] for t in tr], np.int32),
                         trace_psi_contrast=np.array([t["psi_contrast"] for t in tr], np.float32),
                         trace_phi_spread=np.array([t["phi_spread"] for t in tr], np.float32),
@@ -309,6 +341,14 @@ def main():
                                   if tr and tr[0]["pi"].size else np.zeros((0, 0), np.float32)),
                         psi_mean=psi, phi=phi, psi_loc=to_np(loc), psi_scale=to_np(scale),
                         event_id=np.asarray(uq, dtype=object), inv_ev=inv.astype(np.int32),
+                        # WHICH atlas cells phi's rows correspond to. With --holdout-frac, phi
+                        # covers only the training cells, so anything indexing phi by atlas cell
+                        # index is silently wrong -- or loudly wrong, which is what happened:
+                        # "boolean index ... dimension is 119435 but corresponding boolean
+                        # dimension is 132706". Downstream must map through this.
+                        train_idx=(np.setdiff1d(np.arange(N), ho_idx).astype(np.int32)
+                                   if len(ho_idx) else np.arange(N, dtype=np.int32)),
+                        holdout_idx=ho_idx.astype(np.int32),
                         losses=np.asarray(L, np.float64), bb_conc=conc, bb_conc_vec=conc_vec,
                         frac_valid=frac_valid,
                         K=args.K, seed=args.seed, steps_run=finished)

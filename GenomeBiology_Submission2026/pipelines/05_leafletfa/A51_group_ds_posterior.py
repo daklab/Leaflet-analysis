@@ -59,6 +59,7 @@ import torch
 
 sys.path.insert(0, "/gpfs/commons/home/kisaev/LeafletFA")
 from leafletfa.dirichlet_multinomial import build_atse_index, segment_softmax  # noqa: E402
+from _phi_rows import phi_row_of  # noqa: E402
 
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
@@ -95,6 +96,59 @@ def draw_psi(z, atse_idx, n_atse, S, seed=0):
     return torch.stack(out)          # [S, K, J]
 
 
+def draw_dphi(z, rows1, rows2, S, K, seed=0):
+    """Posterior draws of the group-mean phi difference, [S, K].
+
+    Until 2026-08-08 this was a POINT estimate expanded S times, so the test propagated psi's
+    uncertainty and treated dphi as known exactly. That understates the spread of TV -- dphi
+    multiplies psi in every term of Delta_j -- and it is the half of the statistic that carries the
+    biology, so the omission was not the harmless one.
+
+    q(phi) is AutoNormal in UNCONSTRAINED space and phi is Dirichlet, so the map back to the simplex
+    is stick-breaking and the stored trailing dim is K-1. Only the cells in the two arms are drawn:
+    the full [S, N, K] tensor is 2 GB at atlas scale and every other cell is irrelevant to a
+    group contrast.
+
+    Returns None when the fit predates the q(phi) save, so the caller can fall back and SAY SO
+    rather than silently reverting to the old behaviour.
+    """
+    if "phi_loc" not in getattr(z, "files", []):
+        return None
+    loc_all = np.asarray(z["phi_loc"], np.float32)
+    scale_all = np.asarray(z["phi_scale"], np.float32)
+    if loc_all.size == 0 or loc_all.shape[1] != K - 1:
+        return None
+    sb = torch.distributions.transforms.StickBreakingTransform()
+    g = torch.Generator().manual_seed(seed)
+    rows = np.concatenate([rows1, rows2])
+    loc = torch.from_numpy(loc_all[rows])
+    scale = torch.from_numpy(scale_all[rows])
+    n1 = len(rows1)
+    out = torch.empty(S, K)
+    for s in range(S):
+        eps = torch.randn(loc.shape, generator=g)
+        ph = sb(loc + scale * eps)                    # [n1+n2, K], on the simplex
+        out[s] = ph[:n1].mean(0) - ph[n1:].mean(0)
+    return out
+
+
+def bayesian_fdr(prob):
+    """Expected-FDP control for POSTERIOR probabilities, which is what `prob` is.
+
+    The previous code fed `1 - prob` into Benjamini-Hochberg. That quantity is a local false
+    discovery rate, not a p-value: it is not uniform under the null, so BH's guarantee simply does
+    not apply to it and the reported q carried no calibration. The Bayesian analogue is direct --
+    rank by confidence and take the running mean of the local fdr, which IS the expected fraction of
+    false calls in the set called so far.
+    """
+    lfdr = 1.0 - np.asarray(prob, float)
+    o = np.argsort(lfdr)                              # most confident first
+    run = np.cumsum(lfdr[o]) / np.arange(1, len(lfdr) + 1)
+    out = np.empty_like(run)
+    out[o] = np.minimum.accumulate(run[::-1])[::-1]   # monotone in the ranking
+    return np.clip(out, 0, 1)
+
+
 def tv_per_atse(dphi, psi_s, atse_idx, n_atse):
     """TV per (sample, ATSE) = 0.5 * sum_{j in e} |dphi . psi_:,j|, computed without materialising
     the [S, C, J] tensor: rho is linear in phi, so phi can be averaged over the group first."""
@@ -119,17 +173,23 @@ def main():
     ap.add_argument("--min-cells", type=int, default=50)
     ap.add_argument("--alpha", type=float, default=0.05)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--permute", type=int, default=0,
+                    help="permutation null draws: shuffle cells between the two arms, keeping arm "
+                         "sizes and the sampled phi vectors. Gives an empirical p that does not "
+                         "depend on the mean-field posterior width being correct.")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     torch.set_num_threads(int(os.environ.get("SLURM_CPUS_PER_TASK", "8")))
 
     z = np.load(args.fit, allow_pickle=True)
     phi = torch.from_numpy(np.asarray(z["phi"], np.float32))
+    K = int(phi.shape[1])
     with h5py.File(H5, "r") as f:
         n = f["var"]["event_id"]
         c = np.array([x.decode() if isinstance(x, bytes) else x for x in n["categories"][:]])
         ev = c[n["codes"][:]].astype(str)
         lab = obs_cat(f, args.label_field)
+    PROW = phi_row_of(z, len(lab))
     atse_idx, _, _ = build_atse_index(ev)
     uq = np.unique(ev)
     n_atse = len(uq)
@@ -158,14 +218,49 @@ def main():
     rng = np.random.default_rng(args.seed)
     rows = []
     for ci, (_, row) in enumerate(man.iterrows()):
-        c1 = np.flatnonzero(lab == row.a1)
-        c2 = np.flatnonzero(lab == row.a2)
+        c1 = np.flatnonzero(lab == row.a1); c1 = c1[PROW[c1] >= 0]
+        c2 = np.flatnonzero(lab == row.a2); c2 = c2[PROW[c2] >= 0]
         if min(len(c1), len(c2)) < args.min_cells:
             continue
-        p1 = phi[torch.from_numpy(c1)].mean(0)
-        p2 = phi[torch.from_numpy(c2)].mean(0)
-        dphi = (p1 - p2).unsqueeze(0).expand(psi_s.shape[0], -1)
+        r1, r2 = PROW[c1], PROW[c2]
+        S = psi_s.shape[0]
+        dphi = draw_dphi(z, r1, r2, S, K, seed=args.seed + ci)
+        if dphi is None:
+            if ci == 0:
+                print("    NOTE: fit has no q(phi) -- dphi is a POINT estimate and phi's "
+                      "uncertainty is NOT propagated. Retrain with the current A44 to fix.",
+                      flush=True)
+            p1 = phi[torch.from_numpy(r1)].mean(0)
+            p2 = phi[torch.from_numpy(r2)].mean(0)
+            dphi = (p1 - p2).unsqueeze(0).expand(S, -1)
         tv_obs, d_obs = tv_per_atse(dphi, psi_s, atse_idx, n_atse)
+
+        # PERMUTATION NULL: shuffle which cells belong to which arm, keeping the arm sizes and the
+        # sampled phi vectors intact. Only the cell-to-group association is destroyed, so the null
+        # inherits the same posterior width, the same psi draws and the same coverage as the
+        # observed statistic -- which is the point. The test then no longer depends on the
+        # mean-field width being right: q(phi) is 1.3-1.7x too narrow, and any such miscalibration
+        # now enters the null and the observed statistic IDENTICALLY and cancels in the comparison.
+        #
+        # This is NOT the "permute phi" null that failed earlier. That one shuffled phi across ALL
+        # atlas cells, mixing unrelated cell types and converting real between-program variation
+        # into an overdispersed mixture, which inflated the null. Here the shuffle is confined to
+        # the two arms of the contrast being tested.
+        tv_null = None
+        if args.permute:
+            pooled = np.concatenate([r1, r2])
+            n1 = len(r1)
+            draws = []
+            for b in range(args.permute):
+                pr = np.random.default_rng(args.seed + 1000 * (ci + 1) + b).permutation(pooled)
+                dnull = draw_dphi(z, pr[:n1], pr[n1:], S, K, seed=args.seed + 7919 * (b + 1))
+                if dnull is None:
+                    pn1 = phi[torch.from_numpy(pr[:n1])].mean(0)
+                    pn2 = phi[torch.from_numpy(pr[n1:])].mean(0)
+                    dnull = (pn1 - pn2).unsqueeze(0).expand(S, -1)
+                tvb, _ = tv_per_atse(dnull, psi_s, atse_idx, n_atse)
+                draws.append(tvb.mean(0))                       # [n_atse] per permutation
+            tv_null = torch.stack(draws)                        # [B, n_atse]
         # the point estimate takes |mean| rather than mean|.|: E|X| >= |EX|, so mean-of-absolute
         # inherits a positive bias that is exactly what made the old statistic non-null under H0.
         d_mean = d_obs.mean(0)
@@ -196,17 +291,34 @@ def main():
         # but with a biased statistic (mean of absolute rather than absolute of mean) and an
         # unjustified delta of 0.10.
         prob = (tv_obs > args.delta).float().mean(0).numpy()      # P(TV > delta)
-        p = 1.0 - prob                                            # local fdr
-        o = np.argsort(p); q = np.empty(n_atse)
-        pv = p[o]
-        q[o] = np.clip(np.minimum.accumulate((pv * n_atse / np.arange(1, n_atse + 1))[::-1])[::-1], 0, 1)
+        # Bayesian FDR, NOT BH on (1 - prob). `1 - prob` is a local false discovery rate and is not
+        # uniform under the null, so BH's guarantee never applied to it.
+        q = bayesian_fdr(prob)
 
-        rows.append(pd.DataFrame(dict(
-            contrast=f"{row.group_1}__vs__{row.group_2}", cluster=uq,
-            tv=stat.numpy(), prob_de=prob, tv_post_mean=tv_obs.mean(0).numpy(),
-            tv_post_sd=tv_obs.std(0).numpy(), p=p, q=q)))
+        out = dict(contrast=f"{row.group_1}__vs__{row.group_2}", cluster=uq,
+                   tv=stat.numpy(), prob_de=prob, tv_post_mean=tv_obs.mean(0).numpy(),
+                   tv_post_sd=tv_obs.std(0).numpy(), lfdr=1.0 - prob, q=q)
+
+        if tv_null is not None:
+            # empirical p: how often a permuted split reaches this event's observed TV. The +1s are
+            # the standard finite-B correction -- without them a p of exactly 0 is reported for any
+            # event no permutation happens to beat, which is an artefact of B, not evidence.
+            obs = tv_obs.mean(0)
+            p_emp = ((tv_null >= obs.unsqueeze(0)).sum(0).float() + 1) / (tv_null.shape[0] + 1)
+            p_emp = p_emp.numpy()
+            o = np.argsort(p_emp); q_emp = np.empty(n_atse)
+            q_emp[o] = np.clip(np.minimum.accumulate(
+                (p_emp[o] * n_atse / np.arange(1, n_atse + 1))[::-1])[::-1], 0, 1)
+            out["p_perm"] = p_emp
+            out["q_perm"] = q_emp
+            out["tv_null_mean"] = tv_null.mean(0).numpy()
+            out["tv_null_p95"] = np.quantile(tv_null.numpy(), 0.95, axis=0)
+
+        rows.append(pd.DataFrame(out))
         print(f"  [{ci+1}/{len(man)}] {row.group_1} vs {row.group_2}: "
-              f"{int((q <= args.alpha).sum()):,} called at q<={args.alpha}, "
+              f"{int((q <= args.alpha).sum()):,} called at q<={args.alpha}"
+              + (f" (perm {int((out['q_perm'] <= args.alpha).sum()):,})"
+                 if tv_null is not None else "") + ", "
               f"median TV {float(np.median(stat)):.4f}", flush=True)
 
     if not rows:
