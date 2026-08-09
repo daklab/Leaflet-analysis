@@ -97,12 +97,30 @@ def main():
         is_diff = np.asarray(a.var["is_differential"]).astype(bool)
         true_phi = np.asarray(a.obsm["true_phi"], float)
 
+        g0, g1 = 0, 1                  # two true programs; the analogue of endo vs fibro
+
+        # --- the TRUE junction composition, so nothing is judged against a proxy -------------
+        # cassettes: the skip junction carries psi, the two inclusion junctions split the rest.
+        true_skip = np.asarray(a.uns["true_psi_skip"], float)          # [K_true, n_ATSE]
+        role = np.asarray(a.var["junction_role"]).astype(str)
+        ev_j = np.asarray(a.var["event_id"]).astype(str)
+        atse_ids = np.asarray(a.uns["atse_ids"]).astype(str)
+        pos = {e: i for i, e in enumerate(atse_ids)}
+        keep = np.array([e in pos for e in ev_j])
+        col_a = np.array([pos.get(e, -1) for e in ev_j])
+        true_psi_j = np.zeros((true_skip.shape[0], len(ev_j)))
+        for k in range(true_skip.shape[0]):
+            v = np.where(role == "J3", true_skip[k, col_a], (1 - true_skip[k, col_a]) / 2.0)
+            true_psi_j[k] = np.where(keep, v, 0.0)
+        c0t = true_phi[true_prog == g0].mean(0) @ true_psi_j
+        c1t = true_phi[true_prog == g1].mean(0) @ true_psi_j
+        true_contrast = np.abs(c0t - c1t)[is_diff]
+
         Z = [np.load(f, allow_pickle=True) for f in fits]
         psis = [np.asarray(z["psi_mean"], float) for z in Z]
         phis = [np.asarray(z["phi"], float) for z in Z]
 
         # --- per-fit quality, and the contrast each fit predicts -------------------------
-        g0, g1 = 0, 1                      # two true programs; the analogue of endo vs fibro
         contrasts, aris, concs = [], [], []
         for psi, phi in zip(psis, phis):
             aris.append(adjusted_rand_score(true_prog, phi.argmax(1)))
@@ -132,7 +150,22 @@ def main():
         crs = [np.corrcoef(contrasts[i], contrasts[j])[0, 1]
                for i in range(len(contrasts)) for j in range(i + 1, len(contrasts))]
 
+        # accuracy against the TRUTH, which is the whole reason to be on simulation
+        tl1 = float(true_contrast.sum())
+        mag = float(cl1.mean() / max(tl1, 1e-12))            # 1.0 = right size
+        acc = [float(np.corrcoef(c, true_contrast)[0, 1]) for c in contrasts]
+        phi_true_r = []
+        for psi, phi in zip(psis, phis):
+            kk = min(phi.shape[1], true_phi.shape[1])
+            perm, _ = match_programs(true_psi_j[:kk], psi[:kk])
+            phi_true_r.append(float(np.corrcoef(true_phi[:, :kk].ravel(),
+                                                phi[:, perm[:kk]].ravel())[0, 1]))
+
         rows.append(dict(arm=label, n_fits=len(Z),
+                         true_contrast_l1=tl1,
+                         contrast_mag_vs_true=mag,
+                         contrast_acc=float(np.mean(acc)),
+                         phi_r_true=float(np.mean(phi_true_r)),
                          conc_hat=float(np.median(concs)),
                          phi_ari=float(np.mean(aris)),
                          psi_r_seed=float(np.mean(psi_rs)),
