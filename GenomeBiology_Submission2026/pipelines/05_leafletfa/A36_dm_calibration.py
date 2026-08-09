@@ -92,6 +92,8 @@ def main():
                     help="cpu or cuda. Measured on an L40S: 74 ms/step against ~1,240 ms/step on "
                          "4 CPU threads, i.e. a 3000-step fit is 3.7 min instead of 62-118 min. "
                          "The bottleneck is lgamma over [B, J], which is exactly what a GPU is for.")
+    ap.add_argument("--dir-conc", type=float, default=None,
+                    help="pin the Dirichlet concentration on phi instead of learning it")
     ap.add_argument("--conc-per-atse", action="store_true",
                     help="one concentration per ATSE, as the atlas fits use")
     ap.add_argument("--conc-min", type=float, default=1e-3,
@@ -134,6 +136,18 @@ def main():
                              conc_per_atse=args.conc_per_atse,
                              conc_min=args.conc_min,
                              dm_alpha_floor=args.dm_alpha_floor)
+    if args.dir_conc is not None:
+        # Pin the Dirichlet concentration on phi. Measured on the atlas fits, the LEARNED value
+        # puts every effective parameter delta*pi_k at 0.19-0.37 -- all below 1, which makes the
+        # prior sparsity-inducing: it drives each cell into a CORNER of the simplex. Under the DM's
+        # correctly-counted (i.e. halved, at m=2) evidence the corner choice is weakly determined,
+        # so it is noise-dominated; averaging thousands of near-random corners over a cell-type
+        # group returns pi for every group, which is how a real contrast vanishes and why the same
+        # command with the same seed gave different answers. delta*pi_k >= 1 makes the prior
+        # unimodal instead, so phi is smooth rather than corner-seeking.
+        mod.freeze_globals(dir_conc=args.dir_conc)
+        print(f"[1c] dir_conc PINNED at {args.dir_conc:g} "
+              f"(delta*pi_k ~ {args.dir_conc/args.K:.2f} at uniform pi)", flush=True)
     mod.fit(num_steps=args.steps, subsample_size=min(args.batch, junc.shape[0]),
             lr=args.lr, gamma=args.gamma, seed=args.seed, verbose=False)
     _pm = mod.phi_mean()
