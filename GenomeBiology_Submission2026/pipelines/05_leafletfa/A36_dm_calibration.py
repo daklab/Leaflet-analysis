@@ -92,6 +92,11 @@ def main():
                     help="cpu or cuda. Measured on an L40S: 74 ms/step against ~1,240 ms/step on "
                          "4 CPU threads, i.e. a 3000-step fit is 3.7 min instead of 62-118 min. "
                          "The bottleneck is lgamma over [B, J], which is exactly what a GPU is for.")
+    ap.add_argument("--conc-per-atse", action="store_true",
+                    help="one concentration per ATSE, as the atlas fits use")
+    ap.add_argument("--conc-min", type=float, default=1e-3,
+                    help="lower bound on the concentration; the atlas ships 2.0")
+    ap.add_argument("--dm-alpha-floor", type=float, default=1e-2)
     ap.add_argument("--psi-logit-prior-sd", type=float, default=1.0,
                     help="prior sd on the softmax logits. LeafCutter's beta has a free scale, so "
                          "its effective prior is weak; Normal(0,1) is not flat.")
@@ -124,7 +129,11 @@ def main():
                              likelihood=args.likelihood,
                              psi_parameterization=args.psi_parameterization,
                              psi_logit_prior_sd=args.psi_logit_prior_sd,
-                             event_id=ev)
+                             event_id=ev,
+                             # match the ATLAS recipe, or a simulation cannot diagnose the atlas
+                             conc_per_atse=args.conc_per_atse,
+                             conc_min=args.conc_min,
+                             dm_alpha_floor=args.dm_alpha_floor)
     mod.fit(num_steps=args.steps, subsample_size=min(args.batch, junc.shape[0]),
             lr=args.lr, gamma=args.gamma, seed=args.seed, verbose=False)
     _pm = mod.phi_mean()
@@ -195,6 +204,12 @@ def main():
     print(f"[4b] learned bb_conc = {conc_hat:.3f}", flush=True)
 
     loc, scale = mod.psi_loc_scale()
+    # q(phi), needed to compare posterior spread against the across-seed spread
+    _ps = pyro.get_param_store()
+    _phi_loc = (_ps["AutoNormal.locs.phi"].detach().cpu().numpy().astype(np.float32)
+                if "AutoNormal.locs.phi" in _ps else np.zeros((0, 0), np.float32))
+    _phi_scale = (_ps["AutoNormal.scales.phi"].detach().cpu().numpy().astype(np.float32)
+                  if "AutoNormal.scales.phi" in _ps else np.zeros((0, 0), np.float32))
     fit_out = os.path.join(args.out, f"fit_{tag}_{cell}_seed{args.seed}.npz")
     np.savez_compressed(
         fit_out,
@@ -204,6 +219,7 @@ def main():
         psi_scale=(np.asarray(scale.cpu().numpy() if hasattr(scale, "cpu") else scale,
                               dtype=np.float32) if scale is not None else np.zeros(0, np.float32)),
         phi=phi.astype(np.float32),
+        phi_loc=_phi_loc, phi_scale=_phi_scale,
         event_id=np.asarray(uq_ev, dtype=object), inv_ev=inv_ev.astype(np.int32),
         likelihood=args.likelihood, psi_parameterization=args.psi_parameterization,
         seed=args.seed, steps=args.steps, frac_valid=frac_valid, bb_conc=conc_hat,

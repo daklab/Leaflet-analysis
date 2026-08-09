@@ -293,7 +293,8 @@ def simulate_counts(clus, phi, psi_j, rng, bb_conc=np.inf):
     return junc, cl
 
 
-def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1000):
+def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1000,
+                       depth_scale=1.0):
     """Draw one count VECTOR per (cell, ATSE), so sum_j y_j == N_e EXACTLY.
 
     The Binomial/Beta-Binomial arm above draws each junction independently against the shared
@@ -330,8 +331,18 @@ def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1
     A = cols.shape[0]
     clus_d = np.asarray(clus.todense())
     N_e_all = clus_d[:, cols[:, 0]].astype(np.int64)          # [N, A]
+    if depth_scale < 1.0:
+        # Binomial thinning of the ATSE totals, so the simulation can be run at the ATLAS's read
+        # depth rather than the Heart tissue's. Measured, this is the single biggest way the sims
+        # differ from the real data: the atlas has a median of 6 reads per observed cell-junction
+        # entry with 25.2% at 1-2 reads, while the sims sit at 33 and 9.3%. Every claim validated
+        # on simulation was therefore validated ~5.5x deeper than the data it is applied to.
+        # Thinning is the right operation because read sampling IS binomial -- it keeps the
+        # composition unchanged in expectation and only removes evidence.
+        N_e_all = rng.binomial(N_e_all, depth_scale)
     print(f"  {A:,} events x {m} junctions; coverage: "
-          f"{100*(N_e_all > 0).mean():.1f}% of (cell, event) pairs have reads")
+          f"{100*(N_e_all > 0).mean():.1f}% of (cell, event) pairs have reads"
+          + (f"  [depth thinned to {depth_scale:g}x]" if depth_scale < 1.0 else ""))
     if np.isinf(dm_conc):
         print("  emission: MULTINOMIAL (dm_conc = inf; no overdispersion beyond multinomial)")
     else:
@@ -393,6 +404,10 @@ def main():
                     help="Dirichlet-multinomial concentration when --emission is "
                          "dirichletmultinomial. 'inf' collapses to a plain Multinomial.")
     ap.add_argument("--phi-conc", type=float, default=20.0)
+    ap.add_argument("--depth-scale", type=float, default=1.0,
+                    help="binomially thin the ATSE totals to this fraction. 1.0 keeps the tissue's "
+                         "own depth; ~0.18 reproduces the ATLAS depth (median 6 reads per observed "
+                         "cell-junction entry, 25%% at 1-2 reads, against the sims' 33 and 9.3%%).")
     ap.add_argument("--beta-a", type=float, default=0.5, help="Beta prior on skip usage")
     ap.add_argument("--beta-b", type=float, default=0.5)
     ap.add_argument("--min-cells-per-junction", type=int, default=50)
@@ -426,7 +441,8 @@ def main():
         ev_idx = {e: i for i, e in enumerate(events)}
         col_event = np.array([ev_idx[e] for e in ev_all])
         junc_sim, clus_sim = simulate_counts_dm(clus_real, phi, psi_j, col_event, rng,
-                                                dm_conc=dm_conc)
+                                                dm_conc=dm_conc,
+                                                depth_scale=args.depth_scale)
     else:
         emission = "binomial" if np.isinf(bb_conc) else "betabinomial"
         print(f"\n=== 4. simulate counts ({emission}) ===")
@@ -470,6 +486,8 @@ def main():
 
     if args.emission == "dirichletmultinomial":
         etag = "multinom" if np.isinf(dm_conc) else f"dm{dm_conc:g}"
+        if args.depth_scale < 1.0:
+            etag += f"_d{args.depth_scale:g}"
     else:
         etag = "binom" if np.isinf(bb_conc) else f"bb{bb_conc:g}"
     tag = f"{args.tissue.lower()}_K{args.K}_{etag}_eff{args.effect}_frac{args.frac_differential:g}_seed{args.seed}"
