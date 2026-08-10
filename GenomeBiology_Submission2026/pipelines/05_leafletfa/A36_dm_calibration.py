@@ -92,6 +92,11 @@ def main():
                     help="cpu or cuda. Measured on an L40S: 74 ms/step against ~1,240 ms/step on "
                          "4 CPU threads, i.e. a 3000-step fit is 3.7 min instead of 62-118 min. "
                          "The bottleneck is lgamma over [B, J], which is exactly what a GPU is for.")
+    ap.add_argument("--likelihood-weight", default=None,
+                    choices=[None, "none", "m_over_m_minus_1"],
+                    help="tempered pseudo-likelihood. m_over_m_minus_1 reproduces, deliberately, "
+                         "the over-count the BetaBinomial did by accident (2.00x at m=2, 1.508x "
+                         "junction-weighted). Intervals become too narrow by construction.")
     ap.add_argument("--dir-conc", type=float, default=None,
                     help="pin the Dirichlet concentration on phi instead of learning it")
     ap.add_argument("--conc-per-atse", action="store_true",
@@ -135,7 +140,8 @@ def main():
                              # match the ATLAS recipe, or a simulation cannot diagnose the atlas
                              conc_per_atse=args.conc_per_atse,
                              conc_min=args.conc_min,
-                             dm_alpha_floor=args.dm_alpha_floor)
+                             dm_alpha_floor=args.dm_alpha_floor,
+                             likelihood_weight=args.likelihood_weight)
     if args.dir_conc is not None:
         # Pin the Dirichlet concentration on phi. Measured on the atlas fits, the LEARNED value
         # puts every effective parameter delta*pi_k at 0.19-0.37 -- all below 1, which makes the
@@ -209,13 +215,20 @@ def main():
     # width is recoverable too.
     # bb_conc is the overdispersion the model learned. On DM-generated sims we know the truth
     # (--dm-conc), so recovering it is a direct check the likelihood is doing what it claims.
-    # It is a guide site, not returned by any accessor, so read it out of the param store.
+    # Read it through `concentration()`, the single accessor that returns what the model ACTUALLY
+    # uses. Reading the guide site directly was wrong under --conc-per-atse: the site is then
+    # `bb_conc_atse`, so a lookup for "bb_conc" missed and silently reported nan -- which is what
+    # every fit in the first regime sweep recorded, including the control.
     try:
-        _med = mod._median()
-        conc_hat = float(_med["bb_conc"]) if "bb_conc" in _med else float("nan")
-    except Exception:
+        conc_vec = mod.concentration()
+        conc_hat = float(np.median(conc_vec))
+    except Exception as e:
+        print(f"[4b] concentration() failed: {e}", flush=True)
+        conc_vec = np.zeros(0, np.float32)
         conc_hat = float("nan")
-    print(f"[4b] learned bb_conc = {conc_hat:.3f}", flush=True)
+    print(f"[4b] learned concentration: median {conc_hat:.3f} over {conc_vec.size:,} value(s)"
+          + (f", q10 {np.quantile(conc_vec,0.1):.3f} q90 {np.quantile(conc_vec,0.9):.3f}"
+             if conc_vec.size > 1 else ""), flush=True)
 
     loc, scale = mod.psi_loc_scale()
     # q(phi), needed to compare posterior spread against the across-seed spread
@@ -237,6 +250,7 @@ def main():
         event_id=np.asarray(uq_ev, dtype=object), inv_ev=inv_ev.astype(np.int32),
         likelihood=args.likelihood, psi_parameterization=args.psi_parameterization,
         seed=args.seed, steps=args.steps, frac_valid=frac_valid, bb_conc=conc_hat,
+        bb_conc_vec=conc_vec.astype(np.float32),
         a_e_dev_max=a_max, a_e_dev_median=a_med)
     print(f"[5] fit saved -> {os.path.basename(fit_out)}", flush=True)
 
