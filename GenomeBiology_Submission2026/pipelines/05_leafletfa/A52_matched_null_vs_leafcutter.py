@@ -44,6 +44,7 @@ sys.path.insert(0, "/gpfs/commons/home/kisaev/LeafletFA")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from A45_dm_lrt import fit_event   # noqa: E402
 from A49_ds_vs_leafcutter_lrt import norm, obs_cat, read_rows, H5, LC   # noqa: E402
+from _phi_rows import phi_row_of                                        # noqa: E402
 
 
 def main():
@@ -87,6 +88,7 @@ def main():
         if a is None:
             print(f"    {s.cell_type}: not in atlas, skipped"); continue
         cells = np.flatnonzero(ct == a)
+        _pr = phi_row_of(z, len(ct)); cells = cells[_pr[cells] >= 0]
         dons = np.unique(donor[cells])
         nA = int(round(len(dons) * s.n_armA / (s.n_armA + s.n_armB)))
         nA = max(1, min(len(dons) - 1, nA))

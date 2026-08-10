@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from leafletfa.dirichlet_multinomial import build_atse_index   # noqa: E402
 from A49_ds_vs_leafcutter_lrt import norm, obs_cat, H5, LC     # noqa: E402
 from A51_group_ds_posterior import draw_psi                    # noqa: E402
+from _phi_rows import phi_row_of                               # noqa: E402
 
 
 def bh(p, alpha):
@@ -65,6 +66,7 @@ def main():
         ev = c[n["codes"][:]].astype(str)
         ct = obs_cat(f, "tissue_cell_type")
         donor = obs_cat(f, "mouse.id")
+    PROW = phi_row_of(z, len(ct))
     atse_idx, _, _ = build_atse_index(ev)
     uq = np.unique(ev)
     n_atse = len(uq)
@@ -86,7 +88,7 @@ def main():
         a = amap.get(norm(s.cell_type))
         if a is None:
             continue
-        cells = np.flatnonzero(ct == a)
+        cells = np.flatnonzero(ct == a); cells = cells[PROW[cells] >= 0]
         dons = np.unique(donor[cells])
         nA = max(1, min(len(dons) - 1,
                         int(round(len(dons) * s.n_armA / (s.n_armA + s.n_armB)))))
@@ -98,7 +100,8 @@ def main():
             m1 = np.isin(dcell, sh[:nA])
             c1 = cells[m1]
             c2 = cells[~m1]
-            dphi = phi[torch.from_numpy(c1)].mean(0) - phi[torch.from_numpy(c2)].mean(0)
+            dphi = (phi[torch.from_numpy(PROW[c1])].mean(0)
+                    - phi[torch.from_numpy(PROW[c2])].mean(0))
             d = torch.einsum("k,skj->sj", dphi, psi_s)
             tv = 0.5 * torch.zeros(psi_s.shape[0], n_atse).index_add(1, atse_idx, d.abs())
             for dl in args.delta:

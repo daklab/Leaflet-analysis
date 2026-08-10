@@ -44,6 +44,7 @@ from scipy.stats import chi2
 sys.path.insert(0, "/gpfs/commons/home/kisaev/LeafletFA")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from A45_dm_lrt import fit_event, bh   # noqa: E402
+from _phi_rows import phi_row_of       # noqa: E402
 
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
@@ -116,6 +117,9 @@ def main():
         lab = obs_cat(f, args.label_field)
     uq, inv = np.unique(ev, return_inverse=True)
     n_atse = len(uq)
+    # phi rows are TRAINING cells when the fit used --holdout-frac, so atlas indices must be
+    # mapped. -1 marks a held-out cell, which is dropped from the contrast.
+    PROW = phi_row_of(z, len(lab))
     amap = {}
     for a in np.unique(lab):
         amap.setdefault(norm(a), a)
@@ -138,6 +142,8 @@ def main():
     for ci, (_, row) in enumerate(man.iterrows()):
         c1 = np.flatnonzero(lab == row.a1)
         c2 = np.flatnonzero(lab == row.a2)
+        c1 = c1[PROW[c1] >= 0]
+        c2 = c2[PROW[c2] >= 0]
         if min(len(c1), len(c2)) < args.min_cells:
             continue
         cells = np.sort(np.concatenate([c1, c2]))
@@ -147,7 +153,7 @@ def main():
         if args.design == "group":
             X_all = torch.from_numpy((is2 - is2.mean()).reshape(-1, 1))
         else:
-            P = phi[cells]
+            P = phi[PROW[cells]]
             X_all = torch.from_numpy((P - P.mean(0, keepdims=True)).astype(np.float32))
         idx = np.arange(n_atse)
         if args.max_atse:
@@ -167,8 +173,8 @@ def main():
             stat = max(2.0 * (l1 - l0), 0.0)
             df = (m - 1) * X_all.shape[1]
             # deltapsi from the model, so the effect size is comparable to LeafCutter's
-            mu1 = phi[c1].mean(0) @ psi[:, cols]
-            mu2 = phi[c2].mean(0) @ psi[:, cols]
+            mu1 = phi[PROW[c1]].mean(0) @ psi[:, cols]
+            mu2 = phi[PROW[c2]].mean(0) @ psi[:, cols]
             recs.append(dict(cluster=str(uq[e]), m=m, n_cells=int(cov.sum()), loglr=stat / 2.0,
                              df=df, p=float(chi2.sf(stat, df)),
                              deltapsi_max=float(np.abs(mu2 / mu2.sum() - mu1 / mu1.sum()).max())))

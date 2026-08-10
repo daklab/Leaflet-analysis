@@ -113,6 +113,16 @@ def main():
                          "program while the simplex model does not, so that comparison could "
                          "flatter either one. This is how the concentration setting should be "
                          "chosen, rather than on a single showcase ATSE.")
+    ap.add_argument("--dir-conc", type=float, default=None,
+                    help="pin the Dirichlet concentration on phi. Pass -1 for 'auto' = K, which "
+                         "puts the average delta*pi_k at 1.0. Left unset, delta is learned and "
+                         "lands at 0.19-0.37, where the prior drives cells into simplex corners.")
+    ap.add_argument("--likelihood-weight", default=None,
+                    choices=[None, "none", "m_over_m_minus_1"],
+                    help="tempered pseudo-likelihood restoring the BetaBinomial's accidental "
+                         "m/(m-1) over-count deliberately (2.00x at m=2, 43.6%% of atlas ATSEs). "
+                         "Improves phi; makes credible intervals too narrow BY CONSTRUCTION, so "
+                         "the posterior DS test must use the permutation null.")
     ap.add_argument("--conc-min", type=float, default=1e-3,
                     help="lower bound on the per-ATSE concentration. It collapses 0.975 -> 0.518 by "
                          "step 1,600 on the atlas, before structure forms, and 67%% of events end "
@@ -184,7 +194,27 @@ def main():
                            psi_logit_prior_sd=args.psi_logit_prior_sd, event_id=ev,
                            conc_per_atse=not args.global_conc,
                            dm_alpha_floor=args.dm_alpha_floor, phi_floor=args.phi_floor,
-                           clip=args.psi_clip, conc_min=args.conc_min)
+                           clip=args.psi_clip, conc_min=args.conc_min,
+                           likelihood_weight=args.likelihood_weight)
+    # Pin the Dirichlet concentration on phi. --dir-conc auto resolves to K, which puts the AVERAGE
+    # effective parameter delta*pi_k at 1.0 (average pi_k = 1/K), the point where the prior stops
+    # being sparsity-inducing. Measured on simulation at the atlas's regime, over 3 seeds per arm:
+    #
+    #   arm                     phi_r_true  phi_ari   mag   contrast_cv
+    #   control (conc 50, full depth)  0.978    0.998  0.973    0.012
+    #   atlas regime, delta learned    0.247    0.078  0.539    0.144   <- the failure
+    #   + delta = K                    0.577    0.189  0.642    0.106
+    #   + m/(m-1) weight               0.558    0.336  0.733    0.064
+    #   + BOTH                         0.668    0.411  0.765    0.046   <- shipped
+    #
+    # delta = 5K was WORSE than doing nothing (phi_r_true 0.078, mag 0.338), so this is a floor to
+    # sit on, not a knob to turn up. Note atlas pi is not uniform (max pi_k ~ 0.11 at K=20), so
+    # delta = K puts the average program at 1.0 while the smallest still sits below it.
+    if args.dir_conc is not None:
+        dc = float(args.K) if args.dir_conc < 0 else float(args.dir_conc)
+        m.freeze_globals(dir_conc=dc)
+        print(f"[1c] dir_conc PINNED at {dc:g} (delta/K = {dc/args.K:.2f}); the learned value put "
+              f"every delta*pi_k at 0.19-0.37, i.e. corner-seeking", flush=True)
     ck_path = os.path.join(out_dir, "checkpoint.npz")
 
     def _checkpoint(step, psi_now, phi_now, tr):
@@ -365,6 +395,9 @@ def main():
                n_nan_restarts=int(getattr(m, "n_nan_restarts", 0)),
                nan_steps=list(getattr(m, "nan_steps", [])),
                conc_per_atse=(not args.global_conc), dm_alpha_floor=args.dm_alpha_floor,
+               dir_conc_pinned=(None if args.dir_conc is None
+                                else (args.K if args.dir_conc < 0 else args.dir_conc)),
+               likelihood_weight=args.likelihood_weight,
                psi_contrast=(float(tr[-1]["psi_contrast"]) if tr else None),
                phi_spread=(float(tr[-1]["phi_spread"]) if tr else None),
                programs_live=(int(tr[-1]["n_live"]) if tr else None))

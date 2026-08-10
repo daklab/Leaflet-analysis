@@ -34,6 +34,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_common"))
 import leaflet_theme as T  # noqa: E402
+sys.path.insert(0, "/gpfs/commons/home/kisaev/Leaflet-analysis/"
+                   "GenomeBiology_Submission2026/pipelines/05_leafletfa")
+from _phi_rows import phi_row_of  # noqa: E402
 
 import argparse
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
@@ -83,8 +86,11 @@ def main():
     idx = [jpos[j[0]] for j in juncs]
     roles = [j[1] for j in juncs]
 
-    A = phi[tct == G1].mean(0)
-    B = phi[tct == G2].mean(0)
+    PROW = phi_row_of(z, len(tct))
+    _m1 = (tct == G1) & (PROW >= 0)
+    _m2 = (tct == G2) & (PROW >= 0)
+    A = phi[PROW[_m1]].mean(0)
+    B = phi[PROW[_m2]].mean(0)
     d = A - B
 
     fig = plt.figure(figsize=T.figsize("double", 5.6))
@@ -146,7 +152,11 @@ def main():
     # ── d: is the SHARED program a heart-identity program? ───────────────────
     ax = fig.add_subplot(gs[2, 1])
     top_shared = int(np.argmax(np.minimum(A, B)))     # program both types use most
-    means = pd.Series({c: phi[tct == c, top_shared].mean() for c in np.unique(tct)})
+    # phi rows are training cells only when the fit used --holdout-frac, so every cell-type
+    # mask has to be mapped through PROW before it indexes phi.
+    means = pd.Series({c: phi[PROW[(tct == c) & (PROW >= 0)], top_shared].mean()
+                       for c in np.unique(tct)
+                       if ((tct == c) & (PROW >= 0)).sum() > 0})
     means = means.sort_values(ascending=False)
     is_heart = np.array([c.startswith("Heart") for c in means.index])
     ax.bar(np.arange(len(means))[~is_heart], means.values[~is_heart], 1.0,

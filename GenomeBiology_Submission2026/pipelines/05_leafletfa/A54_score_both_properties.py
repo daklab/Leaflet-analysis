@@ -40,6 +40,8 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from _phi_rows import phi_row_of  # noqa: E402
+
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
 # LeafCutter's measured PSI for the Fbln2 ATSE, heart endothelial vs fibroblast
@@ -120,6 +122,12 @@ def main():
         psi = np.asarray(z["psi"] if "psi" in z.files else z["psi_mean"])
         phi = np.asarray(z["phi"])
         K = psi.shape[0]
+        # phi rows are TRAINING cells when the fit used --holdout-frac. Indexing it with atlas
+        # cell indices does not necessarily raise -- the heart cells happen to sit below the
+        # training count -- it silently selects the WRONG cells. That produced fbln2_dphi = 0.045
+        # where the corrected figure script gives 0.31 on the same fit.
+        PROW = phi_row_of(z, len(ct))
+        ok1 = c1[PROW[c1] >= 0]; ok2 = c2[PROW[c2] >= 0]
         S = np.zeros((K, n_atse), np.float32)
         np.add.at(S.T, inv, psi.T)
         valid = float(((S >= 0.9) & (S <= 1.1)).mean())
@@ -128,12 +136,12 @@ def main():
         perp = float(np.exp(-(pp * np.log(pp)).sum(1)).mean())
         r = dict(fit=lab, K=K, psi_valid=valid, psi_max_dev=float(np.abs(S - 1).max()),
                  top3_mass=float(mass[:3].sum()), perplexity=perp)
-        if target is not None and len(c1) and len(c2):
+        if target is not None and len(ok1) and len(ok2):
             cols = np.flatnonzero(inv == target)
-            d = phi[c1].mean(0) - phi[c2].mean(0)
+            d = phi[PROW[ok1]].mean(0) - phi[PROW[ok2]].mean(0)
             r["fbln2_dphi"] = float(np.abs(d).sum())
-            m1 = phi[c1].mean(0) @ psi[:, cols]
-            m2 = phi[c2].mean(0) @ psi[:, cols]
+            m1 = phi[PROW[ok1]].mean(0) @ psi[:, cols]
+            m2 = phi[PROW[ok2]].mean(0) @ psi[:, cols]
             m1, m2 = m1 / m1.sum(), m2 / m2.sum()
             # junction order in the ATSE is not guaranteed; match to LeafCutter by which junction
             # the model puts most endothelial mass on being 'skip' is NOT safe, so report all three

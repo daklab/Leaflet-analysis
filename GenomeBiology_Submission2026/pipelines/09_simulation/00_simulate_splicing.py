@@ -146,14 +146,32 @@ def find_cassettes(var):
 
 
 def load_tissue(splice_path, tissue, min_cells_per_junction):
+    """`tissue` may be one tissue, several comma-separated, or 'all'.
+
+    The ATSE totals are taken VERBATIM from these cells, so whichever cells are selected here fix
+    the coverage, depth and zero-inflation of the simulation. That is the whole design: nothing
+    about coverage is invented, only the way each ATSE's reads split across its junctions.
+
+    Selecting more tissues is therefore the correct way to make a simulation atlas-like -- it
+    inherits the atlas's own coverage distribution and cell count. Thinning the real totals is NOT:
+    it manufactures a depth the data does not have. A --depth-scale of 0.12, calibrated against the
+    per-JUNCTION median, gave the model a median of 5 reads per ATSE where the atlas has 16.
+    """
     print(f"Loading {splice_path}", flush=True)
     a = ad.read_h5ad(splice_path)
-    keep = a.obs["tissue"].astype(str) == tissue
+    t = a.obs["tissue"].astype(str)
+    if str(tissue).lower() == "all":
+        keep = np.ones(a.n_obs, bool)
+        label = f"all tissues ({t.nunique()})"
+    else:
+        want = [x.strip() for x in str(tissue).split(",") if x.strip()]
+        keep = t.isin(want).values
+        label = ", ".join(want)
     if keep.sum() == 0:
-        raise SystemExit(f"No cells with tissue == '{tissue}'. Available: "
-                         f"{sorted(a.obs['tissue'].astype(str).unique())[:10]}")
+        raise SystemExit(f"No cells with tissue in '{tissue}'. Available: "
+                         f"{sorted(t.unique())[:10]}")
     a = a[keep].copy()
-    print(f"  {tissue}: {a.n_obs:,} cells x {a.n_vars:,} junctions")
+    print(f"  {label}: {a.n_obs:,} cells x {a.n_vars:,} junctions")
 
     clus = sp.csr_matrix(a.layers["cell_by_cluster_matrix"])
     covered = np.asarray((clus > 0).sum(axis=0)).ravel()
@@ -175,15 +193,79 @@ def load_tissue(splice_path, tissue, min_cells_per_junction):
     return a
 
 
-def assign_programs(adata, K, rng, phi_conc, celltype_col="broad_cell_type"):
-    """Assign cells to K programs (seeded by real cell type), then draw a peaked phi."""
+def excess_variance_ratio(junc, clus, col_event, groups, rng, min_reads=5, min_cells=30):
+    """How much more variable are the counts than a multinomial, WITHIN a group?
+
+    This is the number that says whether a simulation looks like real data. Measured on the atlas
+    with the identical estimator -- microglia, 3,000 cells, 9,282 ATSEs -- real splicing counts are
+    35.98x a multinomial (IQR 23.9-49.8). Simulations at dm_conc 50-200 sit near 1-2, i.e. they
+    contain almost none of the excess the real data has, so they cannot test whether the model
+    attributes that excess to phi (real program structure) or to a low concentration (noise).
+
+    For each ATSE, pool the group's cells to get the composition p, then compare the observed
+    squared deviation to the multinomial variance N*p*(1-p). A ratio of 1 means the only scatter is
+    read sampling.
+    """
+    ev_idx = np.asarray(col_event)
+    nA = int(ev_idx.max()) + 1
+    Y = np.asarray(junc.todense() if sp.issparse(junc) else junc, dtype=np.float64)
+    out = []
+    for g in np.unique(groups):
+        cells = np.flatnonzero(groups == g)
+        if len(cells) < min_cells:
+            continue
+        Yg = Y[cells]
+        tot_j = Yg.sum(0)
+        tot_e = np.bincount(ev_idx, weights=tot_j, minlength=nA)
+        p = np.where(tot_e[ev_idx] > 0, tot_j / np.maximum(tot_e[ev_idx], 1e-9), 0.0)
+        Ne = np.zeros((len(cells), nA))
+        np.add.at(Ne, (np.arange(len(cells))[:, None],
+                       np.broadcast_to(ev_idx, (len(cells), len(ev_idx)))), Yg)
+        for e in range(nA):
+            cols = np.flatnonzero(ev_idx == e)
+            keep = Ne[:, e] >= min_reads
+            if len(cols) < 2 or keep.sum() < min_cells:
+                continue
+            y = Yg[np.ix_(keep, cols)]
+            n = Ne[keep, e][:, None]
+            pe = p[cols][None, :]
+            vm = n * pe * (1 - pe)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                r = np.nanmean(np.where(vm > 0, (y - n * pe) ** 2 / vm, np.nan))
+            if np.isfinite(r):
+                out.append(r)
+    return np.asarray(out)
+
+
+def assign_programs(adata, K, rng, phi_conc, celltype_col="broad_cell_type", phi_het=0.0):
+    """Assign cells to K programs (seeded by real cell type), then draw phi.
+
+    `phi_het` is the log-normal spread of the PER-CELL concentration. At 0 every cell in a program
+    gets the same Dirichlet concentration, so cells within a program are near-identical and differ
+    only by draw noise -- which is not what real data looks like.
+
+    Why this matters, measured on the real atlas: within ONE cell type (microglia, 3,000 cells,
+    9,282 ATSEs) splicing counts are ~36x more variable than a multinomial (median ratio 35.98,
+    IQR 23.9-49.8). That excess has to be attributed to something, and the model has exactly two
+    ways to do it -- real differences in program usage (phi), or noise around one shared
+    composition (a low concentration). Left free it chooses the second, collapsing conc to 0.52,
+    which is why phi goes flat.
+
+    A simulation with almost no excess variance cannot test that attribution at all, and every
+    simulation to date used dm_conc 50-200, i.e. near-multinomial data. Raising phi_het gives cells
+    genuinely different loadings, so the excess variance is REAL STRUCTURE and the question becomes
+    whether the model assigns it to phi rather than to overdispersion.
+    """
     ct = adata.obs[celltype_col].astype(str).values
     order = pd.Series(ct).value_counts().index.tolist()
     mapping = {c: (i if i < K - 1 else K - 1) for i, c in enumerate(order)}
     prog = np.array([mapping[c] for c in ct], dtype=int)
 
+    # per-cell concentration: cells range from nearly pure to nearly uniform over programs
+    conc_c = phi_conc * np.exp(rng.normal(0.0, phi_het, size=adata.n_obs)) if phi_het > 0 \
+        else np.full(adata.n_obs, float(phi_conc))
     alpha = np.full((adata.n_obs, K), 1.0)
-    alpha[np.arange(adata.n_obs), prog] = phi_conc
+    alpha[np.arange(adata.n_obs), prog] = conc_c
     phi = np.stack([rng.dirichlet(a) for a in alpha]).astype(np.float64)
 
     counts = dict(zip(*np.unique(prog, return_counts=True)))
@@ -293,8 +375,7 @@ def simulate_counts(clus, phi, psi_j, rng, bb_conc=np.inf):
     return junc, cl
 
 
-def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1000,
-                       depth_scale=1.0):
+def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1000):
     """Draw one count VECTOR per (cell, ATSE), so sum_j y_j == N_e EXACTLY.
 
     The Binomial/Beta-Binomial arm above draws each junction independently against the shared
@@ -331,18 +412,8 @@ def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1
     A = cols.shape[0]
     clus_d = np.asarray(clus.todense())
     N_e_all = clus_d[:, cols[:, 0]].astype(np.int64)          # [N, A]
-    if depth_scale < 1.0:
-        # Binomial thinning of the ATSE totals, so the simulation can be run at the ATLAS's read
-        # depth rather than the Heart tissue's. Measured, this is the single biggest way the sims
-        # differ from the real data: the atlas has a median of 6 reads per observed cell-junction
-        # entry with 25.2% at 1-2 reads, while the sims sit at 33 and 9.3%. Every claim validated
-        # on simulation was therefore validated ~5.5x deeper than the data it is applied to.
-        # Thinning is the right operation because read sampling IS binomial -- it keeps the
-        # composition unchanged in expectation and only removes evidence.
-        N_e_all = rng.binomial(N_e_all, depth_scale)
     print(f"  {A:,} events x {m} junctions; coverage: "
-          f"{100*(N_e_all > 0).mean():.1f}% of (cell, event) pairs have reads"
-          + (f"  [depth thinned to {depth_scale:g}x]" if depth_scale < 1.0 else ""))
+          f"{100*(N_e_all > 0).mean():.1f}% of (cell, event) pairs have reads")
     if np.isinf(dm_conc):
         print("  emission: MULTINOMIAL (dm_conc = inf; no overdispersion beyond multinomial)")
     else:
@@ -375,16 +446,6 @@ def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1
         raise AssertionError(f"compositional emission failed: max |sum_j y_j - N_e| = {gap}")
     print(f"  identity sum_j y_j == N_e: max gap {gap} (exact, by construction)")
 
-    # Write the THINNED totals back before returning. Returning the original clus_d left the saved
-    # object internally inconsistent -- counts thinned, denominators not -- which showed up as
-    # sum(junc)/sum(clus) = 0.040 where m=3 events must give ~0.333 (0.333 * 0.12 exactly). The DM
-    # fit itself was unaffected because dm_log_prob derives N_e from the counts, but junc_ratio and
-    # anything reading cell_by_cluster_matrix (NMF, the PSI layers, coverage masks) were wrong by
-    # the thinning factor.
-    if depth_scale < 1.0:
-        clus_d = clus_d.copy()
-        for j in range(m):
-            clus_d[:, cols[:, j]] = N_e_all
     junc_sp = sp.csr_matrix(junc)
     junc_sp.eliminate_zeros()
     clus_sp = sp.csr_matrix(clus_d)
@@ -395,7 +456,9 @@ def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--splice", default=MOUSE_SPLICE)
-    ap.add_argument("--tissue", default="Heart")
+    ap.add_argument("--tissue", default="Heart",
+                    help="one tissue, several comma-separated, or 'all'. This fixes the coverage "
+                         "distribution, because ATSE totals are taken verbatim from these cells.")
     ap.add_argument("--K", type=int, default=8)
     ap.add_argument("--frac-differential", type=float, default=0.30)
     ap.add_argument("--effect", type=float, default=1.0,
@@ -416,10 +479,10 @@ def main():
                     help="Dirichlet-multinomial concentration when --emission is "
                          "dirichletmultinomial. 'inf' collapses to a plain Multinomial.")
     ap.add_argument("--phi-conc", type=float, default=20.0)
-    ap.add_argument("--depth-scale", type=float, default=1.0,
-                    help="binomially thin the ATSE totals to this fraction. 1.0 keeps the tissue's "
-                         "own depth; ~0.18 reproduces the ATLAS depth (median 6 reads per observed "
-                         "cell-junction entry, 25%% at 1-2 reads, against the sims' 33 and 9.3%%).")
+    ap.add_argument("--phi-het", type=float, default=0.0,
+                    help="log-normal spread of the per-cell phi concentration. 0 = every cell in a "
+                         "program is near-identical (unrealistic). Raise it until the simulation "
+                         "reproduces the real data's excess variance, which the run reports.")
     ap.add_argument("--beta-a", type=float, default=0.5, help="Beta prior on skip usage")
     ap.add_argument("--beta-b", type=float, default=0.5)
     ap.add_argument("--min-cells-per-junction", type=int, default=50)
@@ -438,7 +501,7 @@ def main():
     adata = load_tissue(args.splice, args.tissue, args.min_cells_per_junction)
 
     print("\n=== 2. ground-truth programs (phi) ===")
-    prog, phi = assign_programs(adata, args.K, rng, args.phi_conc)
+    prog, phi = assign_programs(adata, args.K, rng, args.phi_conc, phi_het=args.phi_het)
 
     print("\n=== 3. ground-truth skip usage (psi) ===")
     psi_j, psi_skip, is_diff, delta, events = draw_psi(
@@ -453,12 +516,20 @@ def main():
         ev_idx = {e: i for i, e in enumerate(events)}
         col_event = np.array([ev_idx[e] for e in ev_all])
         junc_sim, clus_sim = simulate_counts_dm(clus_real, phi, psi_j, col_event, rng,
-                                                dm_conc=dm_conc,
-                                                depth_scale=args.depth_scale)
+                                                dm_conc=dm_conc)
     else:
         emission = "binomial" if np.isinf(bb_conc) else "betabinomial"
         print(f"\n=== 4. simulate counts ({emission}) ===")
         junc_sim, clus_sim = simulate_counts(clus_real, phi, psi_j, rng, bb_conc=bb_conc)
+
+    _ratios = excess_variance_ratio(junc_sim, clus_sim, col_event, prog, rng)
+    if len(_ratios):
+        print(f"  excess variance vs multinomial, WITHIN program: median {np.median(_ratios):.2f} "
+              f"(IQR {np.percentile(_ratios,25):.2f}-{np.percentile(_ratios,75):.2f}) "
+              f"over {len(_ratios):,} ATSE-groups")
+        print(f"  REAL ATLAS reference (microglia, same estimator): 35.98 (IQR 23.87-49.79). "
+              f"A simulation far below this cannot test whether the model attributes excess "
+              f"variance to phi or to a low concentration.")
 
     print("\n=== 5. PSI layers (same centering as the real pipeline) ===")
     ratio, ratio_centered = compute_psi_layers(junc_sim, clus_sim)
@@ -498,8 +569,6 @@ def main():
 
     if args.emission == "dirichletmultinomial":
         etag = "multinom" if np.isinf(dm_conc) else f"dm{dm_conc:g}"
-        if args.depth_scale < 1.0:
-            etag += f"_d{args.depth_scale:g}"
     else:
         etag = "binom" if np.isinf(bb_conc) else f"bb{bb_conc:g}"
     tag = f"{args.tissue.lower()}_K{args.K}_{etag}_eff{args.effect}_frac{args.frac_differential:g}_seed{args.seed}"

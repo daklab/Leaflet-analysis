@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_common"))
 import leaflet_theme as T  # noqa: E402
+sys.path.insert(0, "/gpfs/commons/home/kisaev/Leaflet-analysis/"
+                   "GenomeBiology_Submission2026/pipelines/05_leafletfa")
+from _phi_rows import phi_row_of  # noqa: E402
 
 WD = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
@@ -64,12 +67,15 @@ def main():
     for s in args.fits:
         name, path = s.split("=", 1)
         z = np.load(path, allow_pickle=True)
-        phi = np.asarray(z["phi"], np.float32)[idx]
-        specs.append((name, phi))
+        PROW = phi_row_of(z, N)
+        keep = idx[PROW[idx] >= 0]          # cells this fit actually has loadings for
+        phi = np.asarray(z["phi"], np.float32)[PROW[keep]]
+        spec_code = np.searchsorted(uq, ct[keep])
+        specs.append((name, phi, spec_code))
 
     fig, axes = plt.subplots(1, len(specs), figsize=T.figsize("double", h=4.2), squeeze=False)
     cmap = plt.get_cmap("tab20")
-    for ax, (name, phi) in zip(axes[0], specs):
+    for ax, (name, phi, code) in zip(axes[0], specs):
         # silhouette on the FULL phi, not the 2-D embedding: the embedding is a lossy view and
         # scoring it would measure UMAP as much as the model.
         sil = float(silhouette_score(phi, code, sample_size=5000, random_state=0))
