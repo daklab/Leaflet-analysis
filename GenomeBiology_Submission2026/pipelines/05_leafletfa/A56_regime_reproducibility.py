@@ -86,8 +86,13 @@ def main():
             print(f"[{label}] only {len(fits)} fits -- skipped", flush=True)
             continue
         # the simulation these fits came from, recovered from the fit filename
+        # the captured tag ALREADY starts with "sim_", so prepending another gave sim_sim_heart_...
         tag = re.search(r"fit_(.+?)_dirichletmultinomial", os.path.basename(fits[0]))
-        h5 = os.path.join(args.sim_dir, f"sim_{tag.group(1)}.h5ad") if tag else None
+        base = tag.group(1) if tag else None
+        h5 = None
+        if base:
+            name = base if base.startswith("sim_") else f"sim_{base}"
+            h5 = os.path.join(args.sim_dir, f"{name}.h5ad")
         if not (h5 and os.path.exists(h5)):
             print(f"[{label}] cannot locate the source sim for {os.path.basename(fits[0])}",
                   flush=True)
