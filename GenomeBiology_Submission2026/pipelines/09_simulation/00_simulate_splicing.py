@@ -375,9 +375,21 @@ def simulate_counts_dm(clus, phi, psi_j, col_event, rng, dm_conc=np.inf, chunk=1
         raise AssertionError(f"compositional emission failed: max |sum_j y_j - N_e| = {gap}")
     print(f"  identity sum_j y_j == N_e: max gap {gap} (exact, by construction)")
 
+    # Write the THINNED totals back before returning. Returning the original clus_d left the saved
+    # object internally inconsistent -- counts thinned, denominators not -- which showed up as
+    # sum(junc)/sum(clus) = 0.040 where m=3 events must give ~0.333 (0.333 * 0.12 exactly). The DM
+    # fit itself was unaffected because dm_log_prob derives N_e from the counts, but junc_ratio and
+    # anything reading cell_by_cluster_matrix (NMF, the PSI layers, coverage masks) were wrong by
+    # the thinning factor.
+    if depth_scale < 1.0:
+        clus_d = clus_d.copy()
+        for j in range(m):
+            clus_d[:, cols[:, j]] = N_e_all
     junc_sp = sp.csr_matrix(junc)
     junc_sp.eliminate_zeros()
-    return junc_sp, sp.csr_matrix(clus_d)
+    clus_sp = sp.csr_matrix(clus_d)
+    clus_sp.eliminate_zeros()
+    return junc_sp, clus_sp
 
 
 def main():
