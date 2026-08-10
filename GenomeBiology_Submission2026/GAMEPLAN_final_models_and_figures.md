@@ -33,13 +33,28 @@ Simulation at the atlas's regime, 3 seeds per arm, scored against ground truth:
 | delta = K | 0.577 | 0.189 | 0.642 | 0.106 |
 | delta = K + m/(m-1) | 0.668 | 0.411 | 0.765 | 0.046 |
 
-**Decision rule, fixed now.** Ship `delta = K` ALONE unless the weighted arm beats it on the atlas by
-more than the simulation gap predicts — concretely, unless Fbln2 `skip_err` improves by >0.02 AND
-across-seed spread of the skip contrast drops by >30%. Rationale: a weighted likelihood is a
-tempered pseudo-likelihood, so its credible intervals are too narrow by construction, and a model
-whose uncertainty means what it says is worth a modest loss in point accuracy. If the weighted arm
-wins by more than that margin, ship it and state the tempering — with the composite-likelihood
-sandwich correction named as the principled fix we did not implement.
+**Decision rule, firmed up 2026-08-10.** Ship `delta = K` ALONE unless it CLEARLY fails — not
+merely unless the weighted arm wins by a margin. Two reasons, and the second is the stronger:
+
+1. **The posterior IS the product.** The model-based DS test is a posterior test, so a tempered
+   likelihood means DS can only ever be calibrated through the permutation null. Honest uncertainty
+   is worth more than a marginal phi gain when DS is a headline claim.
+
+2. **The weight points the wrong way given what we now know.** Its justification was "restore what
+   the BetaBinomial was accidentally doing" — but that behaviour was WRONG. The BB over-counted,
+   scoring an ATSE's m junctions as m independent observations when only m-1 are free. Restoring it
+   deliberately means deliberately over-counting. Meanwhile the molecular measurement says the true
+   effective sample size is LOWER than the read count, not higher: ~2-3 independent molecules where
+   the data shows 48 reads (METHODS_dirichlet_multinomial.md). `conc` already carries that
+   correction — A_e = conc IS the effective sample size, and the floor at 2.0 sets it to the
+   measured molecular reality. The m/(m-1) weight then inflates that same evidence by 1.5-2x,
+   moving AWAY from the measurement.
+
+That the weight empirically improves phi therefore suggests it compensates for some OTHER deficiency
+— the phi prior, or the optimisation — by a mechanism that happens to work rather than one that is
+right. Ship it only if delta-only cannot produce a usable model at all, and then state the tempering
+explicitly, with the composite-likelihood sandwich correction named as the principled fix we did not
+implement.
 
 **What ships either way**
 
