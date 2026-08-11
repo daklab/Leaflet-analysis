@@ -106,6 +106,10 @@ def main():
                     help="floor phi away from the simplex corners. 19 of 1.3M phi entries sit below "
                          "1e-6 on the atlas, and exactly 18 phi entries were non-finite at the "
                          "divergence -- the same cells. Their transform gradient scales as 1/phi.")
+    ap.add_argument("--holdout-ids", default=None,
+                    help="file of row indices to hold out, one per line. Overrides --holdout-frac. "
+                         "Use this to match an EXISTING split (e.g. test_30_70) so downsampled "
+                         "evaluation data already on disk lines up with the held-out cells.")
     ap.add_argument("--holdout-frac", type=float, default=0.0,
                     help="fraction of cells held OUT of training and scored at the end. Everything "
                          "reported so far has been TRAINING likelihood, which cannot detect "
@@ -173,7 +177,23 @@ def main():
     junc = read_all("cell_by_junction_matrix", args.h5, N, J)
     clus = read_all("cell_by_cluster_matrix", args.h5, N, J)
     ho_idx = np.zeros(0, dtype=int)
-    if args.holdout_frac > 0:
+    if args.holdout_ids:
+        # Hold out a SPECIFIC set of cells rather than a random fraction. This exists because the
+        # imputation benchmark's downsampled layers (RESAMPLED_*_PERCENT_test_30_70_*.h5mu) were
+        # generated for one particular 30% split. A random holdout of the same SIZE is not the same
+        # SET, so the evaluation would have no downsampled counts for most held-out cells -- the
+        # model would be clean but unscoreable. Passing the split's own row indices keeps the
+        # retrain and the existing evaluation data aligned.
+        ho_idx = np.sort(np.loadtxt(args.holdout_ids, dtype=int).ravel())
+        if ho_idx.min() < 0 or ho_idx.max() >= N:
+            raise SystemExit(f"--holdout-ids out of range for N={N}: "
+                             f"[{ho_idx.min()}, {ho_idx.max()}]")
+        keep = np.setdiff1d(np.arange(N), ho_idx)
+        junc_ho, clus_ho = junc[ho_idx].copy(), clus[ho_idx].copy()
+        junc, clus = junc[keep], clus[keep]
+        print(f"[2b] holding out {len(ho_idx):,} SPECIFIED cells ({100*len(ho_idx)/N:.0f}%), "
+              f"training on {len(keep):,}. From {os.path.basename(args.holdout_ids)}.", flush=True)
+    elif args.holdout_frac > 0:
         _r = np.random.default_rng(12345)          # fixed, so every fit holds out the SAME cells
         ho_idx = np.sort(_r.choice(N, int(round(args.holdout_frac * N)), replace=False))
         keep = np.setdiff1d(np.arange(N), ho_idx)

@@ -104,6 +104,11 @@ def main():
     ap.add_argument("--conc-min", type=float, default=1e-3,
                     help="lower bound on the concentration; the atlas ships 2.0")
     ap.add_argument("--dm-alpha-floor", type=float, default=1e-2)
+    ap.add_argument("--permute-atse-frac", type=float, default=0.0,
+                    help="permute this fraction of ATSEs across cells before fitting. Those ATSEs "
+                         "become nulls BY CONSTRUCTION while the rest keep dphi at its true "
+                         "magnitude, which is what lets delta be MEASURED rather than chosen.")
+    ap.add_argument("--permute-seed", type=int, default=0)
     ap.add_argument("--psi-logit-prior-sd", type=float, default=1.0,
                     help="prior sd on the softmax logits. LeafCutter's beta has a free scale, so "
                          "its effective prior is weak; Normal(0,1) is not flat.")
@@ -122,6 +127,17 @@ def main():
           flush=True)
 
     atse_idx, rep_idx, sizes = build_atse_index(ev)
+
+    permuted_atses = np.zeros(0, np.int64)
+    if args.permute_atse_frac > 0:
+        from _permute_null import permute_atse_counts
+        junc, clus, permuted_atses = permute_atse_counts(
+            junc, clus, np.asarray(atse_idx), n_atse,
+            args.permute_atse_frac, seed=args.permute_seed)
+        print(f"[1c] permuted {len(permuted_atses):,} of {n_atse:,} ATSEs "
+              f"({100*args.permute_atse_frac:.0f}%) -- null BY CONSTRUCTION. The untouched "
+              f"{n_atse-len(permuted_atses):,} still pin phi, so dphi keeps its true magnitude.",
+              flush=True)
     if args.report_denominator_gap:
         mx, frac = denominator_consistency(torch.from_numpy(junc.astype(np.float32)),
                                            torch.from_numpy(clus.astype(np.float32)),
@@ -251,7 +267,8 @@ def main():
         likelihood=args.likelihood, psi_parameterization=args.psi_parameterization,
         seed=args.seed, steps=args.steps, frac_valid=frac_valid, bb_conc=conc_hat,
         bb_conc_vec=conc_vec.astype(np.float32),
-        a_e_dev_max=a_max, a_e_dev_median=a_med)
+        a_e_dev_max=a_max, a_e_dev_median=a_med,
+        permuted_atses=permuted_atses.astype(np.int64))
     print(f"[5] fit saved -> {os.path.basename(fit_out)}", flush=True)
 
     R = pd.DataFrame(rows)
