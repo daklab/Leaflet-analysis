@@ -191,13 +191,70 @@ def panel_f(ax):
     ax.set_xlim(0, 1.14); ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
 
 
+def panel_g(ax):
+    """Choosing delta: the calibration-power trade-off, measured rather than asserted.
+
+    delta is the effect size the test is asked to resolve. Too small and it sits under psi's own
+    posterior noise, so the test over-calls; too large and real signal is discarded. Plotting
+    realised-FDP-over-nominal against power, with delta as the point label, shows the whole trade in
+    one panel and makes the operating point a reading rather than a claim."""
+    d = pd.read_csv(f"{M}/DM_SHIPPED_SIM/ds/delta_sweep_full.tsv", sep="\t")
+    # An FDP over a handful of calls is noise, not a measurement -- drop those cells rather than
+    # letting a ratio computed from 0.2 called events set the shape of the curve.
+    g = (d.groupby(["eff", "delta"])
+           .agg(ratio=("ratio", "mean"), power=("power", "mean"), n=("n_called", "mean"))
+           .reset_index())
+    g = g[g.n >= 10]
+    effs = sorted(g.eff.unique())
+    cols = {e: c for e, c in zip(effs, [PALETTE[k] for k in
+                                        ("rose", "ochre", "indigo", "teal", "olive")] * 3)}
+    ax.axvline(1.0, color=GREY, lw=0.8, ls=":", zorder=0)
+    for e in effs:
+        s = g[g.eff == e].sort_values("delta")
+        if len(s) < 2:
+            continue
+        ax.plot(s.ratio, s.power, "-o", color=cols[e], ms=3, lw=1.2, label=f"effect {e:g}")
+        for _, r in s.iterrows():
+            ax.annotate(f"{r['delta']:.2f}", (r["ratio"], r["power"]), fontsize=5,
+                        color=cols[e], textcoords="offset points", xytext=(3, 3))
+    ax.set_xscale("log")
+    ax.set_xlabel("realised FDP / nominal\n(1.0 = honest)")
+    ax.set_ylabel("power")
+    ax.set_ylim(0, 1.02)
+    ax.legend(frameon=False, loc="lower right", fontsize=5)
+
+
+def panel_h(ax):
+    """How much of the atlas any delta can reach.
+
+    Effect sizes measured by LEAFCUTTER on the atlas, independent of our model. The test cannot
+    speak to events below delta, so this is the panel that scopes every posterior-test claim, and it
+    belongs in the main text rather than being left for a reader to derive."""
+    tv = np.load(f"{M}/LEAFCUTTER_CMP_DELTAONLY/leafcutter_atlas_tv.npy")
+    grid = np.linspace(0, 0.4, 200)
+    frac = [(tv > t).mean() for t in grid]
+    ax.plot(grid, frac, color=LFA, lw=1.6)
+    for dl, lab in [(0.10, None), (0.15, "shipped")]:
+        f = (tv > dl).mean()
+        ax.axvline(dl, color=PALETTE["olive"] if dl == 0.15 else GREY,
+                   lw=0.9, ls="--" if dl == 0.15 else ":")
+        ax.annotate(f"$\\delta$={dl:.2f}\n{100*f:.0f}%", (dl, f), fontsize=6,
+                    color=PALETTE["olive"] if dl == 0.15 else GREY,
+                    textcoords="offset points", xytext=(5, 12))
+    ax.set_xlabel("effect size measured by LeafCutter (TV)")
+    ax.set_ylabel("fraction of atlas\n(contrast, ATSE) pairs above")
+    ax.set_ylim(0, 1.0)
+
+
 # ---------------------------------------------------------------------------------------------
 def main():
     apply_theme()
-    fig, axes = plt.subplots(2, 3, figsize=figsize("double", h=5.2))
+    fig, axes = plt.subplots(3, 3, figsize=figsize("double", h=7.6))
+    axes.ravel()[-1].axis("off")                 # 8 panels in a 3x3 grid
     for ax, fn, letter in zip(axes.ravel(),
-                              [panel_a, panel_b, panel_c, panel_d, panel_e, panel_f],
-                              "abcdef"):
+                              [panel_a, panel_b, panel_c, panel_d, panel_e, panel_f,
+                               panel_g, panel_h],
+                              "abcdefgh"):
         try:
             fn(ax)
         except Exception as e:                       # a broken panel must not kill the figure
