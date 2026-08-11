@@ -51,6 +51,14 @@ def load_leafcutter(lc_dir):
         t = t[t["status"] == "Success"].dropna(subset=["p"]) if "status" in t else t.dropna(subset=["p"])
         if not len(t):
             continue
+        # LeafCutter names a cluster "chr3:<atse_id>_-"; LeafletFA stores the bare "<atse_id>".
+        # Merging the two raw silently produced ZERO shared rows for every contrast, which the
+        # caller then reported as "no contrasts matched" -- the contrasts matched fine, the JOIN KEY
+        # did not. Strip the chromosome prefix and strand suffix so the two agree.
+        t = t.copy()
+        t["cluster"] = (t["cluster"].astype(str)
+                        .str.replace(r"^chr[^:]*:", "", regex=True)
+                        .str.replace(r"_[+-]$", "", regex=True))
         out[norm(os.path.basename(d.rstrip("/")))] = t[["cluster", "loglr", "df", "p", "p.adjust"]]
     return out
 
@@ -101,8 +109,17 @@ def main():
     lfa_null = None
     if args.lfa_null and os.path.exists(args.lfa_null):
         t = pd.read_csv(args.lfa_null, sep="\t")
+        # Two files can serve as LeafletFA's null and they name the column differently:
+        # A45 writes `perm_p` alongside the observed `p`, while A52 -- which runs LeafCutter's OWN
+        # null construction and is the one that makes the comparison like-for-like -- writes the
+        # null p directly as `p`. Accepting only `perm_p` silently left this None, and every
+        # LeafletFA calibration number printed as nan.
         if "perm_p" in t:
             lfa_null = t.rename(columns={"perm_p": "p"})[["p", "m"]]
+        elif {"p", "m"} <= set(t.columns):
+            lfa_null = t[["p", "m"]]
+        else:
+            print(f"  WARNING: {args.lfa_null} has neither perm_p nor p+m -- null unusable")
 
     print("\n=== 1. calibration, each method on its OWN permutation null ===")
     print(f"  {'nominal':>8} {'LeafCutter':>12} {'LeafletFA':>12}")
@@ -121,11 +138,14 @@ def main():
 
     # ---- 2/3. agreement and power at matched FDR --------------------------------------------
     rows = []
+    n_key_hit = n_thin = 0
     for ck, sub in lfa.groupby("ckey"):
         if ck not in lc:
             continue
+        n_key_hit += 1
         m = sub.merge(lc[ck], on="cluster", suffixes=("_lfa", "_lc"))
         if len(m) < 100:
+            n_thin += 1
             continue
         a_nom = (m["p.adjust_lfa"] <= args.alpha)
         b_nom = (m["p.adjust_lc"] <= args.alpha)
@@ -140,7 +160,16 @@ def main():
                          jaccard_cal=float((a_cal & b_cal).sum() / max((a_cal | b_cal).sum(), 1)),
                          spearman_loglr=rho))
     if not rows:
-        print("\nno contrasts matched between the two tables"); return
+        # Separate the two failure modes, because they have completely different fixes and the old
+        # single message sent the reader after the wrong one.
+        if n_key_hit == 0:
+            print(f"\nno CONTRAST NAMES in common: LeafletFA has {lfa.ckey.nunique()} keys, "
+                  f"LeafCutter {len(lc)} -- e.g. {sorted(lfa.ckey.unique())[:2]} vs "
+                  f"{sorted(lc)[:2]}")
+        else:
+            print(f"\n{n_key_hit} contrast names matched, but {n_thin} of them shared fewer than "
+                  f"100 ATSEs -- the join key `cluster` is the suspect, not the contrast name")
+        return
     R = pd.DataFrame(rows)
     R.to_csv(os.path.join(args.out, "a50_contrast_comparison.tsv"), sep="\t", index=False)
     print(f"\n=== 2/3. agreement over {len(R)} shared contrasts ===")

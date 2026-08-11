@@ -139,8 +139,11 @@ def main():
             continue
         keep = tmap >= 0
         true_tv = np.abs(true_psi[ia, tmap[keep]] - true_psi[ib, tmap[keep]])
-        # true_psi_skip is one junction's usage; at m=2 |dPSI| IS the TV, and for m>2 it is a lower
-        # bound. Scoring on it therefore cannot inflate power -- it can only understate it.
+        # This is the EXACT true TV, not an approximation, because of how the simulator expands a
+        # cassette: P(J3) = psi and P(J1) = P(J2) = (1-psi)/2. So
+        #     TV = 0.5 * (|dpsi| + 2*|dpsi|/2) = |dpsi|
+        # identically. Worth stating because the obvious worry -- that one junction's usage
+        # understates a 3-junction TV and so inflates the measured FDP -- does not apply here.
         is_de = true_tv > args.null_tol
         qq, pp = q[keep], prob[keep]
 
