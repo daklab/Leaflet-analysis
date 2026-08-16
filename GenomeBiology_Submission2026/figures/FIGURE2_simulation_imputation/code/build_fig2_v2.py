@@ -50,7 +50,7 @@ def _umap(ax, emb, prog, title, sil=None):
 
 
 def panel_a(ax):
-    _umap(ax, P["emb_true"], P["prog"], f"simulated cells: true $\\phi$\n({int(P['n_cells']):,} heart cells, K = 5, {int(P['n_atse']):,} cassette exons)")
+    _umap(ax, P["emb_true"], P["prog"], f"simulated cells: true $\\phi$\n({int(P['n_cells']):,} heart cells, K = 5, {int(P['n_atse']):,} cassette-exon ATSEs)")
     ax.legend(frameon=False, fontsize=5, markerscale=6, loc="upper right", handletextpad=0.2)
 
 
@@ -74,11 +74,11 @@ def _example(ax, tag, title):
 
 
 def panel_b(ax):
-    _example(ax, "ds", f"a DIFFERENTIAL exon (30% of exons)\nmax between-program $\\Delta\\psi$ = {float(P['ds_delta']):.2f}")
+    _example(ax, "ds", f"a DIFFERENTIAL ATSE (30% of ATSEs)\nmax between-program $\\Delta\\psi$ = {float(P['ds_delta']):.2f}")
 
 
 def panel_c(ax):
-    _example(ax, "null", "a NON-differential exon (70%)\nsame usage in every program")
+    _example(ax, "null", "a NON-differential ATSE (70%)\nsame usage in every program")
 
 
 def panel_d(ax):
@@ -90,18 +90,24 @@ def panel_e(ax):
 
 
 def panel_f(ax):
+    """Detecting WHICH ATSEs are differential across programs, label-free: score each ATSE by
+    max_k psi_hat - min_k psi_hat over the learned programs, truth = simulated is_differential.
+    AUROC (solid) and AUPRC (dashed); NMF at its best gauge per effect."""
     d = pd.read_csv(f"{DATA}/dm_vs_nmf.tsv", sep="\t")
     d["fam"] = np.where(d.model.str.startswith("LeafletFA"), "LeafletFA", "NMF")
-    g = d.groupby(["fam", "model", "effect"])["spearman_delta"].mean().reset_index()
-    lfa = g[g.fam == "LeafletFA"].groupby("effect")["spearman_delta"].mean()
-    nmf = g[g.fam == "NMF"].groupby("effect")["spearman_delta"].max()
-    ax.plot(lfa.index, lfa.values, "o-", color=LFA, label="LeafletFA (no imputation)", ms=3.2, lw=1.4)
-    ax.plot(nmf.index, nmf.values, "s--", color=LC, label="NMF (best gauge)", ms=3.2, lw=1.4)
-    ax.axhline(0, color=GREY, lw=0.6, ls=":")
+    for metric, ls, lab in [("auroc", "-", "AUROC"), ("ap", "--", "AUPRC")]:
+        g = d.groupby(["fam", "model", "effect"])[metric].mean().reset_index()
+        lfa = g[g.fam == "LeafletFA"].groupby("effect")[metric].mean()
+        nmf = g[g.fam == "NMF"].groupby("effect")[metric].max()
+        ax.plot(lfa.index, lfa.values, "o" + ls, color=LFA, ms=3.2, lw=1.4, label=f"LeafletFA {lab}")
+        ax.plot(nmf.index, nmf.values, "s" + ls, color=LC, ms=3.2, lw=1.4, label=f"NMF {lab}")
+    ax.axhline(0.5, color=GREY, lw=0.6, ls=":"); ax.annotate("AUROC chance", (0.1, 0.5), fontsize=5, color=GREY, va="bottom")
+    ax.axhline(0.3, color=GREY, lw=0.6, ls=":"); ax.annotate("AUPRC chance (30% differential)", (0.1, 0.3), fontsize=5, color=GREY, va="bottom")
     ax.set_xscale("log"); ax.set_xticks([0.1, 0.25, 0.5, 1.0]); ax.set_xticklabels(["0.1", "0.25", "0.5", "1.0"])
-    ax.set_xlabel("simulated effect size"); ax.set_ylabel("recovery of between-program $\\Delta\\psi$\n(Spearman vs truth)")
-    ax.set_title("which exons differ between programs", fontsize=7, loc="left")
-    ax.legend(frameon=False, loc="center right", fontsize=5.5)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("simulated effect size"); ax.set_ylabel("differential-ATSE detection\nfrom learned $\\psi$ (no labels)")
+    ax.set_title("which ATSEs differ between programs", fontsize=7, loc="left")
+    ax.legend(frameon=False, loc="lower right", fontsize=5, ncol=2)
 
 
 def _ds():
@@ -138,7 +144,7 @@ def panel_g(ax):
 
 def panel_h(ax):
     _ds_panel(ax, "power", "power (at $\\alpha$ = 0.05)", False)
-    ax.set_title("does it find the differential exons?", fontsize=7, loc="left")
+    ax.set_title("does it find the differential ATSEs?", fontsize=7, loc="left")
 
 
 def panel_i(ax):
