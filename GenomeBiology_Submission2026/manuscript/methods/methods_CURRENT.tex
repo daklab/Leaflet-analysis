@@ -29,165 +29,122 @@ Processed count matrices, specifically exon-only counts or adjusted intron and e
 \label{sec:GeneExpressionNMF}
 To enable the joint analysis of single-cell and single-nuclei datasets, we implemented a multi-step normalization and integration pipeline. Following best practices for Smart-seq2 data analysis \cite{Phipson2017-fw}, we normalized raw gene counts to account for transcript length bias by dividing each gene's counts by its mean transcript length and then multiplying by the overall median transcript length across all genes. For the Allen Brain nuclei data, which contains intronic reads, we applied the same normalization to intronic counts using mean intron lengths. After length normalization, counts underwent library size normalization and a \texttt{log1p} transformation.
 
-Quality control filtering was applied to remove low-quality cells and potential outliers. We calculated batch-wise robust statistics using median and median absolute deviation (MAD) for gene count and total count metrics. Cells were filtered based on standardized scores (z-scores) calculated from these robust statistics, retaining only cells within ±3 standard deviations of the batch-specific median. Additional filters included removal of cells with >10\% ribosomal RNA content and cells lacking cell type annotations. We also removed long non-coding RNAs (lncRNAs) from both the gene expression and splicing data objects. 
+Cells were retained if they carried at least 200 detected genes and at least 5 detected splice junctions, and were removed as likely doublets if their detected-gene or detected-junction count exceeded the dataset median by more than 5 median absolute deviations. Cells lacking a cell-type annotation were removed. Genes were restricted to protein-coding and lncRNA biotypes by GTF annotation. The 21-month TMS age group (728 cells) was excluded from all analyses as too small for the age contrasts.
 
 % Don't do this in mouse
 %To make the nuclear expression profiles from the Allen Brain data comparable to whole-cell measurements, we combined the length-normalized exonic and intronic counts and trained linear regression models on cell types common to both datasets. These models learned the relationship between nuclear and whole-cell expression, and the derived coefficients were used to adjust all nuclei expression values.
 
-For subsequent analyses, we used all available genes and applied dimensionality reduction approaches for gene expression analysis. We employed Linear scVI \cite{linear_scvi} using the length-normalized raw integer counts as input. scVI analyses were performed with a dimensionality of $K=20$.
+For gene-expression embeddings we trained Linear scVI \cite{linear_scvi} ($K=20$ latent dimensions, batch-aware) on the length-normalized counts of the top 20{,}000 highly variable genes together with all annotated RNA-binding-protein and aging-associated genes. The resulting embedding is used only for visualisation and as a reference for cell-type structure; it is not an input to LeafletFA.
 
 \subsection*{Alternative Splicing Quantification and ATSE Mapping}
 Splice junctions were extracted from BAM files using regtools \cite{Regtools} and processed using our ATSEmapper pipeline (\url{https://github.com/daklab/LeafletFA-utils/tree/main/leafletfa_utils/atsemapper}). Each identified splice junction was validated using species-specific reference genome FASTA files to confirm the presence of canonical SS motifs (GT-AG, GC-AG, or AT-AC). GTF annotation files were used to classify each SS as either annotated (matching known exon boundaries) or novel, allowing us to retain high-confidence novel splicing events while filtering out potential alignment artifacts.
 
 A splice graph is constructed for each gene where nodes represent unique SS and edges represent the observed junctions connecting them. An Alternative Transcript Structure Event (ATSE), analogous to an "intron cluster" in LeafCutter \cite{Leafcutter}, is defined as a set of two or more junctions that are interconnected through common SS, forming a single connected component within the gene's splice graph. ATSEs capture various forms of alternative splicing including cassette exons, alternative 5'/3' SS, and alternative first/last exon usage (\textbf{Fig.} \ref{fig:FIGURE1}B).
 
-Junction coordinates were grouped into ATSEs within each species separately, with mouse and human datasets processed independently to maintain species-specific SS coordinates and annotations. Junctions were filtered according to read and cell count thresholds (minimum 10 reads and 5 cells per junction, with minimum intron lengths of 50 bp and maximum of 500,000 bp). The number of reads supporting each junction in each ATSE in each cell/nucleus were aggregated into sparse \texttt{AnnData}\cite{Anndata} objects for downstream analysis.
+Junction coordinates were grouped into ATSEs within each species separately, with mouse and human datasets processed independently to maintain species-specific SS coordinates and annotations. Junctions were retained if supported by at least 100 reads across at least 10 cells, with intron length between 50 bp and 500{,}000 bp; both annotated and unannotated junctions passing the motif check were kept. After cell QC, junctions detected in fewer than 25 cells were removed and cells with fewer than 500 detected junctions were dropped; ATSEs were then re-derived on the surviving junctions by recomputing connected components of the splice graph, so that no ATSE carries a junction that was filtered out. Junctions that no longer belonged to any multi-junction ATSE were discarded. The number of reads supporting each junction, and the total across the ATSE it belongs to, were stored per cell in sparse \texttt{AnnData}\cite{Anndata} objects. The final mouse atlas comprises 132{,}706 cells, 79{,}768 junctions and 24{,}475 ATSEs (10{,}677 with two junctions; mean 3.26 junctions per ATSE); 13.8\% of (cell, junction) entries carry any reads.
 
 \begin{table}[h]
 \centering
 \scriptsize
-\captionsetup{font=small}  % Set caption font size to 10pt (small = 10pt in most document classes)
+\captionsetup{font=small}
 \begin{tabular}{|c|c|c|}
 \hline
 \textbf{Parameter} & \textbf{Distribution} & \textbf{Description} \\
 \hline
-$a$ & $\text{Gamma}(1,1)$ & Global shape parameter \\
-$b$ & $\text{Gamma}(1,1)$ & Global rate parameter \\
-$\psi_{k,j}$ & $\text{Beta}(a_{(j)}, b_{(j)})$ & Factor-junction usage ratio (PSI)\\
-$\pi_k$ & $\text{Dirichlet}(\mathbf{1}/K)$ & Categorical proportions parameters \\
-$conc$ & $\text{Gamma}(1,1)$ & Concentration parameter (in Beta-Binomial) setting\\
-$a_j$ & $\text{Gamma}(1,1)$ & Junction-specific shape parameter \\
-$b_j$ & $\text{Gamma}(1,1)$ & Junction-specific rate parameter \\
-$y_{cj}$ & $\text{Binomial}(T_{cj}, \rho_{cj})$ & Observed junction read counts in a cell\\
-$T_{cj}$ & - & Total ATSE read counts (number of trials)\\
-$\rho_{cj}$ & - & Cumulative probability of success for the Binomial distribution\\
-$\phi_{ck}$ & $\text{Dirichlet}(\pi \cdot c)$ & State of each cell for category $k$ \\
+$\pi$ & $\text{Dirichlet}(\mathbf{1}/K)$ & Global program proportions \\
+$\phi_{c:}$ & $\text{Dirichlet}(K\,\pi)$ & Cell $c$'s loading over the $K$ splicing programs (sums to 1) \\
+$\eta_{kj}$ & $\mathcal{N}(0,1)$ & Logit of program $k$'s usage of junction $j$ \\
+$\psi_{k,\cdot}^{(e)}$ & $\text{softmax}(\eta_{k,\cdot}^{(e)})$ & Program $k$'s composition over the junctions of ATSE $e$ (sums to 1) \\
+$\rho_{cj}$ & $\sum_k \phi_{ck}\psi_{kj}$ & Cell $c$'s expected usage of junction $j$ \\
+$\gamma_e$ & $\text{Gamma}(2, 0.1)$, floored at 2 & Per-ATSE concentration: the effective number of independent molecules \\
+$\mathbf{y}_{c}^{(e)}$ & $\text{DirMult}(N_{ce}, \gamma_e\,\boldsymbol{\rho}_{c}^{(e)})$ & Observed junction counts of cell $c$ in ATSE $e$ \\
+$N_{ce}$ & -- & Total reads of cell $c$ in ATSE $e$ (equals $\sum_{j\in e} y_{cj}$ exactly) \\
 \hline
 \end{tabular}
-\caption{LeafletFA Model Parameters}
+\caption{LeafletFA model parameters}
 \label{tab:model_parameters}
 \end{table}
 \vspace{0.6cm}
 
+\subsection*{LeafletFA Dirichlet-Multinomial Factor Model}\label{sec:LeafletFAMethod}
 
-\subsection*{LeafletFA Beta-Dirichlet Factor Model}\label{sec:LeafletFAMethod}
+LeafletFA models, for each cell $c$ and each ATSE $e$, the vector of junction read counts $\mathbf{y}_c^{(e)} = (y_{cj})_{j \in e}$ conditional on the ATSE total $N_{ce} = \sum_{j\in e} y_{cj}$. Each cell is a mixture $\phi_{c:}$ over $K$ latent splicing programs, and each program $k$ has a usage composition $\psi_{k,\cdot}^{(e)}$ over the junctions of every ATSE. The expected usage of junction $j$ in cell $c$ is
+$$\rho_{cj} = \sum_{k=1}^K \phi_{ck}\,\psi_{kj}.$$
+Because every $\psi_{k,\cdot}^{(e)}$ is a composition and $\phi_{c:}$ is a mixture, $\boldsymbol{\rho}_c^{(e)}$ is itself a composition over each ATSE's junctions -- the model cannot place more than the ATSE's total splicing mass on its junctions.
 
-LeafletFA models observed junction read counts $y_{cj}$ conditional on total ATSE read counts $T_{cj}$ for each cell $c$ and junction $j$. We model each cell as a weighted combination $\phi_{c:}$ of $K$ latent factors, each of which has a usage ratio $\psi_{kj}$ for each junction, 
-$$\mathbb{E}\left[\frac{y_{cj}}{T_{cj}}\right] = \rho_{cj} = \sum_{k=1}^K \phi_{ck} \psi_{kj}.$$
-The prior for $\phi$ is given by the hierarchy,
-\begin{align}
-    \alpha &\sim \text{Gamma}(1, 1) &\\
-    \pi &\sim \text{Dirichlet}\left(\frac{\alpha}{K}, \dots, \frac{\alpha}{K}\right) &  \\
-    \delta &\sim \text{Gamma}(1, 1) & \\
-    \phi_{c:} | \pi, \delta &\sim \text{Dirichlet}(\delta \pi) & \quad \text{for each } c = 1,\ldots,C
-\end{align}
-
-where $C$ is the number of cells. We explored two different configurations for the prior on $\psi$ but ultimately utilized the junction-specific prior configuration in our final LeafletFA model: 
-\begin{enumerate}
-    \item Global prior: 
-    \begin{align*}
-    a &\sim \text{Gamma}(1, 1), \quad
-    b \sim \text{Gamma}(1, 1) &  \\
-    \psi_{kj}|a,b &\sim \text{Beta}(a, b) & \quad \text{for each } k = 1,\ldots,K; j = 1,\ldots,J
-\end{align*}
-where $J$ is the number of junctions. 
-\item Junction-specific priors:
+\paragraph{Programs.} Junction usage within an ATSE is parameterised on the simplex through a softmax of unconstrained logits,
 \begin{align*}
-    a_j &\sim \text{Gamma}(1, 1), \quad 
-    b_j \sim \text{Gamma}(1, 1) & \quad \text{for each } j = 1,\ldots,J \\
-    \psi_{kj} &\sim \text{Beta}(a_j, b_j) & \quad \text{for each } k = 1,\ldots,K; j = 1,\ldots,J
+    \eta_{kj} &\sim \mathcal{N}(0, 1) & \text{for } k = 1,\ldots,K;\ j = 1,\ldots,J \\
+    \psi_{kj} &= \frac{\exp \eta_{kj}}{\sum_{j' \in e(j)} \exp \eta_{kj'}} & \text{for each ATSE } e,
 \end{align*}
-\end{enumerate}
+so that $\sum_{j \in e} \psi_{kj} = 1$ for every program and every ATSE. This replaces the independent per-junction Beta usage ratios of an earlier version of the model, under which the $m$ junctions of an ATSE were treated as $m$ separate binomial trials that need not sum to one; only $m-1$ of them are free, and treating them as $m$ over-counts the evidence by $m/(m-1)$ -- a factor of two for the 44\% of atlas ATSEs with two junctions.
 
-We considered two different likelihood models and implement the Beta-Binomial likelihood in the final model: 
-\begin{itemize}
-    \item \textbf{Beta-binomial}:
-    \begin{align*}
-    c &\sim \text{Gamma}(2, 2) \\
-    y_{cj}|T_{cj},\rho_{cj},  c &\sim \text{BetaBinomial}(T_{cj}, \rho_{cj}  c, (1 - \rho_{cj})  c),
-    \end{align*}
-where $ c$ is a ``concentration'' parameter (inverse overdispersion). The beta-binomial represents additional noise in scenarios with high technical variability.
+\paragraph{Cell loadings.} 
+\begin{align*}
+    \pi &\sim \text{Dirichlet}(\mathbf{1}/K) \\
+    \phi_{c:} \mid \pi &\sim \text{Dirichlet}(\delta\,\pi), \qquad \delta = K,
+\end{align*}
+for each cell $c = 1, \ldots, C$. The Dirichlet concentration $\delta$ is fixed at $K$, which sets the average effective concentration $\delta\pi_k$ to 1. When $\delta$ was instead learned it fell to values placing every $\delta\pi_k$ between 0.19 and 0.37: a Dirichlet with all parameters below 1 is sparsity-inducing and drives each cell into a corner of the simplex, and under the sparse per-cell evidence of Smart-seq2 data that corner choice was found to be dominated by noise, collapsing the loadings.
 
-    \item \textbf{Binomial:}
-$$ \quad y_{cj} | \rho_{cj} \sim \text{Binomial}(T_{cj}, \rho_{cj}) $$
-which we note is equivalent to the Beta-binomial when $ c \rightarrow \infty$.
-\end{itemize}
+\paragraph{Likelihood.} The junction counts of an ATSE are drawn jointly,
+$$\mathbf{y}_c^{(e)} \mid N_{ce}, \boldsymbol{\rho}_c^{(e)}, \gamma_e \;\sim\; \text{DirichletMultinomial}\!\left(N_{ce},\; \gamma_e\,\boldsymbol{\rho}_c^{(e)}\right),$$
+with one concentration $\gamma_e \sim \text{Gamma}(2, 0.1)$ per ATSE. Under the simplex parameterisation the Dirichlet's total pseudo-count $\sum_{j\in e} \gamma_e \rho_{cj}$ equals $\gamma_e$ exactly. At $m = 2$ this is the Beta-Binomial; for larger $m$ it is its exact multivariate generalisation, and it is the same likelihood used by LeafCutter's differential-splicing model, verified term for term against that implementation.
 
-\subsection*{Multi-pass Mini-batch Training and Global Parameter Update
-\label{Methods:Minibatch}}
+\paragraph{The concentration is an effective sample size, and it was measured.} $\gamma_e$ is the number of independent draws the model believes a cell contributes to an event. Smart-seq2 libraries carry no unique molecular identifiers, so a cell's reads over an ATSE are PCR copies of a small number of cDNA molecules rather than independent observations. We measured this directly: restricting to ATSEs whose pooled composition within a single cell type is genuinely mixed, 68\% of (cell, ATSE) pairs place every read on one junction, at a median of 48 reads per pair; under read independence this would essentially never happen above 50 reads. Solving $P(\text{all reads on one junction}) = p^M + (1-p)^M$ for the number of independent molecules $M$ gives 1.7 to 3.1 molecules per event as read counts rise from 6 to 124 -- reads increase 19-fold while molecules increase 2.5-fold, which is the duplication signature. We therefore floor $\gamma_e$ at 2. Left unconstrained, the fitted concentration collapses to a median of 0.52, i.e. fewer than one independent molecule per event, which is not physical, and the loadings $\phi$ collapse with it. This treatment does not by itself distinguish technical duplication from genuine single-cell isoform commitment; under either, a low concentration is the correct description of the per-cell evidence.
 
-To enable scalable training on the large $\sim$200,000 cell atlas, we implemented a multi-pass mini-batch training strategy optimized for GPU acceleration. The model was trained over 10 full passes of the data, with cells processed in mini-batches of 5,000.
+\subsection*{Model Fitting}\label{Methods:Minibatch}
 
-In this approach, the global parameters $\Psi$ (latent junction usage ratios) and $\Pi$ (factor proportions) are treated as global variables that evolve continuously throughout the training process across all passes.
+We fit LeafletFA by stochastic variational inference in Pyro \cite{pyro}, maximising the evidence lower bound (ELBO) with a mean-field Gaussian variational family over the unconstrained parameters (Pyro's \texttt{AutoNormal}). Cells are conditionally independent given the global parameters, so training uses a single Pyro subsampling plate: at each step a minibatch of 8{,}192 cells is drawn, the local loadings $\phi$ for those cells and the global parameters ($\eta$, $\pi$, $\gamma$) are updated together, and the local terms of the ELBO are rescaled by $C/8{,}192$ so that every step is an unbiased estimate of the full objective. Full-atlas fits ran for 16{,}200 steps at learning rate 0.025 with exponential decay to $0.1\times$ over the run (Adam, gradient-norm clipping at 10). Non-finite losses -- which occurred on every atlas fit before this schedule was fixed -- trigger a rollback to the last checkpointed parameter state rather than terminating the run. Because the ELBO on this data reaches within noise of its final value in the first $\sim$50 steps and its tail slope is not informative, convergence was judged on the between-program contrast of $\psi$ (the mean pairwise distance between programs' compositions), which continues to move for thousands of steps and is what the model is expected to learn.
 
-\begin{enumerate}
-    \item Batch Training: In each batch, LeafletFA trains the local parameters $\Phi$ (cell factor activities) specific to the 5,000 cells in that batch, while simultaneously refining the global parameters $\Psi$ and $\Pi$ using the Evidence Lower Bound (ELBO) objective.
-    \item Global Update and Re-initialization: After each mini-batch finishes training, the refined estimates of the global parameters ($\Psi$, $\Pi$) are extracted and stored. These refined parameters are then used to initialize the model for the \emph{next} batch, ensuring that the model leverages the accumulated information from all previously processed cells.
-    \item Learning Rate Decay: A dynamic learning rate schedule was used to promote convergence, applying a decay factor of $0.95$ to the base learning rate at the start of each new data pass. The first pass was trained for 50 epochs, while subsequent passes were trained for 20 epochs to conserve computational resources while benefiting from continuous global parameter refinement.
-\end{enumerate}
-This strategy ensures all cells contribute to the final global factor structure ($\Psi$ and $\Pi$) while efficiently utilizing GPU memory and computational resources.
+We trained models at $K \in \{10, 20, 30\}$ with three random initialisations each; $K = 20$ is used for all reported analyses and the other ranks serve as robustness checks. Initialisation is from the prior; no data-derived initialisation was required once the single-plate training was in place.
 
-\subsection*{Model Fitting and Initialization Using Waypoints}\label{Methods:Waypoints}
+\subsection*{Differential Splicing Between Cell Groups}
+\label{sec:DS_group}
+LeafletFA tests differential splicing between two groups of cells $A$ and $B$ at the level of the ATSE, using the fitted model's posterior. All quantities below are computed per ATSE and per posterior draw; $S = 300$ draws are used throughout.
 
-We fit LeafletFA using Stochastic Variational Inference (SVI) within the Pyro probabilistic programming framework \cite{pyro}, optimizing the Evidence Lower Bound (ELBO). 
-
-Two initialization approaches were considered: random and waypoint-based. For the former the model is fit three times, and the one with the best ELBO was selected. We use waypoint-based initialization, inspired by Palantir \cite{palantir}, to reduce run-to-run variability due to optimization getting trapped in different local minima, and to improve reproducibility and potentially overall fit. This strategy is applied differently depending on the training context:
-
-\begin{enumerate}
-    \item Initial Waypoint (First Batch): For the first mini-batch processed, the number of waypoints is set to the number of factors \( K \). The waypoints are chosen to capture major subspaces of variation in the observed read count ratios, $\hat{\rho}_{cj} = y_{cj}/T_{cj}$. Given the sparsity in single-cell data, we first mean-centered non-missing values to reduce total expression influence. We extracted ten PCs from these adjusted junction usage ratios using sparse singular value decomposition (SVD). We use max-min sampling in the PC space to select $K$ diverse cells as waypoints. The initial $\psi$ for factor $k$ is set to the average non-missing junction usage ratio across the 50 nearest neighbors (to reduce noise) of waypoint $k$, for each $k$.
-    \item Sequential Initialization (Subsequent Batches): For all subsequent mini-batches, the model is initialized using the global $\Psi$ and $\Pi$ estimates accumulated from the preceding batch, as detailed in \textbf{Section \ref{Methods:Minibatch}}. This continuous update strategy leverages the learning across all cells seen so far, ensuring efficient training.
-\end{enumerate}
-
-\subsection*{Bayesian Factor-Specific Differential Splicing Analysis} 
-\label{sec:DS_JUNC_FDR}
-To identify splice junctions that exhibit significant differential usage across latent factors, we use a Bayesian posterior sampling-based approach inspired by scVI's differential expression framework. Given the inferred latent variables from LeafletFA, we estimate factor-specific differential splicing by comparing the contribution of a given factor $k$ to splice junction usage relative to the combined effect of the remaining factors.
-
-\paragraph{Posterior Sampling and Effect Size Estimation} 
-Since our approach is approximately Bayesian, we estimate differential splicing probabilistically by drawing posterior samples from the variational approximation.  The default number of posterior samples is 500. Let $\psi_{s, kj}$ denote the posterior sample $s$ of $\psi_{kj}$, and $\phi_{s, ck}$ posterior sample $s$ for the factor assignment weights $\phi_{ck}$. For each sample, the factor-specific junction usage is,
+\paragraph{Statistic.} For posterior draw $s$, let $\phi^{(s)}_{c:}$ and $\psi^{(s)}_{k,\cdot}$ be draws from the variational posterior of the cell loadings and program compositions ($\phi$ through its stick-breaking parameterisation, $\psi$ through the within-ATSE softmax, so both remain on the simplex). The difference in mean loading between the groups is
 \begin{equation}
-    \rho_{s, kj} = \frac{1}{C} \sum_{c=1}^{C} \phi_{s, ck} \psi_{s, kj}.
+    \Delta\phi^{(s)}_k = \frac{1}{|A|}\sum_{c\in A}\phi^{(s)}_{ck} - \frac{1}{|B|}\sum_{c\in B}\phi^{(s)}_{ck},
 \end{equation}
-To estimate the overall effect of factor $k$ relative to all others, we compute,
+and because $\rho$ is linear in $\phi$, the difference in expected usage of junction $j$ is $\Delta_j^{(s)} = \sum_k \Delta\phi^{(s)}_k\,\psi^{(s)}_{kj}$. Both groups' loadings are drawn from the posterior rather than fixed at their means; the loadings carry the between-group biology, so treating them as known would understate the spread of every downstream quantity. The effect size for ATSE $e$ is the total variation distance between the two groups' predicted compositions,
 \begin{equation}
-    \Delta \psi_{s, kj} = \rho_{s, kj} - \frac{1}{K-1} \sum_{k' \neq k} \rho_{s, k'j}
+    \mathrm{TV}^{(s)}_e = \tfrac{1}{2}\sum_{j\in e}\left|\Delta_j^{(s)}\right| \in [0, 1],
 \end{equation}
-ensuring that the difference is computed against all other factors combined. Since $\psi_{s, kj}$ and $\phi_{s, ck}$ are sampled from the posterior distribution, this formulation allows us to quantify uncertainty in differential splicing estimates.
+the fraction of the event's splicing mass that moves between the groups; for a two-junction ATSE it equals $|\Delta\mathrm{PSI}|$. We report the posterior mean of $\mathrm{TV}_e$ as the effect estimate.
 
-\paragraph{Effect Size and Probabilistic Estimation of Differential Splicing.} 
-Rather than relying on a single effect size estimate, we use posterior sampling to empirically estimate the probability that a junction is differentially spliced. We define the overall effect size as,
+\paragraph{Calling.} An ATSE is called differentially spliced when the posterior probability that its effect exceeds a stated minimum,
 \begin{equation}
-    \beta_{kj} = \mathbb{E} [\Delta \psi_{kj}] = \frac1S \sum_{s=1}^S \Delta \psi_{kj}
+    P_e = \frac{1}{S}\sum_{s=1}^S \mathbf{1}\!\left(\mathrm{TV}^{(s)}_e > \delta\right),
 \end{equation}
-i.e., the mean factor-specific differential splicing effect across posterior samples. Additionally, we define the probability that a junction is differentially spliced as,
-\begin{equation}
-P_{kj} = \frac{1}{S} \sum_{s=1}^{S} \mathbf{1}(|\Delta \psi_{s,kj}| > \delta)
-\end{equation} where $P_{kj}$ is the fraction of posterior samples where the effect size exceeds the threshold $\delta$. The default threshold $\delta$ is set to $0.1$, but can be adjusted based on the variability of the data set.
-\paragraph{False Discovery Rate Correction.} 
+is high. $\delta$ is the effect size of interest, not a significance level: it says how large a change we are willing to call, and the separate false-discovery control below says how sure we are. Multiplicity is controlled through the posterior expected false discovery proportion: ranking ATSEs by $P_e$ descending, the expected FDP among the top $n$ is $\frac{1}{n}\sum_{i\le n}(1-P_{(i)})$, and the called set is the largest $n$ for which this is at most $\alpha = 0.05$. This is the Bayesian FDR of the earlier version of the method, applied to a per-ATSE rather than per-junction statistic.
 
-To control for multiple hypothesis testing, we apply a false discovery rate (FDR) correction based on the posterior expected False Discovery Proportion (FDP). Since differential splicing is evaluated for each junction and factor, we compute factor-specific FDP estimates i.e., to find splicing events enriched or depleted in specific factors. For a given factor $k$, we rank the splice junctions by their posterior probability and estimate the expected FDP at each threshold $\tau$ as,
-\begin{equation}
-    \text{FDP}_k(\tau) = \frac{1}{N_k(\tau)} \sum_{j: P_{kj} \geq \tau} (1 - P_{kj})
-\end{equation} 
-where $N_k(\tau)$ is the number of junctions where $P_{kj}\geq \tau$. For each factor \( k \), the final significance threshold \( \tau^* \) is determined as the largest \( \tau \) that satisfies \( \text{FDP}_k(\tau^*) \leq \alpha \), where \( \alpha \) (default 0.05) is the FDR control level for factor \( k \). This ensures that at most 5\% of the reported differentially spliced junctions for a given factor are false positives. This approach follows a Bayesian FDR control strategy similar to scVI but is applied separately for each factor to identify factor-specific differential splicing markers.
+\paragraph{Choosing $\delta$ from the model's own resolution.} $\delta$ has to sit above the value $\mathrm{TV}_e$ takes when nothing differs -- the model's resolution floor -- and that floor scales with $|\Delta\phi|$, so it cannot be read from a null that collapses the loadings (permuting cell labels between the groups drives $\Delta\phi \to 0$ and the test degenerates to the point null ``$\Delta \ne 0$'', which is essentially always true). We measure the floor with permuted negative-control ATSEs: a random 10\% of ATSEs have their per-cell count vectors permuted across cells (each cell keeps its own $N_{ce}$, so depth and composition are preserved and only the association between cell identity and usage is destroyed), the model is refit, and those events are null by construction while the untouched 90\% keep the loadings at their true magnitude. Their $\mathrm{TV}_e$ distribution under a real contrast is the floor at the right scale. The construction was validated on simulations, where truly null events are known: permuted and truly-null events had indistinguishable $\mathrm{TV}$ distributions (median ratio 0.93--1.02 across contrasts and effect sizes). On the mouse atlas the 99th percentile of the floor over eight cell-type contrasts was 0.13; we use $\delta = 0.15$. On simulations at this $\delta$ the realised FDP is 1.2--2.0 times nominal with power 0.46--0.90 for effect sizes $\ge 0.35$; at $\delta = 0.05$ the same test is 5--6 times anti-conservative, because $\delta$ then lies below the posterior standard deviation of $\psi$ itself (0.02--0.09 per junction). Since fitted loadings vary in scale between initialisations, we report as called the ATSEs called in at least two of three independently seeded fits; the rank ordering of $\mathrm{TV}_e$ across seeds is stable (Spearman $\rho \approx 0.90$ within contrast).
 
+\subsection*{Likelihood-Ratio Test for the Comparison with LeafCutter}
+\label{sec:DS_LRT}
+For a like-for-like comparison with LeafCutter we also test each ATSE with LeafCutter's own inference -- a Dirichlet-multinomial generalised linear model \cite{Leafcutter} -- but with individual cells as the unit rather than pseudobulk replicates. Under $H_0$ every cell in the contrast shares one composition, $\boldsymbol{\alpha}_e = \gamma_e\,\mathrm{softmax}(\mathbf{b})$; under $H_1$ the composition depends on a binary cell-type indicator $x_c$, $\boldsymbol{\alpha}_{ce} = \gamma_e\,\mathrm{softmax}(\mathbf{b} + x_c\,\mathbf{B})$, with the last junction's coefficient fixed at zero for identifiability. The statistic $2(\ell_1 - \ell_0)$ is referred to $\chi^2_{m-1}$. Because Wilks' approximation is exactly what could fail at $m = 2$ and low coverage, we do not assume it: calibration is measured on a matched permutation null (below), and on simulations against known truth.
 
-% we no longer do complicated filtering just minimal filtering with adequately detected ATSEs and all cells (max 5 junctions in ATSE)
-%\subsection*{ATSE Filtering for LeafletFA Model Training}
-%\label{sec:ATSE_filtering}
+\paragraph{Comparison design.} LeafCutter was run on pseudobulk replicates constructed by aggregating cells within each cell type into seven or eight replicates per group, the realistic design for Smart-seq2 differential splicing. LeafletFA's LRT was run on the same contrasts using every individual cell. Each method's calibration was measured on its own permutation null -- for LeafCutter, cell-type labels shuffled within a cell type; for LeafletFA, cells of a single cell type split at random into two arms. Because a within-type split can carry residual donor structure, LeafletFA's null is contaminated by real signal and its inflation ratio is an upper bound; the comparison is therefore conservative with respect to LeafletFA's calibration and, since it forces a tighter threshold, conservative against LeafletFA's power. Methods were compared at matched \emph{realised} false discovery proportion: each was thresholded where its own null delivered an FDP of 0.05 (LeafCutter $q \le 1.39\times10^{-3}$, LeafletFA $q \le 3.16\times10^{-2}$), since comparing counts at a common nominal $q$ would score miscalibration as sensitivity. Where the posterior effect-size test is compared with LeafCutter, the comparison is restricted to events whose effect size, as measured by LeafCutter's own pseudobulk estimates ($\tfrac12\sum_j|\Delta\mathrm{PSI}_j|$), exceeds $\delta$, so that both methods are asked the same question.
+
+\subsection*{Program Reproducibility}
+\label{sec:reproducibility}
+Programs from independently seeded fits, and from fits at different $K$, were matched by the Hungarian algorithm on the absolute correlation of their compositions $\psi$ (never on $\phi$, whose per-cell values are the poorly determined direction). A program is counted as reproduced when its matched correlation is at least 0.9 in every other seed; this is a stated cutoff, as the distribution of matched correlations is a smooth gradient rather than bimodal. Cross-$K$ matching is one-sided from the smaller rank into the larger.
 
 \subsection*{Simulating Junction Usage Ratios Across Cell Types}\label{sec:simulation_method}
 
-Our simulations are based on observed ATSE counts and predefined cell types from real TMS brain cells to ensure the overall sparsity of read coverage is maintained. Every 3-junction ATSE is randomly assigned a positive (has DS across cell states) or negative label (no DS)  (\textbf{Fig.} \ref{fig:SUPP_FIGURE1}A). The three splice junctions belonging to a given ATSE are sorted into the two corresponding to exon inclusion (\textbf{J1} and \textbf{J2}) and the one corresponding to exon exclusion (\textbf{J3}). For negative ATSEs we sample one shared $\psi^{J3}$ from Beta$(0.5,0.5)$ (hyperparameters chosen to emulate the known bimodality of splicing patterns \cite{NirYosefCoverage}) for all cell states. For positive ATSEs, we sample a different $\psi^{J3}_k \sim \text{Beta}(0.5,0.5)$ for each cell state $k$. We then set \( \psi^{J1}_k = \psi^{J2}_k = (1-\psi^{J3}_k)/2 \) for each $k$. Junction counts are then sampled from binomial distributions with these $\psi$ values and total count from the observed ('real') TMS data. We evaluate the observed differences, ($\psi_{k=1}^{J1} - \psi_{k=2}^{J1}$ for example) after simulating junction counts to ensure sampled junction usage ratios correspond to their label: positive (DS) ATSE or negative (no DS). 
+Our simulations are based on observed ATSE counts and predefined cell types from real TMS heart cells (6{,}986 cells, 4{,}268 three-junction ATSEs) so that the sparsity of read coverage is that of real data: every cell's total read count over each ATSE is taken verbatim from its real value. Every 3-junction ATSE is randomly assigned a positive (has DS across cell states) or negative label (no DS), 30\% positive (\textbf{Fig.} \ref{fig:SUPP_FIGURE1}A). The three splice junctions belonging to a given ATSE are sorted into the two corresponding to exon inclusion (\textbf{J1} and \textbf{J2}) and the one corresponding to exon exclusion (\textbf{J3}). Cells are assigned to $K=5$ latent states by their annotated cell type. For negative ATSEs we sample one shared $\psi^{J3}$ from Beta$(0.5,0.5)$ (hyperparameters chosen to emulate the known bimodality of splicing patterns \cite{NirYosefCoverage}) for all states. For positive ATSEs we sample an independent $\psi^{J3,\mathrm{ind}}_k \sim \text{Beta}(0.5,0.5)$ for each state $k$ and set $\psi^{J3}_k = (1-\epsilon)\,\psi^{J3} + \epsilon\,\psi^{J3,\mathrm{ind}}_k$, where the effect parameter $\epsilon \in \{0.10, 0.15, 0.20, 0.25, 0.35, 0.50, 1.00\}$ controls how far states are pulled apart. We then set \( \psi^{J1}_k = \psi^{J2}_k = (1-\psi^{J3}_k)/2 \) for each $k$, so the true total-variation effect between two states is exactly $|\Delta\psi^{J3}|$. Junction counts for a cell are drawn jointly for the whole ATSE, $\mathbf{q} \sim \text{Dirichlet}(\gamma\,\boldsymbol{\psi})$ then $\mathbf{y} \sim \text{Multinomial}(N, \mathbf{q})$, so the counts sum to the observed total exactly; the concentration $\gamma$ was 50 in the main simulations and 2 -- the effective sample size measured on the atlas -- in the matched-overdispersion set. Differential splicing is scored against the contrast-specific truth $|\psi^{J3}_p - \psi^{J3}_q|$ for the two states compared, not against the generative label, since two of five states can share a value on a flagged event.
 
-%\subsection*{Annotation of Aging-Associated Genes}
-%\label{sec:Annotation_Aging_Genes}
-%To contextualize our SPs, all genes associated with differentially spliced events were annotated using the Human Ageing Genomic %Resources (HAGR) suite, particularly the GenAge database $\cite{de-Magalhaes2024-uf}$, which features genes related to human and model organism (mouse) aging and longevity.
+\subsection*{Held-Out Imputation}
+\label{sec:imputation}
+To evaluate imputation on cells the model had never seen, the atlas was split 70/30 (92{,}894 / 39{,}812 cells) and LeafletFA was refit on the 70\% alone. Reads in the held-out 30\% were downsampled to 10, 25, 50, 75, 90 and 99\% of their original depth. For each held-out cell at each depth, the loading $\phi_c$ was inferred by variational E-step with every global parameter ($\psi$, $\pi$, $\delta$, $\gamma$) frozen at its trained value; the imputed usage is then the Dirichlet-multinomial posterior mean $(\gamma_e\rho_{cj} + y_{cj}) / (\gamma_e + N_{ce})$, which shrinks the cell's observed ratio toward its program-predicted composition by an amount set by the event's effective sample size. Imputed values are scored against each cell's full-coverage usage on entries that were covered at full depth, both across all such entries and restricted to entries lost to downsampling, where every method must genuinely impute. Baselines are non-negative matrix factorisation at the same rank on the observed ratios (scored at whichever missing-value convention favours it), the per-junction mean over observed cells, and the per-junction mean within the cell's annotated type -- the last of which uses labels LeafletFA does not see and is an upper reference rather than a competitor. Highly variable junctions were selected on the training split only. \textbf{XX} [numbers on landing].
 
 \subsection*{Modeling Aging with Splicing and Expression}
 We assessed the predictive power of alternative splicing and gene expression for chronological age using standard linear regression models at both cell-type–specific and global levels. For the cell-type–specific analysis, we iterated over each broad cell type containing at least 50 cells and spanning two or more age groups. Within each group, we trained three separate models to predict numeric age: one using splicing-based latent features ($\Phi$), one using gene expression–based NMF features, and one combining both feature sets. We computed $R^2$ scores using 10-fold cross-validation, examined the relative performance of splicing and expression features, and extracted the top contributing features by absolute model coefficients. A scatter plot of CV $R^2$ values was used to highlight cell types where either modality offered superior predictive power.
 
 For the global analysis, we trained linear regression models across all cells to compare four combinations of input features: broad cell type alone (one-hot encoded), broad cell type with splicing, broad cell type with expression, and all features combined. Age was modeled as a continuous outcome, and 10-fold cross-validation was used to compute mean and standard deviation of the $R^2$ score for each model.
 
+% ---- MARKED FOR REMOVAL 2026-08-15: not used in the revised results ----
+\iffalse
 \subsection*{RBP Aging Mediation Analysis}
 
 To identify potential regulatory drivers of age-associated splicing changes, we conducted a systematic mediation analysis focusing on a curated list of 269 RNA-binding proteins (RBPs). We hypothesized that chronological age ($X$) influences the expression of specific RBPs ($M$), which in turn modulates the activity of observed SPs ($Y$) (\textbf{Fig.} \ref{fig:FIGURE5}B). This analysis was performed independently for each tissue-cell type pair.
@@ -195,6 +152,9 @@ To identify potential regulatory drivers of age-associated splicing changes, we 
 We utilized the \texttt{mediation\_analysis} function from the \texttt{pingouin} Python package. For each cell, the mediator variable ($M$) was defined as the denoised expression level of a given RBP, obtained from the linear scVI-normalized expression layer to minimize technical noise and dropout effects. The outcome variable ($Y$) was the cell-specific SP activity ($\phi$) inferred by LeafletFA. The significance of the indirect effect (the mediation effect) was determined using bootstrapping with 500 iterations to estimate 95\% confidence intervals and p-values.
 
 To account for multiple hypothesis testing across the suite of RBPs and SPs, we applied the Benjamini-Hochberg False Discovery Rate (FDR) correction to the indirect effect p-values within each cell type. An RBP was considered a significant mediator if the FDR-corrected p-value was less than 0.05. The Aging Mediation Coefficient was defined as the standardized coefficient of the indirect effect, representing the magnitude and direction of the aging signal propagated through RBP expression to the splicing program activity (\textbf{Fig.} \ref{fig:FIGURE5}C).
+
+\fi
+% ---- end RBP block ----
 
 \subsection*{Cross-species Splicing Conservation Analysis}
 To evaluate conservation of alternative splicing between human and mouse, we filtered ATSEs in each species to retain only splice junctions derived from genes with one-to-one orthologs, as defined by Ensembl. To focus on simpler splicing topologies, we included only ATSEs involving five or fewer junctions. All annotations were derived from GENCODE vM19 (mouse) and v45 (human), aligned to the GRCm38 (mm10) and GRCh38 (hg38) genome assemblies, respectively.
