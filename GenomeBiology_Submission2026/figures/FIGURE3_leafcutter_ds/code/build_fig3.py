@@ -119,29 +119,24 @@ def panel_d(ax):
 
 
 def panel_e(ax):
-    """posterior DS at delta 0.15: single-seed vs consensus, and rank consistency."""
-    paths = {0: f"{O}/a51_delta0.15/a51_group_ds_posterior.tsv",
-             1: f"{O}/a51_seed1_delta0.15/a51_group_ds_posterior.tsv",
-             2: f"{O}/a51_seed2_delta0.15/a51_group_ds_posterior.tsv"}
-    D = {s: pd.read_csv(p, sep="\t", usecols=["contrast", "cluster", "tv_post_mean", "q"]) for s, p in paths.items()}
-    m = D[0].merge(D[1], on=["contrast", "cluster"], suffixes=("_0", "_1")).merge(
-        D[2].rename(columns={"tv_post_mean": "tv_post_mean_2", "q": "q_2"}), on=["contrast", "cluster"])
-    votes = (m.q_0 <= .05).astype(int) + (m.q_1 <= .05).astype(int) + (m.q_2 <= .05).astype(int)
-    per = [int((m[f"q_{s}"] <= .05).sum()) for s in range(3)]
-    cons2 = int((votes >= 2).sum()); cons3 = int((votes == 3).sum())
-    x = np.arange(5)
-    vals = per + [cons2, cons3]
-    cols = [GREY, GREY, GREY, LFA, OLIVE]
+    """posterior DS at delta 0.15 with the COVERAGE GATE: >= 25 covered cells in each arm.
+
+    Ungated, 86% of consensus calls sat on events with <25 covered cells in one arm -- the model
+    reporting its imputation prior, not the data. Gated, the posterior test is conservative on
+    well-covered events and half its calls are independently made by LeafCutter."""
+    X = pd.read_csv(f"{O}/analysis_matched/posterior_consensus_gated.tsv.gz", sep="\t")
+    el = X[X.mincov >= 25]
+    a, b = el.lfa_cons.values, el.lc_sig.values
+    both, lfa_only, lc_only = int((a & b).sum()), int((a & ~b).sum()), int((~a & b).sum())
+    x = np.arange(3); vals = [lc_only, both, lfa_only]
+    cols = [LC, OLIVE, LFA]
     ax.bar(x, vals, color=cols, width=0.7)
     for i, v in enumerate(vals):
-        ax.annotate(f"{v/1000:.1f}k", (i, v), ha="center", va="bottom", fontsize=5.5)
-    ax.set_xticks(x); ax.set_xticklabels(["seed 0", "seed 1", "seed 2", "$\\geq$2 of 3\n(shipped)", "all 3"], fontsize=5.5)
-    ax.set_ylabel(f"ATSEs called, $P(TV>0.15)$, q$\\leq$0.05\n(sum over 70 contrasts)")
-    r = np.median([m.tv_post_mean_0.corr(m.tv_post_mean_1, method="spearman"),
-                   m.tv_post_mean_0.corr(m.tv_post_mean_2, method="spearman"),
-                   m.tv_post_mean_1.corr(m.tv_post_mean_2, method="spearman")])
-    ax.annotate(f"TV rank consistency\nacross seeds: $\\rho$ = {r:.2f}", (0.98, 0.95),
-                xycoords="axes fraction", ha="right", va="top", fontsize=6, color=OLIVE)
+        ax.annotate(f"{v:,}", (i, v), ha="center", va="bottom", fontsize=6)
+    ax.set_xticks(x); ax.set_xticklabels(["LeafCutter\nonly", "both", "LeafletFA\nposterior only"], fontsize=6)
+    ax.set_ylabel("ATSEs called\n(70 contrasts, $\\geq$25 covered cells / arm)")
+    ax.annotate(f"eligible: {len(el):,} (contrast, ATSE) pairs\nposterior: $P(TV>0.15)$, q$\\leq$0.05,\n$\\geq$2 of 3 seeds",
+                (0.98, 0.95), xycoords="axes fraction", ha="right", va="top", fontsize=5.5, color=GREY)
 
 
 def panel_f(ax):
@@ -161,15 +156,14 @@ def panel_f(ax):
 
 def panel_g(ax):
     """Fbln2 worked example -- reuse the built panel as an image."""
-    p = os.path.join(FIGROOT, "FIGURE3_leafcutter_ds",
-                     "FIG3_supp_Fbln2_program_decomposition_K20_seed0_SHIPPED.png")
+    p = os.path.join(FIGROOT, "FIGURE3_leafcutter_ds", "plots", "FIG3_examples_v2.png")
     ax.imshow(mpimg.imread(p)); ax.axis("off")
 
 
 def main():
     apply_theme()
-    fig = plt.figure(figsize=figsize("double", h=7.6))
-    gs = fig.add_gridspec(3, 3, height_ratios=[1, 1, 1.15])
+    fig = plt.figure(figsize=figsize("double", h=8.6))
+    gs = fig.add_gridspec(3, 3, height_ratios=[1, 1, 1.9])
     axes = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]),
             fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2]),
             fig.add_subplot(gs[2, :])]
