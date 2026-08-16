@@ -246,15 +246,33 @@ def panel_h(ax):
     ax.set_ylim(0, 1.0)
 
 
+def panel_j(ax):
+    """DS at the data's REAL overdispersion (concentration 2, the measured effective sample size)
+    against the clean simulations (concentration 50). Answers "your simulations are cleaner than
+    your data" with the number rather than a caveat."""
+    d = pd.read_csv(f"{M}/DM_SHIPPED_SIM_CONC2/summary_conc2_vs_conc50.tsv", sep="\t")
+    g = d.groupby(["method", "conc", "eff"]).agg(ratio=("ratio", "mean"), power=("power", "mean")).reset_index()
+    ax.axhline(1.0, color=GREY, lw=0.8, ls=":", zorder=0)
+    for meth, col, mk in [("LeafletFA LRT", LFA, "o"), ("LeafCutter", LC, "s")]:
+        for conc, ls, alpha in [(50, "-", 0.45), (2, "-", 1.0)]:
+            s_ = g[(g.method == meth) & (g.conc == conc)].sort_values("eff")
+            ax.plot(s_.eff, s_.ratio, marker=mk, ls=ls, color=col, alpha=alpha, ms=3.5, lw=1.4,
+                    label=f"{meth.replace(' LRT','')}, conc {conc}" + (" (atlas-like)" if conc == 2 else ""))
+    ax.set_yscale("log"); ax.set_xscale("log"); ax.set_xticks([0.25, 0.5, 1.0]); ax.set_xticklabels(["0.25", "0.5", "1.0"])
+    ax.set_xlabel("simulated effect size")
+    ax.set_ylabel("realised FDP / nominal\n(at $\\alpha$ = 0.05)")
+    ax.legend(frameon=False, fontsize=5, loc="upper right")
+    ax.annotate("honest", (1.02, 1.0), xycoords=("axes fraction", "data"), fontsize=6, color=GREY, va="center")
+
+
 # ---------------------------------------------------------------------------------------------
 def main():
     apply_theme()
     fig, axes = plt.subplots(3, 3, figsize=figsize("double", h=7.6))
-    axes.ravel()[-1].axis("off")                 # 8 panels in a 3x3 grid
     for ax, fn, letter in zip(axes.ravel(),
                               [panel_a, panel_b, panel_c, panel_d, panel_e, panel_f,
-                               panel_g, panel_h],
-                              "abcdefgh"):
+                               panel_g, panel_h, panel_j],
+                              "abcdefghi"):
         try:
             fn(ax)
         except Exception as e:                       # a broken panel must not kill the figure

@@ -1323,8 +1323,8 @@ def main():
 
         base = {
             "run_dir":             os.path.basename(run_dir),
-            "param_id":            int(summary["param_id"]),
-            "K":                   int(summary["K"]),
+            "param_id":            int(summary.get("param_id", -1)),   # DM fits carry no run_summary
+            "K":                   int(summary.get("K", K)),
             "pruned_K":            int(summary.get("pruned_K", K)),
             "waypoints_use":       waypoints_use,
             "junc_specific_prior": junc_prior,
