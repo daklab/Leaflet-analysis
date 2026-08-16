@@ -7,7 +7,7 @@ Imputed = the DM posterior mean (gamma_e rho_cj + y_cj)/(gamma_e + N_ce), rho = 
 shipped K=20 fit; for cells with no reads at the event it equals the prior phi . psi.
 
 a  gene model with the two junctions as arcs
-b  per cell type (>= 10 covered cells): raw IIIb usage of covered cells (jitter + violin, left) and
+b  epithelial and mesenchymal cell types (>= 5 covered cells): raw IIIb usage of covered cells (jitter + violin, left) and
    imputed IIIb usage of ALL cells of that type (violin, right); types ordered by lineage then raw
 c  mean phi of the same cell types, programs as SP1..SP20 (SP1 = largest pi)
 """
@@ -98,25 +98,29 @@ def main():
     order = sp_order(z); K = len(order)
     ct = df[df.tr].groupby("lab").agg(ncell=("tr", "size"), ncov=("n", lambda x: int((x > 0).sum())), lin=("lin", "first"),
                                      raw_mean=("raw", "mean"), post_mean=("post", "mean"))
-    keep = ct[(ct.ncov >= 10)].copy()
+    keep = ct[(ct.ncov >= 5) & ct.lin.isin(["epithelial", "mesenchymal"])].copy()
     keep["lin_rank"] = keep.lin.map({"epithelial": 0, "mesenchymal": 1, "neural / glial": 2, "other": 3})
     keep = keep.sort_values(["lin_rank", "raw_mean"], ascending=[True, False])
     types = list(keep.index)
     col = {"epithelial": PALETTE["ochre"], "mesenchymal": PALETTE["teal"], "neural / glial": PALETTE["indigo"], "other": PALETTE["grey"]}
 
     fig = plt.figure(figsize=figsize("double", h=8.4))
-    gs = fig.add_gridspec(3, 1, height_ratios=[0.8, 1.6, 1.6], hspace=0.55)
+    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.5, 1.5], hspace=0.6)
     # a: gene model
     ax = fig.add_subplot(gs[0])
     parts = [j.split("_") for j in jn]; chrom = parts[0][0]; strand = parts[0][3]
     starts = np.array([int(p[1]) for p in parts]); ends = np.array([int(p[2]) for p in parts])
-    lo, hi = starts.min() - 1500, ends.max() + 1500
-    tx = viz.get_transcripts(gffutils.FeatureDB(viz.DEFAULT_DB), chrom, lo, hi, strand, max_tx=4)
+    # window: the shared upstream exon (ends 130,200,982), IIIb, IIIc, and the shared downstream exon
+    # (starts 130,196,374), with margin, so every exon of the switch is drawn with its introns
+    lo, hi = 130195800, 130201700
+    tx = viz.get_transcripts(gffutils.FeatureDB(viz.DEFAULT_DB), chrom, lo, hi, strand, max_tx=6)
     ybot = viz.draw_exons(ax, tx, lo, hi) if tx else -0.7
     for s, e_, j in zip(starts, ends, jn):
         isb = j == J_IIIB
-        arc(ax, s, e_, 1.6 if isb else 2.2, col["epithelial"] if isb else col["mesenchymal"], 1.8, "IIIb junction (epithelial)" if isb else "IIIc junction (mesenchymal)")
-    ax.set_xlim(lo, hi); ax.set_ylim(ybot - 0.4, 3.0); ax.set_yticks([]); ax.spines[["left", "top", "right"]].set_visible(False)
+        arc(ax, s, e_, 1.4 if isb else 2.0, col["epithelial"] if isb else col["mesenchymal"], 1.8, "exon 7 $\\rightarrow$ IIIb (epithelial)" if isb else "exon 7 $\\rightarrow$ IIIc (mesenchymal)")
+    for xx, nm in [(130200982 - 60, "exon 7"), ((130199905 + 130199757) / 2, "IIIb"), ((130198563 + 130198418) / 2, "IIIc"), (130196374 - 80, "exon 10")]:
+        ax.text(xx, 0.45, nm, ha="center", va="bottom", fontsize=5.5, color="#333333")
+    ax.set_xlim(lo, hi); ax.set_ylim(ybot - 0.4, 2.8); ax.set_yticks([]); ax.spines[["left", "top", "right"]].set_visible(False)
     ax.set_xlabel(f"{chrom} ({strand})", fontsize=6); ax.ticklabel_format(axis="x", style="plain", useOffset=False); ax.tick_params(axis="x", labelsize=5.5)
     ax.set_title("$Fgfr2$ ATSE 3: mutually exclusive exons IIIb / IIIc", fontsize=8, loc="left"); panel_label(ax, "a", dx=-0.02)
 
@@ -143,16 +147,18 @@ def main():
     from matplotlib.lines import Line2D
     h = [mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.3, label="raw, covered cells (jitter + violin)"),
          mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA imputed (DM posterior mean), all cells")]
-    h += [mpatches.Patch(facecolor=col[k], label=k) for k in ["epithelial", "mesenchymal", "neural / glial", "other"]]
+    h += [mpatches.Patch(facecolor=col[k], label=k) for k in ["epithelial", "mesenchymal"]]
     ax.legend(handles=h, frameon=False, fontsize=5, ncol=3, loc="upper right", bbox_to_anchor=(1, 1.12))
     despine(ax); panel_label(ax, "b", dx=-0.02)
 
     # c: phi heatmap of the same cell types, SP order
     ax = fig.add_subplot(gs[2])
     Mphi = np.vstack([np.nanmean(PH[(df.lab == t).values], 0) for t in types])[:, order]
-    im = ax.imshow(Mphi.T, aspect="auto", cmap="Greens", vmin=0, vmax=0.8)
-    ax.set_xticks(range(len(types))); ax.set_xticklabels([t.replace("_", " ").replace("Non-Myeloid ", "").replace("Isocortex ", "").lower() for t in types], rotation=60, ha="right", fontsize=5)
-    for lbl, t in zip(ax.get_xticklabels(), types): lbl.set_color(col[keep.loc[t, "lin"]])
+    from scipy.cluster.hierarchy import linkage, leaves_list
+    co = leaves_list(linkage(Mphi, "average", metric="cityblock")); ctypes = [types[i] for i in co]
+    im = ax.imshow(Mphi[co].T, aspect="auto", cmap="Greens", vmin=0, vmax=0.8)
+    ax.set_xticks(range(len(ctypes))); ax.set_xticklabels([t.replace("_", " ").replace("Non-Myeloid ", "").replace("Isocortex ", "").lower() for t in ctypes], rotation=60, ha="right", fontsize=5)
+    for lbl, t in zip(ax.get_xticklabels(), ctypes): lbl.set_color(col[keep.loc[t, "lin"]])
     ax.set_yticks(range(K)); ax.set_yticklabels([f"SP{r+1}" for r in range(K)], fontsize=5)
     ax.set_ylabel("splicing program (SP1 = largest $\\pi$)")
     # psi_IIIb per program, as text on the right
@@ -164,7 +170,7 @@ def main():
         ax.text(len(types) - 0.3, r, f"$\\psi_{{IIIb}}$={psi[order[r], ib]:.2f}", va="center", fontsize=4.5, color=PALETTE["grey"])
     ax.set_xlim(-0.5, len(types) + 3.5)
     cb = fig.colorbar(im, ax=ax, fraction=0.02, pad=0.01); cb.set_label("mean $\\phi$", fontsize=6); cb.ax.tick_params(labelsize=5)
-    ax.set_title("program usage of these cell types, and each program's IIIb usage", fontsize=7, loc="left"); panel_label(ax, "c", dx=-0.02)
+    ax.set_title("program usage of these cell types (columns clustered on $\\phi$ alone; label colour = lineage), and each program's IIIb usage", fontsize=7, loc="left"); panel_label(ax, "c", dx=-0.02)
     out = os.path.join(FIGROOT, "FIGURE2_simulation_imputation", "plots", "FIG2_supp_Fgfr2_IIIb_IIIc")
     save(fig, out); print("->", out)
 
