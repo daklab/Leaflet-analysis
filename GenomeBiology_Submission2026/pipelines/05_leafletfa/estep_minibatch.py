@@ -33,11 +33,19 @@ def _dense(x):
 
 def infer_phi_minibatch(chunk_adata, psi, K, dir_conc=None, pi=None, alpha_pi=None,
                         bb_conc=None, junc_prior=True, num_epochs=3000, lr=0.1, gamma=0.1,
-                        seed=0, device=None, subsample_size=None, verbose=False):
+                        seed=0, device=None, subsample_size=None, verbose=False,
+                        likelihood=None, event_id=None, conc_min=1e-3, dm_alpha_floor=1e-2):
     """Infer phi for `chunk_adata` against a frozen dictionary. Returns (n_cells, K) float32.
 
     `psi` must be (K, n_vars) and aligned to `chunk_adata.var_names` — the caller is responsible for
     that alignment, exactly as with the previous implementation.
+
+    likelihood
+        None keeps the legacy behaviour: binomial if bb_conc is inf, else betabinomial. Pass
+        "dirichletmultinomial" for the shipped atlas model. That model needs `event_id` (so the
+        ATSE index can be built) and takes `bb_conc` as a PER-ATSE vector -- the concentration each
+        event was trained with, not a scalar. Under the DM, psi is a within-ATSE composition and
+        is frozen as given; the model does not sigmoid or renormalise it.
     """
     import torch
     import pyro
@@ -56,11 +64,22 @@ def infer_phi_minibatch(chunk_adata, psi, K, dir_conc=None, pi=None, alpha_pi=No
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     pyro.clear_param_store()
-    m = LeafletFAMinibatch(junc, clus, K=int(K), junc_specific_prior=bool(junc_prior),
-                           device=device,
-                           likelihood="binomial" if _is_inf(bb_conc) else "betabinomial")
-    m.freeze_globals(psi=psi, pi=pi, alpha_pi=alpha_pi, dir_conc=dir_conc,
-                     bb_conc=None if _is_inf(bb_conc) else bb_conc)
+    if likelihood == "dirichletmultinomial":
+        if event_id is None:
+            raise ValueError("the Dirichlet-multinomial E-step needs event_id to index ATSEs")
+        conc = np.asarray(bb_conc, dtype=np.float32) if bb_conc is not None else None
+        m = LeafletFAMinibatch(junc, clus, K=int(K), device=device,
+                               likelihood="dirichletmultinomial",
+                               psi_parameterization="simplex", event_id=np.asarray(event_id),
+                               conc_per_atse=(conc is not None and conc.ndim == 1),
+                               conc_min=conc_min, dm_alpha_floor=dm_alpha_floor)
+        m.freeze_globals(psi=psi, pi=pi, alpha_pi=alpha_pi, dir_conc=dir_conc, bb_conc=conc)
+    else:
+        m = LeafletFAMinibatch(junc, clus, K=int(K), junc_specific_prior=bool(junc_prior),
+                               device=device,
+                               likelihood="binomial" if _is_inf(bb_conc) else "betabinomial")
+        m.freeze_globals(psi=psi, pi=pi, alpha_pi=alpha_pi, dir_conc=dir_conc,
+                         bb_conc=None if _is_inf(bb_conc) else bb_conc)
     # checkpoint_every must divide the budget finely enough that early stopping can actually fire:
     # fit() stops after `patience` (8) consecutive non-improving checkpoints, so with the default
     # interval of 100 the soonest possible stop is 800 steps -- unreachable within the 500-step

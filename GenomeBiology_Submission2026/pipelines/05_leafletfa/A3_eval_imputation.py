@@ -121,7 +121,49 @@ from mean_bayes import MeanBayes
 
 # ── shared helpers (same as 04b) ─────────────────────────────────────────────
 
+# set in main() from the loaded model; consulted by the E-step and the posterior blend
+MODEL_LIKELIHOOD = "betabinomial"
+MODEL_EVENT_ID = None
+MODEL_ATSE_IDX = None
+
+def load_dm_fit(run_dir):
+    """Load a shipped Dirichlet-multinomial fit (A44 `fit.npz`) into the dict shape A3 expects.
+
+    The pkl path below is the BetaBinomial model. The DM fit differs in three ways that each
+    silently corrupt the evaluation if ignored:
+      * psi is a within-ATSE COMPOSITION already on the constrained scale (`psi_mean`). There is no
+        sigmoid to apply; doing so gives numbers that are not psi and do not sum to 1.
+      * the concentration is PER ATSE (`bb_conc_vec`, [n_atse]), not a scalar. The E-step and the
+        posterior blend must each use the concentration the event was trained with.
+      * the imputed value is the DM posterior mean, (alpha_j + y_j) / (A_e + N_e) with A_e = conc_e,
+        not the BetaBinomial's per-junction (alpha + y) / (alpha + beta + n).
+    `pi` is not saved as its own key; the last row of `trace_pi` is the fitted value.
+    """
+    z = np.load(os.path.join(run_dir, "fit.npz"), allow_pickle=True)
+    psi = np.asarray(z["psi_mean"], np.float32)
+    inv = np.asarray(z["inv_ev"], np.int64)
+    n_atse = int(inv.max()) + 1
+    sums = np.zeros((psi.shape[0], n_atse), np.float64)
+    for k in range(psi.shape[0]):
+        np.add.at(sums[k], inv, psi[k])
+    assert np.abs(sums - 1).max() < 1e-2, \
+        f"DM psi does not sum to 1 within ATSE (max dev {np.abs(sums-1).max():.3g}); wrong loader?"
+    pi = np.asarray(z["trace_pi"])[-1] if "trace_pi" in z.files else None
+    conc = np.asarray(z["bb_conc_vec"], np.float32)
+    ev = np.asarray(z["event_id"]).astype(str)
+    return dict(psi=psi, K=int(z["K"]), pi=pi, alpha_pi=None,
+                dir_conc=float(int(z["K"])),           # shipped recipe pins delta = K
+                bb_conc=conc,                          # PER ATSE
+                event_id_junction=ev[inv],             # [J], the event each junction belongs to
+                atse_idx=inv, likelihood="dirichletmultinomial",
+                train_idx=np.asarray(z["train_idx"]) if "train_idx" in z.files else None,
+                holdout_idx=np.asarray(z["holdout_idx"]) if "holdout_idx" in z.files else None)
+
+
 def load_model(run_dir):
+    if os.path.exists(os.path.join(run_dir, "fit.npz")) and \
+            not os.path.exists(os.path.join(run_dir, "leafletfa_model.pkl.gz")):
+        return load_dm_fit(run_dir)
     pkl_path = os.path.join(run_dir, "leafletfa_model.pkl.gz")
     data = {}
     with gzip.open(pkl_path, "rb") as f:
@@ -134,7 +176,10 @@ def load_model(run_dir):
 
 
 def load_run_summary(run_dir):
-    return pd.read_csv(os.path.join(run_dir, "run_summary.csv")).iloc[0].to_dict()
+    p = os.path.join(run_dir, "run_summary.csv")
+    if not os.path.exists(p):
+        return {}                                          # DM fits carry no run_summary
+    return pd.read_csv(p).iloc[0].to_dict()
 
 
 def get_junction_count(train_h5ad_path):
@@ -414,10 +459,15 @@ def infer_phi_chunk(chunk_adata, psi_tensor, K, dir_conc, junc_specific_prior,
     (mean |delta phi| = 0.004 between seeds on simulated data)."""
     from estep_minibatch import infer_phi_minibatch
     psi_np = psi_tensor.detach().cpu().numpy() if hasattr(psi_tensor, "detach") else np.asarray(psi_tensor)
+    extra = {}
+    if MODEL_LIKELIHOOD == "dirichletmultinomial":
+        # the E-step must be the SAME model that was trained: DM likelihood, simplex psi, per-ATSE
+        # concentration frozen at its trained value, ATSE index supplied so events can be grouped
+        extra = dict(likelihood="dirichletmultinomial", event_id=MODEL_EVENT_ID, conc_min=2.0)
     phi, _info = infer_phi_minibatch(
         chunk_adata, psi_np, K, dir_conc=dir_conc, pi=pi_init, alpha_pi=alpha_pi_init,
         bb_conc=bb_conc, junc_prior=junc_specific_prior, num_epochs=num_epochs,
-        device=("cuda" if DEVICE.type == "cuda" else "cpu"))
+        device=("cuda" if DEVICE.type == "cuda" else "cpu"), **extra)
     return phi
 
 
@@ -763,10 +813,23 @@ def evaluate_one_level(h5mu_path, psi, psi_tensor, hvj_idx, K,
     # posterior_mean = (alpha + obs_junc) / (alpha + beta + obs_atse)
     # where alpha = mu * bb_conc, beta = (1-mu) * bb_conc, mu = phi @ psi
     print(f"\n  [LeafletFA BB] Computing Beta-Binomial posterior mean...")
-    bb_val = float('inf') if str(bb_conc) == "infinity" else float(bb_conc)
-    if np.isinf(bb_val):
-        imp_lf_bb = imp_lf.copy()
+    if MODEL_LIKELIHOOD == "dirichletmultinomial":
+        # DM posterior mean of junction j's usage given the cell's observed counts:
+        #     (alpha_j + y_j) / (A_e + N_e),  alpha_j = conc_e * mu_j,  A_e = conc_e
+        # conc_e is the PER-ATSE concentration the model was trained with -- the effective sample
+        # size of the prior -- and N_e is the cell's observed ATSE total (the cluster layer already
+        # carries N_e on every junction of the event). This is the exact DM analogue of the
+        # BetaBinomial blend below and reduces to it at m=2.
+        obs_junc_h = junc_full[:, hvj_idx].toarray().astype(np.float32)
+        obs_atse_h = clust_full[:, hvj_idx].toarray().astype(np.float32)
+        conc_h = np.asarray(bb_conc, np.float32)[MODEL_ATSE_IDX[hvj_idx]][None, :]   # [1, n_hvj]
+        imp_lf_bb = (imp_lf * conc_h + obs_junc_h) / (conc_h + obs_atse_h)
+        del obs_junc_h, obs_atse_h
     else:
+      bb_val = float('inf') if str(bb_conc) == "infinity" else float(bb_conc)
+      if np.isinf(bb_val):
+        imp_lf_bb = imp_lf.copy()
+      else:
         obs_junc_h = junc_full[:, hvj_idx].toarray().astype(np.float32)
         obs_atse_h = clust_full[:, hvj_idx].toarray().astype(np.float32)
         alpha_arr  = imp_lf * bb_val
@@ -1112,10 +1175,18 @@ def main():
     print("\nLoading model...")
     model_data = load_model(run_dir)
     summary    = load_run_summary(run_dir)
+    global MODEL_LIKELIHOOD, MODEL_EVENT_ID, MODEL_ATSE_IDX
+    MODEL_LIKELIHOOD = model_data.get("likelihood", "betabinomial")
+    MODEL_EVENT_ID   = model_data.get("event_id_junction")
+    MODEL_ATSE_IDX   = model_data.get("atse_idx")
+    print(f"  model likelihood: {MODEL_LIKELIHOOD}")
 
     # Sample psi ~ sigmoid(psis_loc + psis_scale·eps) as in 05_impute_on_test.py.
     # Falls back to the point estimate if the posterior params are absent.
-    if "psis_loc" in model_data and "psis_scale" in model_data:
+    if model_data.get("likelihood") == "dirichletmultinomial":
+        psi = model_data["psi"].astype(np.float32)
+        print(f"  psi = DM posterior mean, within-ATSE composition, shape={psi.shape}")
+    elif "psis_loc" in model_data and "psis_scale" in model_data:
         _loc   = np.asarray(model_data["psis_loc"],   dtype=np.float32)
         _scale = np.asarray(model_data["psis_scale"], dtype=np.float32)
         _rng_psi = np.random.default_rng(0)
@@ -1133,7 +1204,8 @@ def main():
     junc_prior = bool(summary.get("junc_specific_prior", True))
     psi_tensor = torch.tensor(psi, dtype=torch.float32)
 
-    print(f"  psi={psi.shape}  K={K}  dir_conc={dir_conc}  bb_conc={bb_conc}")
+    _bc = bb_conc if np.ndim(bb_conc) == 0 else f"per-ATSE[{np.size(bb_conc)}] median {np.median(bb_conc):.2f}"
+    print(f"  psi={psi.shape}  K={K}  dir_conc={dir_conc}  bb_conc={_bc}")
     if psi.max() < 1e-6:
         print("  WARNING: psi all-zero (collapsed). Skipping.")
         sys.exit(0)

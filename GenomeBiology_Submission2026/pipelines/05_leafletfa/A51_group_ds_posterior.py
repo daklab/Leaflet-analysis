@@ -261,10 +261,16 @@ def main():
                 tvb, _ = tv_per_atse(dnull, psi_s, atse_idx, n_atse)
                 draws.append(tvb.mean(0))                       # [n_atse] per permutation
             tv_null = torch.stack(draws)                        # [B, n_atse]
-        # the point estimate takes |mean| rather than mean|.|: E|X| >= |EX|, so mean-of-absolute
-        # inherits a positive bias that is exactly what made the old statistic non-null under H0.
+        # ONE statistic, reported and thresholded identically. The call is P(TV > delta) where TV is
+        # computed PER DRAW (mean-of-absolute across draws), so the reported effect size is the
+        # posterior mean of that same per-draw TV. An earlier version reported the absolute-of-mean
+        # (0.5 * sum_j |E[Delta_j]|) instead -- a different functional that is systematically
+        # smaller (E|X| >= |EX|), so 4% of called events carried a reported tv BELOW the delta they
+        # had just cleared. The absolute-of-mean is kept as `tv_absmean` for reference; it is the
+        # less biased point estimate of the effect but it is not what the test thresholds.
         d_mean = d_obs.mean(0)
-        stat = 0.5 * torch.zeros(n_atse).index_add(0, atse_idx, d_mean.abs())
+        stat_absmean = 0.5 * torch.zeros(n_atse).index_add(0, atse_idx, d_mean.abs())
+        stat = tv_obs.mean(0)
 
         # P(TV > delta). NOT a point null, and that distinction is the whole thing.
         #
@@ -296,7 +302,8 @@ def main():
         q = bayesian_fdr(prob)
 
         out = dict(contrast=f"{row.group_1}__vs__{row.group_2}", cluster=uq,
-                   tv=stat.numpy(), prob_de=prob, tv_post_mean=tv_obs.mean(0).numpy(),
+                   tv=stat.numpy(), tv_absmean=stat_absmean.numpy(), prob_de=prob,
+                   tv_post_mean=tv_obs.mean(0).numpy(),
                    tv_post_sd=tv_obs.std(0).numpy(), lfdr=1.0 - prob, q=q)
 
         if tv_null is not None:
