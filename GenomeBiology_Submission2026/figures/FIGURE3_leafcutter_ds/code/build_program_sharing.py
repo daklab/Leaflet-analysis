@@ -18,6 +18,7 @@ FIGROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, FIGROOT); sys.path.insert(0, os.path.join(FIGROOT, "_common"))
 sys.path.insert(0, "/gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/pipelines/05_leafletfa")
 from leaflet_theme import apply_theme, PALETTE, METHOD_COLORS, figsize, panel_label, despine, save
+from programs import sp_order
 from _phi_rows import phi_row_of
 
 M = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
@@ -37,8 +38,10 @@ def main():
         lab = np.array([l.replace(" ", "_") for l in c[n["codes"][:]]])
     prow = phi_row_of(z, len(lab)); tr = prow >= 0
     types = sorted(set(t for cc in g.contrast.unique() for t in cc.split("__vs__")))
-    PH = pd.DataFrame({t: phi[prow[(lab == t) & tr]].mean(0) for t in types}).T
-    PH.columns = [f"P{k+1}" for k in range(K)]
+    order = sp_order(z)
+    PH = pd.DataFrame({t: phi[prow[(lab == t) & tr]].mean(0)[order] for t in types}).T
+    PH.columns = [f"SP{k+1}" for k in range(K)]
+    NC = pd.Series({t: int(((lab == t) & tr).sum()) for t in types})
     rows = []
     for cc, s in g.groupby("contrast"):
         a, b = cc.split("__vs__")
@@ -69,18 +72,19 @@ def main():
     for _, r_ in d.iterrows():
         if r_.contrast in SHOW:
             ax.annotate(SHOW[r_.contrast], (r_.dphi, r_.ceiling), fontsize=5, color="black", textcoords="offset points", xytext=(4, -2))
-    ax.set_xlabel("$\\|\\bar\\phi_A - \\bar\\phi_B\\|_1$  (program-loading distance between the two cell types)")
-    ax.set_ylabel("posterior TV ceiling of the contrast\n(99th percentile over eligible ATSEs)")
+    ax.set_xlabel("how differently the two cell types use the programs\n$\\|\\bar\\phi_A - \\bar\\phi_B\\|_1$: 0 = identical program usage, 2 = no program in common")
+    ax.set_ylabel("largest effect the posterior test reports in the contrast\n(99th percentile of posterior TV over eligible ATSEs)")
     ax.legend(frameon=False, fontsize=4.5, ncol=2, loc="upper left", title="tissue (size = # posterior calls)", title_fontsize=5)
     ax.set_xlim(0, None); ax.set_ylim(0, None); despine(ax); panel_label(ax, "a")
 
     ax2 = fig.add_subplot(gs[1])
     order = leaves_list(linkage(PH.values, "average", metric="cityblock"))
-    im = ax2.imshow(PH.values[order], aspect="auto", cmap="Greys", vmin=0, vmax=0.8)
-    ax2.set_yticks(range(len(types))); ax2.set_yticklabels([types[i].replace("_", " ").replace("Non-Myeloid ", "") for i in order], fontsize=4)
+    im = ax2.imshow(PH.values[order], aspect="auto", cmap="Greens", vmin=0, vmax=0.8)
+    ax2.set_yticks(range(len(types)))
+    ax2.set_yticklabels([f"{types[i].replace('_', ' ').replace('Non-Myeloid ', '')} ({NC[types[i]]:,})" for i in order], fontsize=4)
     ax2.set_xticks(range(K)); ax2.set_xticklabels(PH.columns, fontsize=5, rotation=90)
-    ax2.set_xlabel("program"); ax2.set_title("mean $\\phi$ per cell type (clustered)", fontsize=7, loc="left")
-    cb = fig.colorbar(im, ax=ax2, fraction=0.03, pad=0.02); cb.set_label("mean loading", fontsize=6); cb.ax.tick_params(labelsize=5)
+    ax2.set_xlabel("splicing program (SP1 = largest $\\pi$)"); ax2.set_title("mean program activity per cell type (rows clustered)", fontsize=7, loc="left")
+    cb = fig.colorbar(im, ax=ax2, fraction=0.03, pad=0.02); cb.set_label("mean SP activity ($\\phi$)", fontsize=6); cb.ax.tick_params(labelsize=5)
     panel_label(ax2, "b")
     out = os.path.join(FIGROOT, "FIGURE3_leafcutter_ds", "plots", "FIG3_supp_program_sharing")
     save(fig, out); print("->", out)

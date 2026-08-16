@@ -50,7 +50,7 @@ def _umap(ax, emb, prog, title, sil=None):
 
 
 def panel_a(ax):
-    _umap(ax, P["emb_true"], P["prog"], f"simulated cells: true $\\phi$\n({int(P['n_cells']):,} heart cells, K = 5, {int(P['n_atse']):,} cassette-exon ATSEs)")
+    _umap(ax, P["emb_true"], P["prog"], f"simulated cells: true $\\phi$\n({int(P['n_cells']):,} heart cells, K = 5 programs, {int(P['n_atse']):,} cassette-exon ATSEs)")
     ax.legend(frameon=False, fontsize=5, markerscale=6, loc="upper right", handletextpad=0.2)
 
 
@@ -82,7 +82,7 @@ def panel_c(ax):
 
 
 def panel_d(ax):
-    _umap(ax, P["emb_lfa"], P["prog"], "learned $\\phi$, LeafletFA\n(coloured by TRUE program)", float(P["sil_lfa"]))
+    _umap(ax, P["emb_lfa"], P["prog"], "learned $\\phi$, LeafletFA fit at K = 5\n(coloured by TRUE program)", float(P["sil_lfa"]))
 
 
 def panel_e(ax):
@@ -97,16 +97,16 @@ def panel_f(ax):
     d["fam"] = np.where(d.model.str.startswith("LeafletFA"), "LeafletFA", "NMF")
     for metric, ls, lab in [("auroc", "-", "AUROC"), ("ap", "--", "AUPRC")]:
         g = d.groupby(["fam", "model", "effect"])[metric].mean().reset_index()
-        lfa = g[g.fam == "LeafletFA"].groupby("effect")[metric].mean()
-        nmf = g[g.fam == "NMF"].groupby("effect")[metric].max()
-        ax.plot(lfa.index, lfa.values, "o" + ls, color=LFA, ms=3.2, lw=1.4, label=f"LeafletFA {lab}")
+        lfa = d[d.fam == "LeafletFA"].groupby("effect")[metric].agg(["mean", "std"])   # 3 model seeds
+        nmf = g[g.fam == "NMF"].groupby("effect")[metric].max()                       # deterministic
+        ax.errorbar(lfa.index, lfa["mean"], yerr=lfa["std"].fillna(0), fmt="o" + ls, color=LFA, ms=3.2, lw=1.4, capsize=2, label=f"LeafletFA {lab}")
         ax.plot(nmf.index, nmf.values, "s" + ls, color=LC, ms=3.2, lw=1.4, label=f"NMF {lab}")
     ax.axhline(0.5, color=GREY, lw=0.6, ls=":"); ax.annotate("AUROC chance", (0.1, 0.5), fontsize=5, color=GREY, va="bottom")
     ax.axhline(0.3, color=GREY, lw=0.6, ls=":"); ax.annotate("AUPRC chance (30% differential)", (0.1, 0.3), fontsize=5, color=GREY, va="bottom")
     ax.set_xscale("log"); ax.set_xticks([0.1, 0.25, 0.5, 1.0]); ax.set_xticklabels(["0.1", "0.25", "0.5", "1.0"])
     ax.set_ylim(0, 1.02)
     ax.set_xlabel("simulated effect size"); ax.set_ylabel("differential-ATSE detection\nfrom learned $\\psi$ (no labels)")
-    ax.set_title("which ATSEs differ between programs", fontsize=7, loc="left")
+    ax.set_title("which ATSEs differ between programs (K = 5; mean $\\pm$ SD, 3 seeds)", fontsize=7, loc="left")
     ax.legend(frameon=False, loc="lower right", fontsize=5, ncol=2)
 
 
@@ -138,7 +138,7 @@ def _ds_panel(ax, col, ylabel, logy):
 
 def panel_g(ax):
     _ds_panel(ax, "ratio", "realised FDP / nominal\n(at $\\alpha$ = 0.05)", True)
-    ax.set_title("does it over- or under-call?", fontsize=7, loc="left")
+    ax.set_title("does it over- or under-call?  (mean $\\pm$ SD, 3 seeds $\\times$ contrasts)", fontsize=7, loc="left")
     ax.legend(frameon=False, fontsize=5, loc="upper right")
 
 
