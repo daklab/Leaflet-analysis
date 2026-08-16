@@ -17,3 +17,4 @@ regenerated or placed in the paper.
 | `FIGURE3_leafcutter_ds/FIG3_calibration_draft.*` | drawn from the collapsed-phi model |
 | `FIGURE3_calibration/` | a single Fbln2 reference panel from the released BetaBinomial |
 | `MORNING_REPORT_*`, `RUN_LOG_*`, `INIT_COMPARISON_REPORT`, `SEED_CONSISTENCY_APPROACHES`, `METHODS_simulation_2026-07-26`, `FIGURE2_CAPTION`, `REPRODUCE_FIGURE2` | dated working notes describing the pre-DM pipeline |
+| (moved back out) `FIGURE3_calibration/reference_atse_Fbln2.*` | the LeafCutter reference PSI for the Fbln2 worked example -- still needed, now in `FIGURE3_leafcutter_ds/data/` |

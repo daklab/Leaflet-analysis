@@ -52,7 +52,7 @@ _ARGS, _ = _ap.parse_known_args()
 FIT = _ARGS.fit or f"{WD}/LEAFLETFA_MODELS/2026-07-26_atlas_FULL/mb_run_{_ARGS.task}/fit.npz"
 H5 = f"{WD}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
 REF = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                   "..", "FIGURE3_calibration", "reference_atse_Fbln2.json")
+                   "data", "reference_atse_Fbln2.json")
 G1, G2 = "Heart_ENDOTHELIAL_CELL", "Heart_FIBROBLAST"
 safe = lambda s: re.sub(r"[^A-Za-z0-9_.-]", "_", str(s))
 
