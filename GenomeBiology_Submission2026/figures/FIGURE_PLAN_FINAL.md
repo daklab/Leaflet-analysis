@@ -30,26 +30,28 @@ the measured effective sample size -- so it belongs in Figure 1, not the supplem
 Numbers established: 132,706 cells x 79,768 junctions; 24,475 ATSEs; 70/30 split 92,894 / 39,812;
 junction coverage 13.80%.
 
-### Figure 2 — Simulation and held-out imputation  [BUILT (a-h) / RUNNING (i-j)]
+### Figure 2 — Simulation and held-out imputation  [REDESIGNED 2026-08-16: v2, one idea per panel]
 
-`FIGURE2_simulation_imputation/plots/FIG2_final.{pdf,png}` from `code/build_fig2_final.py`.
+`FIGURE2_simulation_imputation/plots/FIG2_v2.{pdf,png}` from `code/build_fig2_v2.py`
+(prep: `code/prep_fig2_v2.py` -> `data/fig2_v2_prep.npz`). Caption: `CAPTION_FIG2_v2.md`.
+FIG2_final (9 dense panels) is superseded; its extra panels go to the supplement.
+
+Story in three rows -- setup / recovery / test+imputation:
 
 | panel | content | status | results-text message |
 |---|---|---|---|
-| a | psi effect-size recovery vs NMF at its BEST gauge | DONE | recovery 0.21 -> 0.85 vs NMF -0.01 -> 0.24: a factor model on compositions, not a matrix factorisation on ratios |
-| b | concentration recovery 10/50/200 -> 10/49/183 | DONE | the overdispersion parameter is identified, not absorbing slack |
-| c | psi recovery vs read depth | DONE | recovery RISES with coverage; a method at 1.0 on 1-2 reads would be fitting noise |
-| d | DS calibration vs LeafCutter, same sims, same truth | DONE | LeafletFA's LRT is better calibrated at every effect size (5.99 -> 0.33 vs 7.94 -> 2.16) and reaches nominal around effect 0.30; **LeafCutter never does** |
-| e | DS power at alpha 0.05 | DONE | more powerful than LeafCutter from effect 0.25 up; read ONLY beside d |
-| f | phi vs truth by regime | DONE | the limitation panel: the recipe recovers 58% of phi's accuracy, not all; delta = 5K is WORSE than doing nothing (0.08 vs 0.25) |
-| g | delta: calibration-power trade-off | DONE | delta 0.15 sits at ratio 1.2-2.0 with power 0.46-0.90; the operating point is READ off, not chosen |
-| h | fraction of atlas above each TV (LeafCutter-measured) | DONE | 28% of atlas pairs exceed 0.10, 18% exceed 0.15 -- the posterior test speaks to the top fifth |
-| **i** | **held-out imputation vs depth: LeafletFA / NMF / naive / mb_ct on the 30% split at 10-100% reads** | RUNNING (A3 sweep) | the ONLY imputation number scored on cells the model never saw |
-| **j** | **the same at dm_conc = 2 (measured effective sample size) for panels d/e** | RUNNING (`c2_*`) | answers "you tested calibration on data cleaner than the atlas" |
+| a | UMAP of TRUE phi, coloured by program (6,986 heart cells, K=5, 4,268 cassette exons, real depth) | DONE | this is what was simulated |
+| b | one DIFFERENTIAL exon: true skip-PSI per program + observed per-cell violins by program | DONE | what the model has to find from counts |
+| c | one NON-differential exon | DONE | what it must not call |
+| d | UMAP of LEARNED phi (LeafletFA), coloured by true program, silhouette 0.82 (truth 0.87) | DONE | recovers the programs |
+| e | NMF at the same rank, mean-imputed input, silhouette 0.41 | DONE | NMF merges programs even with imputation |
+| f | between-program delta-psi recovery vs NMF (best gauge) by effect | DONE | 0.21->0.85 vs 0.0->0.24 |
+| g | DS calibration: LFA LRT, LFA posterior P(TV>0.15) [from effect 0.25], LeafCutter | DONE | LFA tests reach 1.0 by effect 0.35; LeafCutter 2.2x at 1.0 |
+| h | DS power beside g | DONE | LRT >= LeafCutter everywhere; posterior conservative by design |
+| i | held-out atlas imputation: DM posterior mean vs NMF by % reads removed | A3 RUNNING (jobs 20621463-5) | plus SANITY_imputed_vs_raw_heldout.png: prior gets junction LEVEL (r 0.87) not within-junction ranking (0.11); posterior mean 0.98/0.95/0.74 at 10/50/90% removed; on entries with no reads left it reverts to the prior (0.14) |
 
-Captions MUST carry: sims at median 33 reads/ATSE vs atlas 16 (every power number is an optimistic
-bound); both methods anti-conservative below effect 0.20; delta 0.15 is derived (gate passed at
-ratio 0.93-1.02; atlas floor p99 = 0.13). Panel h is scoping, and its number belongs in the text.
+To supplement from FIG2_final: concentration recovery, psi vs depth, phi by regime, delta trade-off,
+atlas reach, conc-2 DS. Cell-type-mean baseline DROPPED everywhere (uses labels).
 
 ### Figure 3 — Differential splicing on the atlas, vs LeafCutter  [DATA-READY, TO-BUILD]
 
@@ -64,6 +66,7 @@ enters through the posterior test, which is the only arm that uses what LeafletF
 | d | Jaccard decomposition by LeafCutter-measured effect and by m | `analysis_group/jaccard_decomposition.tsv.gz` | agreement rises monotonically with effect (19% -> 61% both-called); disagreement splits along m: LeafletFA-only at m=2 (55%), LeafCutter-only at m>=6 (38%) where its null is 11x inflated |
 | e | posterior DS at delta 0.15: consensus set, COVERAGE-GATED, LeafletFA-only split by data support | A51 x3 seeds; `analysis_matched/posterior_consensus_gated.tsv.gz`; A65 `analysis_consistency/` | gate >=25 covered cells/arm (ungated 49,865 -> 7,041; 86% of ungated calls were extrapolation on <25 cells). Half of the gated calls are LeafCutter-confirmed. Of the 3,490 LeafletFA-only, **2,191 have observed pooled TV >= 0.15 in the contrast (real effects 7v8 pseudobulk missed), 1,299 do NOT** (hatched): psi is a global program property, so TV can be large because the PROGRAMS differ at that event while the two arms' own cells do not follow them (Gna13 ATSE1: posterior 0.33-0.41 every seed, cells 0.09). Say this in the text as a limitation of a K-program model, not hide it |
 | f | posterior test vs LeafCutter on the SAME question (A63) | A63 at delta 0.15 (re-run) | on LeafCutter's own large-effect set: lower recall, higher precision (0.81 vs 0.68 at 0.10). Conservative and precise rather than sensitive |
+| supp | per-ATSE effect sizes by contrast: posterior TV vs LeafCutter TV vs observed pooled TV, 6 contrasts | `code/build_effect_sizes_by_contrast.py` | LeafCutter TV tracks observed (Spearman 0.65-0.71); posterior TV saturates at a CONTRAST-SPECIFIC ceiling set by how far apart the groups' phi are (0.7 brain endo/oligo, 0.42 heart endo/fibro, ~0.1 skin basal/keratinocyte and intestine) -- cell types sharing programs cannot clear delta at any event. State as a property of the test |
 | g | worked examples with genomic context, SAME contrast (brain endothelial vs oligodendrocyte): Apbb2 (both) and Mbd3 (LeafletFA-only) | `code/build_examples_v2.py` -> `plots/FIG3_examples_v2.png` | junction arcs over transcripts + per-junction single-cell violins with per-mouse pseudobulk dots. Apbb2: LC q 3e-18, posterior TV 0.64-0.76, observed 0.98. Mbd3: 238/414 cells shift J1 0.19->0.37 (observed TV 0.35, posterior 0.25-0.28 all seeds) but the 7v8 pseudobulks overlap and LC q = 0.20. Examples gated on >=50 cells/arm AND observed TV >= 0.25. Gna13 (was here) and Usp54 (before that) both REMOVED: Usp54 was 14 covered cells, Gna13 was a program-only call. Fbln2 program decomposition moves to supp |
 
 ### Figure 4 — Aging  [TO-BUILD, biology]
