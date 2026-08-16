@@ -16,8 +16,16 @@ Two events, same layout per event:
 The posterior TV histogram from v1 is dropped: it repeats the P(TV > delta) number and adds little.
 
   Apbb2  ATSE 3   endothelial vs oligodendrocyte, brain    found by BOTH   (LC q 3e-18)
-  Gna13  ATSE 1   endothelial vs fibroblast, heart         LeafletFA ONLY  (LC q 0.63) -- and the
-                  same event is LeafletFA-only in four other tissues' mesenchymal-vs-immune contrasts
+  Mbd3   ATSE 1   endothelial vs oligodendrocyte, brain    LeafletFA ONLY  (LC q 0.20)
+                  Same contrast as Apbb2, so the two rows differ only in what LeafCutter could see.
+
+Gna13 ATSE1 (heart endothelial vs fibroblast) was here before and was WRONG as an example: the
+posterior gives TV 0.33-0.41 in all seeds but the covered cells sit at per-cell PSI 0.42 vs 0.36
+(pooled 0.55 vs 0.46) -- the model's group means (0.67 vs 0.23) are ~4-5 SE from the data in both
+arms. psi is a global program property and programs 7/10 are polarised at that event by brain cell
+types; the heart cells do not follow. A65 measures this across all calls: 37% of LeafletFA-only
+calls have observed pooled TV < 0.15. Every example here is now ALSO gated on observed pooled TV
+>= 0.25 in the contrast (A65 `obs_tv_pooled`), so what is shown is supported by the cells.
 """
 import os, sys, re
 import numpy as np, pandas as pd, h5py, scipy.sparse as sp
@@ -40,16 +48,18 @@ H5 = f"{M}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
 LCROOT = f"{M}/LEAFCUTTER_DS_2026-08/by_pair"
 DB = gffutils.FeatureDB(viz.DEFAULT_DB)
 C1, C2 = PALETTE["teal"], PALETTE["ochre"]
+GATED = pd.read_csv(f"{M}/LEAFCUTTER_CMP_DELTAONLY/analysis_matched/posterior_consensus_gated.tsv.gz", sep="\t")
+CONS = pd.read_csv(f"{M}/LEAFCUTTER_CMP_DELTAONLY/analysis_consistency/data_consistency.tsv.gz", sep="\t")
 
 EXAMPLES = [
     dict(gene="Apbb2", event="ENSMUSG00000029207.16_atse_3", tag="found by both",
          g1="Brain_Non-Myeloid_ENDOTHELIAL CELL", g2="Brain_Non-Myeloid_OLIGODENDROCYTE",
          lab1="endothelial", lab2="oligodendrocyte",
          lcdir="Brain_Non-Myeloid_ENDOTHELIAL_CELL__vs__Brain_Non-Myeloid_OLIGODENDROCYTE"),
-    dict(gene="Gna13", event="ENSMUSG00000020611.14_atse_1", tag="LeafletFA only",
-         g1="Heart_ENDOTHELIAL CELL", g2="Heart_FIBROBLAST",
-         lab1="endothelial", lab2="fibroblast",
-         lcdir="Heart_ENDOTHELIAL_CELL__vs__Heart_FIBROBLAST"),
+    dict(gene="Mbd3", event="ENSMUSG00000035478.14_atse_1", tag="LeafletFA only",
+         g1="Brain_Non-Myeloid_ENDOTHELIAL CELL", g2="Brain_Non-Myeloid_OLIGODENDROCYTE",
+         lab1="endothelial", lab2="oligodendrocyte",
+         lcdir="Brain_Non-Myeloid_ENDOTHELIAL_CELL__vs__Brain_Non-Myeloid_OLIGODENDROCYTE"),
 ]
 
 
@@ -140,6 +150,14 @@ def main():
         sig = pd.read_csv(f"{lcd}/ds_results_cluster_significance.txt", sep="\t")
         sig["cluster"] = sig.cluster.str.replace(r"^chr[^:]*:", "", regex=True).str.replace(r"_[+-]$", "", regex=True)
         q_lc = float(sig.loc[sig.cluster == ex["event"], "p.adjust"].iloc[0])
+        # LeafletFA side: posterior TV per seed (A51 consensus table) and the observed pooled TV (A65)
+        gk = ex["lcdir"]
+        gr = GATED[(GATED.contrast == gk) & (GATED.cluster == ex["event"])]
+        cr = CONS[(CONS.contrast == gk) & (CONS.cluster == ex["event"])]
+        tv_seeds = gr[["tv_post_mean_0", "tv_post_mean_1", "tv_2"]].values.ravel() if len(gr) else []
+        lfa_txt = (f"LeafletFA posterior TV = {np.min(tv_seeds):.2f}-{np.max(tv_seeds):.2f} "
+                   f"({int(gr.votes.iloc[0])}/3 seeds q<=0.05)   observed pooled TV = "
+                   f"{float(cr.obs_tv_pooled.iloc[0]):.2f}") if len(gr) and len(cr) else ""
 
         # ---- per-junction usage panels
         n1 = len(r1); is1 = np.r_[np.ones(n1, bool), np.zeros(len(r2), bool)]
@@ -176,8 +194,10 @@ def main():
             else:
                 ax.set_yticklabels([])
             despine(ax)
-        fig.text(0.99, outer[row].get_position(fig).y0 - 0.005,
-                 f"LeafCutter q = {q_lc:.2g}", ha="right", fontsize=6.5, color=METHOD_COLORS["NMF"])
+        axg.text(0.995, 0.98, f"LeafCutter (7 v 8 pseudobulk) q = {q_lc:.2g}", transform=axg.transAxes,
+                 ha="right", va="top", fontsize=6, color=METHOD_COLORS["NMF"], zorder=6)
+        axg.text(0.995, 0.84, lfa_txt.replace("   ", "\n"), transform=axg.transAxes, ha="right", va="top",
+                 fontsize=6, color=METHOD_COLORS["LeafletFA"], zorder=6)
     out = os.path.join(FIGROOT, "FIGURE3_leafcutter_ds", "plots", "FIG3_examples_v2")
     save(fig, out); print(f"-> {out}.[pdf|png]")
 

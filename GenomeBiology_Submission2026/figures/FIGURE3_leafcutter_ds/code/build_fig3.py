@@ -119,20 +119,35 @@ def panel_d(ax):
 
 
 def panel_e(ax):
-    """posterior DS at delta 0.15 with the COVERAGE GATE: >= 25 covered cells in each arm.
+    """posterior DS at delta 0.15 with the COVERAGE GATE: >= 25 covered cells in each arm, and the
+    LeafletFA-only bar split by whether the CELLS in that contrast support the call.
 
     Ungated, 86% of consensus calls sat on events with <25 covered cells in one arm -- the model
-    reporting its imputation prior, not the data. Gated, the posterior test is conservative on
-    well-covered events and half its calls are independently made by LeafCutter."""
+    reporting its imputation prior, not the data. Gated, half of the posterior calls are made
+    independently by LeafCutter. Of the rest, A65 shows 37% have observed pooled TV < 0.15 in the
+    contrast: psi is a global program property, and TV = sum_k dphi_k psi_kj can be large because
+    the PROGRAMS differ at that event (pinned by other cell types) even when the two arms' cells do
+    not follow them (Gna13 ATSE1, heart endothelial vs fibroblast: posterior 0.33-0.41, cells 0.09).
+    Those are shown hatched: they are the model's inference about programs, not a data-supported
+    discovery in that contrast, and the text must say so."""
     X = pd.read_csv(f"{O}/analysis_matched/posterior_consensus_gated.tsv.gz", sep="\t")
+    D = pd.read_csv(f"{O}/analysis_consistency/data_consistency.tsv.gz", sep="\t",
+                    usecols=["contrast", "cluster", "obs_tv_pooled"])
+    X = X.merge(D, on=["contrast", "cluster"], how="left")
     el = X[X.mincov >= 25]
     a, b = el.lfa_cons.values, el.lc_sig.values
-    both, lfa_only, lc_only = int((a & b).sum()), int((a & ~b).sum()), int((~a & b).sum())
-    x = np.arange(3); vals = [lc_only, both, lfa_only]
-    cols = [LC, OLIVE, LFA]
-    ax.bar(x, vals, color=cols, width=0.7)
-    for i, v in enumerate(vals):
+    sup = (el.obs_tv_pooled.values >= 0.15)
+    both, lc_only = int((a & b).sum()), int((~a & b).sum())
+    lfa_sup, lfa_unsup = int((a & ~b & sup).sum()), int((a & ~b & ~sup).sum())
+    x = np.arange(3)
+    ax.bar(x[:2], [lc_only, both], color=[LC, OLIVE], width=0.7)
+    ax.bar(x[2], lfa_sup, color=LFA, width=0.7)
+    ax.bar(x[2], lfa_unsup, bottom=lfa_sup, color="white", edgecolor=LFA, hatch="////", lw=0.8, width=0.7)
+    for i, v in enumerate([lc_only, both, lfa_sup + lfa_unsup]):
         ax.annotate(f"{v:,}", (i, v), ha="center", va="bottom", fontsize=6)
+    ax.annotate(f"{lfa_sup:,} cells agree\n(observed TV$\\geq$0.15)", (2.42, lfa_sup * 0.25), fontsize=5, color=LFA, va="center")
+    ax.annotate(f"{lfa_unsup:,} programs only\n(observed TV$<$0.15)", (2.42, lfa_sup + lfa_unsup + 2200), fontsize=5, color=LFA, va="center")
+    ax.set_xlim(-0.6, 3.3)
     ax.set_xticks(x); ax.set_xticklabels(["LeafCutter\nonly", "both", "LeafletFA\nposterior only"], fontsize=6)
     ax.set_ylabel("ATSEs called\n(70 contrasts, $\\geq$25 covered cells / arm)")
     ax.annotate(f"eligible: {len(el):,} (contrast, ATSE) pairs\nposterior: $P(TV>0.15)$, q$\\leq$0.05,\n$\\geq$2 of 3 seeds",
