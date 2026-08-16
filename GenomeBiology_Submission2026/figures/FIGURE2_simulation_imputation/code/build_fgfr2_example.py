@@ -33,7 +33,8 @@ import gffutils
 
 M = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{M}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
-FIT = f"{M}/ATLAS_DM/runs_final_deltaonly/dm_simplex_K20_seed0_b8192/fit.npz"
+FITS = [f"{M}/ATLAS_DM/runs_final_deltaonly/dm_simplex_K20_seed{s}_b8192/fit.npz" for s in (0, 1, 2)]
+FIT = FITS[0]
 EV = "ENSMUSG00000030849.18_atse_3"
 J_IIIB, J_IIIC = "chr7_130199905_130200982_-", "chr7_130198563_130200982_-"
 EPI = ("EPITHELIAL", "KERATINOCYTE", "BASAL", "HEPATOCYTE", "DUCTAL", "INTESTINAL", "ISLET", "KIDNEY CELL", "LUMINAL")
@@ -61,14 +62,12 @@ def lineage(t):
 
 
 def load():
-    z = np.load(FIT, allow_pickle=True)
-    fev = np.asarray(z["event_id"]).astype(str); inv = np.asarray(z["inv_ev"]).astype(np.int64)
-    e = int(np.flatnonzero(fev == EV)[0]); cols = np.flatnonzero(inv == e)
-    phi = np.asarray(z["phi"]); conc = float(np.asarray(z["bb_conc_vec"])[e])
-    psi = segment_softmax(torch.from_numpy(np.asarray(z["psi_loc"], np.float32)), torch.from_numpy(inv), len(fev)).numpy()[:, cols]
     if os.path.exists(CACHE):
         c = np.load(CACHE, allow_pickle=True); Y = c["Y"]; lab = c["lab"]; jn = c["jn"]
     else:
+        z0 = np.load(FIT, allow_pickle=True)
+        fev = np.asarray(z0["event_id"]).astype(str); inv = np.asarray(z0["inv_ev"]).astype(np.int64)
+        e = int(np.flatnonzero(fev == EV)[0]); cols = np.flatnonzero(inv == e)
         with h5py.File(H5, "r") as f:
             jid = cat(f["var/junction_id"]) if isinstance(f["var/junction_id"], h5py.Group) else f["var/junction_id"][:].astype(str)
             lab = cat(f["obs/tissue_cell_type"]); N = len(lab)
@@ -80,22 +79,31 @@ def load():
                 for jj, cc in enumerate(cols):
                     m = idx == cc; Y[rowid[m], jj] += dat[m]
         jn = jid[cols]; np.savez_compressed(CACHE, Y=Y, lab=lab, jn=jn)
-    prow = phi_row_of(z, len(lab)); tr = prow >= 0
-    ib = int(np.flatnonzero(jn == J_IIIB)[0])
-    Nt = Y.sum(1)
-    rho = np.full((len(lab), len(cols)), np.nan, np.float32); rho[tr] = phi[prow[tr]] @ psi
-    post = (conc * rho + Y) / (conc + Nt[:, None])
+    ib = int(np.flatnonzero(jn == J_IIIB)[0]); Nt = Y.sum(1)
     raw = np.where(Nt > 0, Y[:, ib] / np.maximum(Nt, 1), np.nan)
-    df = pd.DataFrame(dict(lab=lab, raw=raw, post=post[:, ib], n=Nt, tr=tr))
-    df["lin"] = [lineage(t) for t in df.lab]
-    PH = np.full((len(lab), phi.shape[1]), np.nan, np.float32); PH[tr] = phi[prow[tr]]
-    return df, PH, z, jn
+    df = pd.DataFrame(dict(lab=lab, raw=raw, n=Nt)); df["lin"] = [lineage(t) for t in df.lab]
+    seeds = []
+    for fp in FITS:
+        z = np.load(fp, allow_pickle=True)
+        fev = np.asarray(z["event_id"]).astype(str); inv = np.asarray(z["inv_ev"]).astype(np.int64)
+        e = int(np.flatnonzero(fev == EV)[0]); cols = np.flatnonzero(inv == e)
+        phi = np.asarray(z["phi"]); conc = float(np.asarray(z["bb_conc_vec"])[e])
+        psi = segment_softmax(torch.from_numpy(np.asarray(z["psi_loc"], np.float32)), torch.from_numpy(inv), len(fev)).numpy()[:, cols]
+        prow = phi_row_of(z, len(lab)); tr = prow >= 0
+        rho = np.full((len(lab), len(cols)), np.nan, np.float32); rho[tr] = phi[prow[tr]] @ psi
+        post = (conc * rho + Y) / (conc + Nt[:, None])
+        PH = np.full((len(lab), phi.shape[1]), np.nan, np.float32); PH[tr] = phi[prow[tr]]
+        seeds.append(dict(post=post[:, ib], PH=PH, order=sp_order(z), psi_b=psi[:, ib], tr=tr))
+    df["tr"] = seeds[0]["tr"]
+    for i, sd in enumerate(seeds): df[f"post_{i}"] = sd["post"]
+    df["post"] = df[[f"post_{i}" for i in range(len(seeds))]].mean(1)
+    return df, seeds, jn
 
 
 def main():
     apply_theme()
-    df, PH, z, jn = load()
-    order = sp_order(z); K = len(order)
+    df, seeds, jn = load()
+    K = len(seeds[0]["order"])
     ct = df[df.tr].groupby("lab").agg(ncell=("tr", "size"), ncov=("n", lambda x: int((x > 0).sum())), lin=("lin", "first"),
                                      raw_mean=("raw", "mean"), post_mean=("post", "mean"))
     keep = ct[(ct.ncov >= 5) & ct.lin.isin(["epithelial", "mesenchymal"])].copy()
@@ -104,10 +112,10 @@ def main():
     types = list(keep.index)
     col = {"epithelial": PALETTE["ochre"], "mesenchymal": PALETTE["teal"], "neural / glial": PALETTE["indigo"], "other": PALETTE["grey"]}
 
-    fig = plt.figure(figsize=figsize("double", h=8.4))
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.5, 1.5], hspace=0.6)
+    fig = plt.figure(figsize=figsize("double", h=8.6))
+    gs = fig.add_gridspec(3, 3, height_ratios=[0.9, 1.5, 1.6], hspace=0.65, wspace=0.55)
     # a: gene model
-    ax = fig.add_subplot(gs[0])
+    ax = fig.add_subplot(gs[0, :])
     parts = [j.split("_") for j in jn]; chrom = parts[0][0]; strand = parts[0][3]
     starts = np.array([int(p[1]) for p in parts]); ends = np.array([int(p[2]) for p in parts])
     # window: the shared upstream exon (ends 130,200,982), IIIb, IIIc, and the shared downstream exon
@@ -124,8 +132,8 @@ def main():
     ax.set_xlabel(f"{chrom} ({strand})", fontsize=6); ax.ticklabel_format(axis="x", style="plain", useOffset=False); ax.tick_params(axis="x", labelsize=5.5)
     ax.set_title("$Fgfr2$ ATSE 3: mutually exclusive exons IIIb / IIIc", fontsize=8, loc="left"); panel_label(ax, "a", dx=-0.02)
 
-    # b: per cell type raw vs imputed
-    ax = fig.add_subplot(gs[1])
+    # b: per cell type raw vs imputed (imputed = mean over the 3 seeds per cell; seed means as ticks)
+    ax = fig.add_subplot(gs[1, :])
     for i, t in enumerate(types):
         s = df[(df.lab == t) & df.tr]; c = col[keep.loc[t, "lin"]]
         v = s.raw.dropna().values; rng = np.random.default_rng(i)
@@ -137,6 +145,8 @@ def main():
         vp = ax.violinplot([w], positions=[i + 0.2], widths=0.38, showextrema=False, points=40)
         for b in vp["bodies"]: b.set_facecolor(c); b.set_alpha(0.85); b.set_edgecolor("black"); b.set_linewidth(0.4)
         ax.hlines(w.mean(), i + 0.02, i + 0.38, color="black", lw=1.1, zorder=5)
+        for k_ in range(3):
+            ax.plot(i + 0.42, s[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
         ax.text(i, -0.12, f"{len(v)}", ha="center", fontsize=4.5, color=c)
         ax.text(i, -0.2, f"{len(w):,}", ha="center", fontsize=4.5, color="black")
     ax.text(-0.9, -0.12, "covered", ha="right", fontsize=4.5); ax.text(-0.9, -0.2, "all cells", ha="right", fontsize=4.5)
@@ -146,31 +156,26 @@ def main():
     ax.set_ylim(-0.25, 1.08); ax.set_xlim(-1.2, len(types) - 0.4); ax.set_ylabel("IIIb usage per cell")
     from matplotlib.lines import Line2D
     h = [mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.3, label="raw, covered cells (jitter + violin)"),
-         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA imputed (DM posterior mean), all cells")]
+         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA imputed (DM posterior mean, mean of 3 seeds), all cells; ticks = each seed's mean")]
     h += [mpatches.Patch(facecolor=col[k], label=k) for k in ["epithelial", "mesenchymal"]]
     ax.legend(handles=h, frameon=False, fontsize=5, ncol=3, loc="upper right", bbox_to_anchor=(1, 1.12))
     despine(ax); panel_label(ax, "b", dx=-0.02)
 
-    # c: phi heatmap of the same cell types, SP order
-    ax = fig.add_subplot(gs[2])
-    Mphi = np.vstack([np.nanmean(PH[(df.lab == t).values], 0) for t in types])[:, order]
+    # c: phi heatmap of the same cell types, one per seed, each clustered on its own phi, SP order per seed
     from scipy.cluster.hierarchy import linkage, leaves_list
-    co = leaves_list(linkage(Mphi, "average", metric="cityblock")); ctypes = [types[i] for i in co]
-    im = ax.imshow(Mphi[co].T, aspect="auto", cmap="Greens", vmin=0, vmax=0.8)
-    ax.set_xticks(range(len(ctypes))); ax.set_xticklabels([t.replace("_", " ").replace("Non-Myeloid ", "").replace("Isocortex ", "").lower() for t in ctypes], rotation=60, ha="right", fontsize=5)
-    for lbl, t in zip(ax.get_xticklabels(), ctypes): lbl.set_color(col[keep.loc[t, "lin"]])
-    ax.set_yticks(range(K)); ax.set_yticklabels([f"SP{r+1}" for r in range(K)], fontsize=5)
-    ax.set_ylabel("splicing program (SP1 = largest $\\pi$)")
-    # psi_IIIb per program, as text on the right
-    fev = np.asarray(z["event_id"]).astype(str); inv = np.asarray(z["inv_ev"]).astype(np.int64)
-    e = int(np.flatnonzero(fev == EV)[0]); cols_ = np.flatnonzero(inv == e)
-    psi = segment_softmax(torch.from_numpy(np.asarray(z["psi_loc"], np.float32)), torch.from_numpy(inv), len(fev)).numpy()[:, cols_]
-    ib = int(np.flatnonzero(jn == J_IIIB)[0])
-    for r in range(K):
-        ax.text(len(types) - 0.3, r, f"$\\psi_{{IIIb}}$={psi[order[r], ib]:.2f}", va="center", fontsize=4.5, color=PALETTE["grey"])
-    ax.set_xlim(-0.5, len(types) + 3.5)
-    cb = fig.colorbar(im, ax=ax, fraction=0.02, pad=0.01); cb.set_label("mean $\\phi$", fontsize=6); cb.ax.tick_params(labelsize=5)
-    ax.set_title("program usage of these cell types (columns clustered on $\\phi$ alone; label colour = lineage), and each program's IIIb usage", fontsize=7, loc="left"); panel_label(ax, "c", dx=-0.02)
+    for k_, sd in enumerate(seeds):
+        ax = fig.add_subplot(gs[2, k_])
+        order = sd["order"]
+        Mphi = np.vstack([np.nanmean(sd["PH"][(df.lab == t).values], 0) for t in types])[:, order]
+        co = leaves_list(linkage(Mphi, "average", metric="cityblock")); ctypes = [types[i] for i in co]
+        im = ax.imshow(Mphi[co].T, aspect="auto", cmap="Greens", vmin=0, vmax=0.8)
+        ax.set_xticks(range(len(ctypes))); ax.set_xticklabels([t.replace("_", " ").replace("Non-Myeloid ", "").lower() for t in ctypes], rotation=70, ha="right", fontsize=4)
+        for lbl, t in zip(ax.get_xticklabels(), ctypes): lbl.set_color(col[keep.loc[t, "lin"]])
+        ax.set_yticks(range(K)); ax.set_yticklabels([f"SP{r+1} ($\\psi_{{IIIb}}$ {sd['psi_b'][order[r]]:.2f})" for r in range(K)], fontsize=4)
+        if k_ == 0: ax.set_ylabel("program (SP1 = largest $\\pi$), with its IIIb usage")
+        ax.set_title(f"seed {k_}: mean $\\phi$, columns clustered", fontsize=6.5, loc="left")
+        if k_ == 0: panel_label(ax, "c", dx=-0.02)
+    cb = fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02); cb.set_label("mean $\\phi$", fontsize=6); cb.ax.tick_params(labelsize=5)
     out = os.path.join(FIGROOT, "FIGURE2_simulation_imputation", "plots", "FIG2_supp_Fgfr2_IIIb_IIIc")
     save(fig, out); print("->", out)
 
