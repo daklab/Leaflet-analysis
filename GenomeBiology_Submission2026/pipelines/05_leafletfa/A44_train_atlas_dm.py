@@ -106,6 +106,11 @@ def main():
                     help="floor phi away from the simplex corners. 19 of 1.3M phi entries sit below "
                          "1e-6 on the atlas, and exactly 18 phi entries were non-finite at the "
                          "divergence -- the same cells. Their transform gradient scales as 1/phi.")
+    ap.add_argument("--permute-atse-frac", type=float, default=0.0,
+                    help="permute this fraction of ATSEs across cells before fitting, as negative "
+                         "controls. Lets delta be measured on the atlas instead of imported from a "
+                         "simulation whose depth and effect-size range differ from the real data.")
+    ap.add_argument("--permute-seed", type=int, default=0)
     ap.add_argument("--holdout-ids", default=None,
                     help="file of row indices to hold out, one per line. Overrides --holdout-frac. "
                          "Use this to match an EXISTING split (e.g. test_30_70) so downsampled "
@@ -202,6 +207,19 @@ def main():
         print(f"[2b] holding out {len(ho_idx):,} cells ({100*args.holdout_frac:.0f}%), "
               f"training on {len(keep):,}. Seed is FIXED at 12345 so every fit is scored on the "
               f"same cells and the numbers are comparable across runs.", flush=True)
+    permuted_atses = np.zeros(0, np.int64)
+    if args.permute_atse_frac > 0:
+        # Negative-control ATSEs, so delta can be MEASURED on the atlas rather than imported from a
+        # simulation. These events are null by construction; the untouched majority still pin phi,
+        # so dphi keeps the magnitude a real cell-type contrast has. Their TV distribution is the
+        # model's resolution floor at the right scale, with no truth labels required.
+        from _permute_null import permute_atse_counts
+        _ai, _, _ = build_atse_index(ev)
+        junc, clus, permuted_atses = permute_atse_counts(
+            junc, clus, np.asarray(_ai), n_atse, args.permute_atse_frac,
+            seed=args.permute_seed)
+        print(f"[2c] permuted {len(permuted_atses):,} of {n_atse:,} ATSEs "
+              f"({100*args.permute_atse_frac:.0f}%) as negative controls", flush=True)
     print(f"[2] loaded in {time.time()-t0:.0f}s ({junc.nbytes/1e9:.1f} GB each), "
           f"coverage {100*(clus>0).mean():.2f}%, observed rate {junc.sum()/max(clus.sum(),1):.4f}",
           flush=True)
@@ -390,6 +408,7 @@ def main():
                         trace_pi=(np.stack([t["pi"] for t in tr]).astype(np.float32)
                                   if tr and tr[0]["pi"].size else np.zeros((0, 0), np.float32)),
                         psi_mean=psi, phi=phi, psi_loc=to_np(loc), psi_scale=to_np(scale),
+                        permuted_atses=permuted_atses.astype(np.int64),
                         event_id=np.asarray(uq, dtype=object), inv_ev=inv.astype(np.int32),
                         # WHICH atlas cells phi's rows correspond to. With --holdout-frac, phi
                         # covers only the training cells, so anything indexing phi by atlas cell
