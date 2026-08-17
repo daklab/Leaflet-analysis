@@ -34,9 +34,10 @@ LeafletFA's prior φ·ψ, NMF at the same rank (mean- and zero-imputed input) an
 all near the floor (0.03–0.06), LeafletFA highest at heavy loss. Inset: on all covered entries,
 methods that keep the cell's remaining reads (LeafletFA posterior mean 0.85 → 0.50 at 10 → 90%
 removed; junction mean + own reads 0.89 → 0.51) sit far above NMF (0.10 → 0.07). Read together: at
-~2 effective molecules per cell no label-free method ranks cells within a junction from nothing;
-what LeafletFA adds is the junction-level composition, graceful degradation, and calibrated
-per-cell uncertainty (supplement, A68). Full-scale sanity plot on all 39,812 held-out cells:
+~2 effective molecules per cell the per-cell observation cannot rank cells within a junction, so
+no method (the label-based cell-type mean included, 0.04) scores above the floor there; per-cell
+estimates are validated at the cell-type and group level (supplement: SP activity by cell type,
+training vs held-out; A66 cell-type-level usage), and carry calibrated uncertainty (A68). Full-scale sanity plot on all 39,812 held-out cells:
 `plots/SANITY_imputed_vs_raw_heldout.png` (posterior mean / NMF / junction-mean rows; the
 "all entries" correlation of 0.86 for a per-junction constant shows why only within-junction
 numbers are quoted).
