@@ -69,7 +69,10 @@ def cat(name, which):
 
 def main():
     T.apply_theme()
-    z = np.load(FIT)
+    z = np.load(FIT, allow_pickle=True)
+    import sys as _s; _s.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '_common'))
+    from programs import sp_rank
+    SPR = sp_rank(z)   # fit index -> SP number (SP1 = largest pi)
     # DM+simplex fits store the point estimate as psi_mean; the released BetaBinomial fits as psi.
     phi = z["phi"]
     psi = z["psi"] if "psi" in z.files else z["psi_mean"]
@@ -101,12 +104,13 @@ def main():
     # ── a: psi for the three junctions across programs ───────────────────────
     ax = fig.add_subplot(gs[0, :])
     x = np.arange(K)
+    ORD = np.argsort(SPR)                    # SP1 first
     w = 0.27
     cols = [T.PALETTE["teal"], T.PALETTE["ochre"], T.PALETTE["indigo"]]
     for i, (jj, role) in enumerate(zip(idx, roles)):
-        ax.bar(x + (i - 1) * w, psi[:, jj], w, color=cols[i], label=role)
+        ax.bar(x + (i - 1) * w, psi[ORD, jj], w, color=cols[i], label=role)
     st = 1 if K <= 20 else 2
-    ax.set_xticks(x[::st]); ax.set_xticklabels(x[::st])
+    ax.set_xticks(x[::st]); ax.set_xticklabels([f"SP{k+1}" for k in x[::st]], fontsize=5, rotation=90)
     ax.set_xlabel("splicing program")
     ax.set_ylabel(r"$\psi$ — program's" "\nuse of the junction")
     ax.legend(frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.28))
@@ -115,11 +119,11 @@ def main():
 
     # ── b: phi-bar per cell type, and the difference ─────────────────────────
     ax = fig.add_subplot(gs[1, :])
-    ax.bar(x - 0.2, A, 0.4, color=T.PALETTE["teal"], label=G1.replace("_", " ").title())
-    ax.bar(x + 0.2, B, 0.4, color=T.PALETTE["ochre"], label=G2.replace("_", " ").title())
-    ax.plot(x, np.abs(d), "o", ms=2.6, color=T.INK, label=r"|difference|")
+    ax.bar(x - 0.2, A[ORD], 0.4, color=T.PALETTE["teal"], label=G1.replace("_", " ").title())
+    ax.bar(x + 0.2, B[ORD], 0.4, color=T.PALETTE["ochre"], label=G2.replace("_", " ").title())
+    ax.plot(x, np.abs(d)[ORD], "o", ms=2.6, color=T.INK, label=r"|difference|")
     st = 1 if K <= 20 else 2
-    ax.set_xticks(x[::st]); ax.set_xticklabels(x[::st])
+    ax.set_xticks(x[::st]); ax.set_xticklabels([f"SP{k+1}" for k in x[::st]], fontsize=5, rotation=90)
     ax.set_xlabel("splicing program")
     ax.set_ylabel(r"$\bar{\phi}$ — cell type's" "\nuse of the program")
     ax.legend(frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.28))
@@ -164,9 +168,9 @@ def main():
     ax.bar(np.arange(len(means))[is_heart], means.values[is_heart], 1.0,
            color=T.PALETTE["rose"], label="heart cell types")
     ax.set_xlabel(f"cell types, ranked ({len(means)} total)")
-    ax.set_ylabel(f"mean use of program {top_shared}")
+    ax.set_ylabel(f"mean use of SP{SPR[top_shared]}")
     hr = np.flatnonzero(is_heart) + 1
-    ax.set_title(f"program {top_shared}: shared by both heart types\n"
+    ax.set_title(f"SP{SPR[top_shared]}: shared by both heart types\n"
                  f"heart ranks {', '.join(map(str, hr))} of {len(means)}",
                  fontsize=T.PT["annot"], pad=4)
     ax.legend(frameon=False, fontsize=T.PT["legend"] - 1)

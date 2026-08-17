@@ -146,7 +146,7 @@ def panel_e(ax):
     for i, v in enumerate([lc_only, both, lfa_sup + lfa_unsup]):
         ax.annotate(f"{v:,}", (i, v), ha="center", va="bottom", fontsize=6)
     ax.annotate(f"{lfa_sup:,} cells agree\n(observed TV$\\geq$0.15)", (2.42, lfa_sup * 0.25), fontsize=5, color=LFA, va="center")
-    ax.annotate(f"{lfa_unsup:,} programs only\n(observed TV$<$0.15)", (2.42, lfa_sup + lfa_unsup + 2200), fontsize=5, color=LFA, va="center")
+    ax.annotate(f"{lfa_unsup:,} program-level\n(observed TV$<$0.15)", (2.42, lfa_sup + lfa_unsup + 2200), fontsize=5, color=LFA, va="center")
     ax.set_xlim(-0.6, 3.3)
     ax.set_xticks(x); ax.set_xticklabels(["LeafCutter\nonly", "both", "LeafletFA\nposterior only"], fontsize=6)
     ax.set_ylabel("ATSEs called\n(70 contrasts, $\\geq$25 covered cells / arm)")
@@ -175,26 +175,51 @@ def panel_g(ax):
     ax.imshow(mpimg.imread(p)); ax.axis("off")
 
 
+def panel_k(ax):
+    """posterior test across model rank: consensus calls, LeafCutter agreement, overlap with K=20."""
+    d = pd.read_csv(f"{O}/ksweep/summary_by_K.tsv", sep="\t").set_index("K")
+    x = np.arange(len(d)); w = 0.38
+    ax.bar(x - w/2, d.consensus, w, color=LFA, label="posterior consensus calls (gated)")
+    ax.bar(x + w/2, d.both, w, color=OLIVE, label="of which LeafCutter agrees")
+    for i, (c, b) in enumerate(zip(d.consensus, d.both)):
+        ax.annotate(f"{c:,}", (i - w/2, c), ha="center", va="bottom", fontsize=5.5)
+        ax.annotate(f"{100*b/c:.0f}%", (i + w/2, b), ha="center", va="bottom", fontsize=5.5, color=OLIVE)
+    ax.set_xticks(x); ax.set_xticklabels([f"K = {k}" for k in d.index])
+    ax.set_ylabel("ATSEs called (70 contrasts, 3 seeds each)")
+    ax.annotate("call-set Jaccard vs K=20: K10 0.52, K30 0.71\nper-contrast TV rank $\\rho$: 0.93, 0.97", (0.02, 0.97), xycoords="axes fraction", va="top", fontsize=5.5, color=GREY)
+    ax.legend(frameon=False, fontsize=5.5, loc="upper right")
+
+
 def main():
     apply_theme()
-    fig = plt.figure(figsize=figsize("double", h=8.6))
-    gs = fig.add_gridspec(3, 3, height_ratios=[1, 1, 1.9])
-    axes = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]),
-            fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1]), fig.add_subplot(gs[1, 2]),
-            fig.add_subplot(gs[2, :])]
-    for ax, fn, L in zip(axes, [panel_a, panel_b, panel_c, panel_d, panel_e, panel_f, panel_g], "abcdefg"):
+    # MAIN: b calibration by m | c calls at matched FDP | e posterior split bar ; g examples
+    fig = plt.figure(figsize=figsize("double", h=7.4))
+    gs = fig.add_gridspec(2, 3, height_ratios=[1, 2.1])
+    axes = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[0, 2]), fig.add_subplot(gs[1, :])]
+    for ax, fn, L in zip(axes, [panel_b, panel_c, panel_e, panel_g], "abcd"):
         try:
             fn(ax)
         except Exception as e:
-            ax.text(.5, .5, f"{L}: {type(e).__name__}\n{e}", ha="center", va="center",
-                    transform=ax.transAxes, fontsize=5, color=GREY, wrap=True)
+            ax.text(.5, .5, f"{L}: {type(e).__name__}\n{e}", ha="center", va="center", transform=ax.transAxes, fontsize=5, color=GREY, wrap=True)
             print(f"  panel {L} FAILED: {type(e).__name__}: {e}", flush=True)
-        if L != "g": despine(ax)
+        if L != "d": despine(ax)
         panel_label(ax, L)
     fig.tight_layout(w_pad=1.6, h_pad=2.0)
     os.makedirs(PLOTS, exist_ok=True)
-    save(fig, os.path.join(PLOTS, "FIG3_draft"))
-    print(f"-> {PLOTS}/FIG3_draft.[pdf|png]")
+    save(fig, os.path.join(PLOTS, "FIG3_main")); print(f"-> {PLOTS}/FIG3_main.[pdf|png]")
+    # SUPP: a QQ | d Jaccard by effect | f A63 | k K sweep
+    fig = plt.figure(figsize=figsize("double", h=5.2))
+    gs = fig.add_gridspec(2, 2)
+    axes = [fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, 0]), fig.add_subplot(gs[1, 1])]
+    for ax, fn, L in zip(axes, [panel_a, panel_d, panel_f, panel_k], "abcd"):
+        try:
+            fn(ax)
+        except Exception as e:
+            ax.text(.5, .5, f"{L}: {type(e).__name__}\n{e}", ha="center", va="center", transform=ax.transAxes, fontsize=5, color=GREY, wrap=True)
+            print(f"  supp panel {L} FAILED: {type(e).__name__}: {e}", flush=True)
+        despine(ax); panel_label(ax, L)
+    fig.tight_layout(w_pad=1.6, h_pad=2.0)
+    save(fig, os.path.join(PLOTS, "FIG3_supp_calibration_and_K")); print(f"-> {PLOTS}/FIG3_supp_calibration_and_K.[pdf|png]")
 
 
 if __name__ == "__main__":
