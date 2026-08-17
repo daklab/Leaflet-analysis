@@ -26,7 +26,7 @@ def main():
     apply_theme()
     files = sorted(glob.glob(f"{D}/level_*.npz")); Z = [np.load(f) for f in files]
     NM = {int(np.load(f)["level"]): np.load(f) for f in glob.glob(f"{D}/nmf_level_*.npz")}
-    rows = [("post", "LeafletFA\nDM posterior mean", LFA)] + ([("nmf", "NMF (rank 20,\nmean-imputed input)", LC)] if NM else []) + [("jmean", "junction mean\n(baseline)", GREY)]
+    rows = [("pure", "LeafletFA prior $\\phi\\cdot\\psi$\n(no reads from the cell)", PALETTE["olive"]), ("post", "LeafletFA\nDM posterior mean", LFA)] + ([("nmf", "NMF (rank 20,\nmean-imputed input)", LC)] if NM else []) + [("jmean", "junction mean\n(baseline)", GREY)]
     fig, axes = plt.subplots(len(rows), len(Z), figsize=figsize("double", h=2.3 * len(rows)), squeeze=False)
     tab = []
     for c, z in enumerate(Z):
@@ -48,7 +48,7 @@ def main():
             if c == 0: ax.set_ylabel(lab + "\nimputed PSI", fontsize=6.5)
             if r_ == len(rows) - 1: ax.set_xlabel("observed PSI at full coverage\n(held-out cells, $\\geq$5 reads)", fontsize=6.5)
             despine(ax)
-    for ax, l in zip(axes[:, 0], "abc"): panel_label(ax, l)
+    for ax, l in zip(axes[:, 0], "abcd"): panel_label(ax, l)
     fig.suptitle("All 39,812 held-out cells (70/30 fit), HVJ junctions: imputed vs observed junction usage", fontsize=8, y=0.995)
     fig.tight_layout()
     pd.DataFrame(tab).to_csv(f"{D}/summary_stats.tsv", sep="\t", index=False); print(pd.DataFrame(tab).round(3).to_string())

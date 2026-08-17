@@ -93,10 +93,11 @@ def load():
         rho = np.full((len(lab), len(cols)), np.nan, np.float32); rho[tr] = phi[prow[tr]] @ psi
         post = (conc * rho + Y) / (conc + Nt[:, None])
         PH = np.full((len(lab), phi.shape[1]), np.nan, np.float32); PH[tr] = phi[prow[tr]]
-        seeds.append(dict(post=post[:, ib], PH=PH, order=sp_order(z), psi_b=psi[:, ib], tr=tr))
+        seeds.append(dict(post=post[:, ib], prior=rho[:, ib], PH=PH, order=sp_order(z), psi_b=psi[:, ib], tr=tr))
     df["tr"] = seeds[0]["tr"]
-    for i, sd in enumerate(seeds): df[f"post_{i}"] = sd["post"]
+    for i, sd in enumerate(seeds): df[f"post_{i}"] = sd["post"]; df[f"prior_{i}"] = sd["prior"]
     df["post"] = df[[f"post_{i}" for i in range(len(seeds))]].mean(1)
+    df["prior"] = df[[f"prior_{i}" for i in range(len(seeds))]].mean(1)
     return df, seeds, jn
 
 
@@ -137,16 +138,20 @@ def main():
     for i, t in enumerate(types):
         s = df[(df.lab == t) & df.tr]; c = col[keep.loc[t, "lin"]]
         v = s.raw.dropna().values; rng = np.random.default_rng(i)
-        vp = ax.violinplot([v], positions=[i - 0.2], widths=0.38, showextrema=False, points=40)
+        vp = ax.violinplot([v], positions=[i - 0.28], widths=0.27, showextrema=False, points=40)
         for b in vp["bodies"]: b.set_facecolor(c); b.set_alpha(0.3); b.set_edgecolor("none")
-        ax.scatter(i - 0.2 + rng.normal(0, 0.05, len(v)), v, s=2.5, color=c, alpha=0.6, lw=0)
-        ax.hlines(v.mean(), i - 0.38, i - 0.02, color="black", lw=1.1, zorder=5)
+        ax.scatter(i - 0.28 + rng.normal(0, 0.04, len(v)), v, s=2.5, color=c, alpha=0.6, lw=0)
+        ax.hlines(v.mean(), i - 0.41, i - 0.15, color="black", lw=1.1, zorder=5)
+        u = s.prior.dropna().values
+        vp = ax.violinplot([u], positions=[i], widths=0.27, showextrema=False, points=40)
+        for b in vp["bodies"]: b.set_facecolor("white"); b.set_alpha(1); b.set_edgecolor(c); b.set_linewidth(0.7); b.set_hatch("////")
+        ax.hlines(u.mean(), i - 0.13, i + 0.13, color="black", lw=1.1, zorder=5)
         w = s.post.dropna().values
-        vp = ax.violinplot([w], positions=[i + 0.2], widths=0.38, showextrema=False, points=40)
+        vp = ax.violinplot([w], positions=[i + 0.28], widths=0.27, showextrema=False, points=40)
         for b in vp["bodies"]: b.set_facecolor(c); b.set_alpha(0.85); b.set_edgecolor("black"); b.set_linewidth(0.4)
-        ax.hlines(w.mean(), i + 0.02, i + 0.38, color="black", lw=1.1, zorder=5)
+        ax.hlines(w.mean(), i + 0.15, i + 0.41, color="black", lw=1.1, zorder=5)
         for k_ in range(3):
-            ax.plot(i + 0.42, s[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
+            ax.plot(i + 0.45, s[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
         ax.text(i, -0.12, f"{len(v)}", ha="center", fontsize=4.5, color=c)
         ax.text(i, -0.2, f"{len(w):,}", ha="center", fontsize=4.5, color="black")
     ax.text(-0.9, -0.12, "covered", ha="right", fontsize=4.5); ax.text(-0.9, -0.2, "all cells", ha="right", fontsize=4.5)
@@ -156,9 +161,10 @@ def main():
     ax.set_ylim(-0.25, 1.08); ax.set_xlim(-1.2, len(types) - 0.4); ax.set_ylabel("IIIb usage per cell")
     from matplotlib.lines import Line2D
     h = [mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.3, label="raw, covered cells (jitter + violin)"),
-         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA imputed (DM posterior mean, mean of 3 seeds), all cells; ticks = each seed's mean")]
+         mpatches.Patch(facecolor="white", edgecolor=PALETTE["grey"], hatch="////", label="LeafletFA prior $\\phi\\cdot\\psi$ (no reads used), all cells"),
+         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA posterior mean (prior + own reads), all cells; ticks = each seed")]
     h += [mpatches.Patch(facecolor=col[k], label=k) for k in ["epithelial", "mesenchymal"]]
-    ax.legend(handles=h, frameon=False, fontsize=5, ncol=3, loc="upper right", bbox_to_anchor=(1, 1.12))
+    ax.legend(handles=h, frameon=False, fontsize=4.8, ncol=3, loc="upper right", bbox_to_anchor=(1, 1.14))
     despine(ax); panel_label(ax, "b", dx=-0.02)
 
     # c: phi heatmap of the same cell types, one per seed, each clustered on its own phi, SP order per seed
