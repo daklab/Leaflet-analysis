@@ -84,6 +84,7 @@ def main():
     rng = np.random.default_rng(0)
     for lev in [int(x) for x in args.levels.split(",")]:
         t0 = time.time()
+        PHI = np.zeros((N, K), np.float32)
         acc = {k: Acc(len(hvj), N) for k in ("post", "pure", "jmean")}
         acc_lost = {k: Acc(len(hvj), N) for k in ("post", "pure", "jmean")}
         # cell-TYPE level: per (type, junction): n cells, sum obs, sum reads, sum obs*reads (pooled), sum pred per method
@@ -119,6 +120,7 @@ def main():
                 a = ad.AnnData(X=Ym.copy()); a.layers["cell_by_junction_matrix"] = Ym; a.layers["cell_by_cluster_matrix"] = Cm
                 phi, _ = infer_phi_minibatch(a, psi, K, dir_conc=float(K), pi=pi, bb_conc=conc, num_epochs=args.epochs,
                                              device=args.device, likelihood="dirichletmultinomial", event_id=ev, conc_min=2.0)
+                PHI[r0:r1] = phi
                 pure = (phi @ psi[:, hvj]).astype(np.float32)
                 Yh, Nh = Yd[:, hvj], Nd[:, hvj]
                 post = (conc_j[hvj][None, :] * pure + Yh) / (conc_j[hvj][None, :] + Nh)
@@ -147,6 +149,7 @@ def main():
             out[f"J_{k}"] = acc[k].J; out[f"C_{k}"] = acc[k].C; out[f"G_{k}"] = acc[k].G
             out[f"Jlost_{k}"] = acc_lost[k].J; out[f"Clost_{k}"] = acc_lost[k].C; out[f"Glost_{k}"] = acc_lost[k].G
         np.savez_compressed(f"{args.out}/level_{lev:03d}.npz", **out)
+        np.save(f"{args.out}/phi_level_{lev:03d}.npy", PHI)
         # cell-type-level: per junction, Pearson across cell types (>= 10 cells each) of pooled observed vs mean predicted
         okT = TL["n"] >= 10; obsT = np.where(okT, TL["obs_w"] / np.maximum(TL["reads"], 1), np.nan)
         for k in ("post", "pure", "jmean"):
