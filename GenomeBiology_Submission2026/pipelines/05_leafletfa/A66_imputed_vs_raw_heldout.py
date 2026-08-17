@@ -80,11 +80,14 @@ def main():
     with h5py.File(ref, "r") as f:
         s = f["mod/splicing"]; N = s["obs/_index"].shape[0]; bct = cat(s["obs/broad_cell_type"])
     np.save(f"{args.out}/cells_bct.npy", bct)
+    types, tcode = np.unique(bct, return_inverse=True); T = len(types); np.save(f"{args.out}/types.npy", types)
     rng = np.random.default_rng(0)
     for lev in [int(x) for x in args.levels.split(",")]:
         t0 = time.time()
         acc = {k: Acc(len(hvj), N) for k in ("post", "pure", "jmean")}
         acc_lost = {k: Acc(len(hvj), N) for k in ("post", "pure", "jmean")}
+        # cell-TYPE level: per (type, junction): n cells, sum obs, sum reads, sum obs*reads (pooled), sum pred per method
+        TL = {k: np.zeros((T, len(hvj))) for k in ("n", "obs", "reads", "obs_w", "post", "pure", "jmean")}
         sub = {k: [] for k in ("post", "pure", "jmean", "obs", "cell", "junc", "N_orig", "N_level")}
         # pass 1: junction means at this level (over covered cells)
         jsum = np.zeros(J); jcnt = np.zeros(J)
@@ -132,15 +135,27 @@ def main():
                     for k, y in preds.items():
                         m = lost & (okj if k == "jmean" else True)
                         acc_lost[k].add(r0 + r[m], c[m], x[m], y[m])
+                tt = tcode[r0 + r]; w = Co[r, c]
+                np.add.at(TL["n"], (tt, c), 1); np.add.at(TL["obs"], (tt, c), x); np.add.at(TL["reads"], (tt, c), w); np.add.at(TL["obs_w"], (tt, c), x * w)
+                for k, y in preds.items(): np.add.at(TL[k], (tt, c), np.nan_to_num(y))
                 pick = rng.random(len(x)) < args.sub
                 for k, y in preds.items(): sub[k].append(y[pick])
                 sub["obs"].append(x[pick]); sub["cell"].append(r0 + r[pick]); sub["junc"].append(c[pick]); sub["N_orig"].append(Co[r, c][pick]); sub["N_level"].append(Nh[r, c][pick])
                 print(f"  level {lev}: cells {r1:,}/{N:,}  {time.time()-t0:.0f}s", flush=True)
-        out = dict(level=lev, hvj=hvj, **{f"sub_{k}": np.concatenate(v) for k, v in sub.items()})
+        out = dict(level=lev, hvj=hvj, **{f"sub_{k}": np.concatenate(v) for k, v in sub.items()}, **{f"TL_{k}": v for k, v in TL.items()})
         for k in acc:
             out[f"J_{k}"] = acc[k].J; out[f"C_{k}"] = acc[k].C; out[f"G_{k}"] = acc[k].G
             out[f"Jlost_{k}"] = acc_lost[k].J; out[f"Clost_{k}"] = acc_lost[k].C; out[f"Glost_{k}"] = acc_lost[k].G
         np.savez_compressed(f"{args.out}/level_{lev:03d}.npz", **out)
+        # cell-type-level: per junction, Pearson across cell types (>= 10 cells each) of pooled observed vs mean predicted
+        okT = TL["n"] >= 10; obsT = np.where(okT, TL["obs_w"] / np.maximum(TL["reads"], 1), np.nan)
+        for k in ("post", "pure", "jmean"):
+            predT = np.where(okT, TL[k] / np.maximum(TL["n"], 1), np.nan); rs = []
+            for j in range(len(hvj)):
+                m = okT[:, j]
+                if m.sum() >= 5 and np.nanstd(obsT[m, j]) > 1e-6 and np.nanstd(predT[m, j]) > 1e-6:
+                    rs.append(np.corrcoef(obsT[m, j], predT[m, j])[0, 1])
+            print(f"level {lev:3d}% {k:6s}: CELL-TYPE-level within-junction r (across types, >=5 types with >=10 cells): median {np.median(rs):.3f} over {len(rs):,} junctions", flush=True)
         for k in acc:
             wj = Acc.r(acc[k].J[acc[k].J[:, 0] >= 30]); wc = Acc.r(acc[k].C[acc[k].C[:, 0] >= 30]); g = Acc.r(acc[k].G)
             wl = Acc.r(acc_lost[k].J[acc_lost[k].J[:, 0] >= 30]) if acc_lost[k].G[0] > 0 else np.array([np.nan])
