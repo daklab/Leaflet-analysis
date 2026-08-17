@@ -28,14 +28,18 @@ by effect 0.35; LeafCutter is 2.2× above nominal even at effect 1.0.
 **(h)** Power at α = 0.05, read together with (g): the LRT matches or exceeds LeafCutter at every
 effect; the posterior test is deliberately conservative (it asks for TV > 0.15, not TV > 0).
 **(i)** Held-out imputation on the atlas (30% of cells never seen in training; reads removed at
-increasing rates): [A3 sweep pending — DM posterior mean vs NMF]. Supporting analysis
-`plots/SANITY_imputed_vs_raw_heldout.png` (1,500 held-out cells, entries covered at full coverage
-with ≥5 reads; DM posterior mean vs NMF rank 20 on the mean-imputed matrix): over all entries the
-DM posterior mean gives r 0.99/0.99/0.98/0.94 at 0/10/50/90% of reads removed (NMF 0.87 throughout);
-within a junction (ranking cells) 1.00/0.98/0.95/0.74 vs NMF 0.23/0.22/0.21/0.18; on entries whose
-reads were ALL removed (the imputation task proper) within-junction r is 0.14 vs NMF 0.06 and
-within-cell r 0.85 vs 0.83 — both methods predict a junction's level far better than a cell's rank
-within it, which is expected at ~2 effective molecules per cell.
+increasing rates; K = 20, 70/30 fit, seeds averaged). Main axes: median within-junction Pearson
+across held-out cells on entries whose reads were *all* removed — the imputation task proper — for
+LeafletFA's prior φ·ψ, NMF at the same rank (mean- and zero-imputed input) and a per-junction mean:
+all near the floor (0.03–0.06), LeafletFA highest at heavy loss. Inset: on all covered entries,
+methods that keep the cell's remaining reads (LeafletFA posterior mean 0.85 → 0.50 at 10 → 90%
+removed; junction mean + own reads 0.89 → 0.51) sit far above NMF (0.10 → 0.07). Read together: at
+~2 effective molecules per cell no label-free method ranks cells within a junction from nothing;
+what LeafletFA adds is the junction-level composition, graceful degradation, and calibrated
+per-cell uncertainty (supplement, A68). Full-scale sanity plot on all 39,812 held-out cells:
+`plots/SANITY_imputed_vs_raw_heldout.png` (posterior mean / NMF / junction-mean rows; the
+"all entries" correlation of 0.86 for a per-junction constant shows why only within-junction
+numbers are quoted).
 
 Caveats for the text: the simulations sit at median 33 reads/ATSE and DM concentration 50 (the
 atlas: 16 reads and an effective sample size of ~2 molecules), so power here is an optimistic

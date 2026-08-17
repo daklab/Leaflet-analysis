@@ -148,18 +148,32 @@ def panel_h(ax):
 
 
 def panel_i(ax):
-    """held-out imputation on the atlas -- filled from A3 once the sweep lands."""
-    p = os.path.join(DATA, "a3_heldout_summary.tsv")
-    if not os.path.exists(p):
-        ax.text(0.5, 0.5, "held-out imputation (atlas)\nA3 sweep pending:\nDM posterior mean vs NMF\nby % reads dropped",
-                ha="center", va="center", transform=ax.transAxes, fontsize=6, color=GREY)
-        ax.set_xlabel("% of reads removed"); ax.set_ylabel("Pearson, imputed vs held-out PSI")
-        return
-    d = pd.read_csv(p, sep="\t")
-    for meth, c, mk in [("lf_bb", LFA, "o"), ("nmf_mean", LC, "s"), ("nmf_0", PALETTE["indigo"], "s")]:
-        s = d[d.method == meth].sort_values("pct_dropped")
-        if len(s): ax.errorbar(s.pct_dropped, s.pearson_mean, yerr=s.pearson_sd, fmt=mk + "-", color=c, ms=3, lw=1.3, capsize=2, label=meth)
-    ax.set_xlabel("% of reads removed"); ax.set_ylabel("Pearson, imputed vs held-out PSI"); ax.legend(frameon=False, fontsize=5.5)
+    """held-out imputation on the atlas (A3, 70/30 split, 3 seeds where available).
+    Metric = median within-junction Pearson across held-out cells (does the method rank the cells of a
+    junction?), on entries whose reads were ALL removed -- the imputation task proper. Inset: the same
+    on all covered entries, where methods that keep the cell's own reads (LeafletFA posterior mean,
+    MeanBayes) are far above NMF and near each other. Cell-type-mean baseline dropped (uses labels)."""
+    import glob
+    fs = sorted(glob.glob(f"{M}/IMPUTATION_DM/results/a3_heldout70_seed*.csv"))
+    d = pd.concat([pd.read_csv(f).assign(seed=i) for i, f in enumerate(fs)]); d = d[d.dataset == "all"]
+    meth = [("lf", "LeafletFA (prior $\\phi\\cdot\\psi$)", LFA, "o", "-"), ("nmfm", "NMF, mean-imputed", LC, "s", "--"),
+            ("nmf0", "NMF, zero-imputed", PALETTE["indigo"], "s", ":"), ("mb", "junction mean", GREY, "^", "-")]
+    L = d[d.entry_set == "lost_to_downsampling"]
+    for k, lab, c, mk, ls in meth:
+        g = L.groupby("downsampling_pct")[f"median_pearson_{k}"].agg(["mean", "std"])
+        ax.errorbar(g.index, g["mean"], yerr=g["std"].fillna(0), fmt=mk + ls, color=c, ms=3, lw=1.3, capsize=2, label=lab)
+    ax.set_xlabel("% of reads removed from held-out cells"); ax.set_ylabel("within-junction Pearson\n(entries with NO reads left)")
+    ax.set_ylim(-0.005, 0.12); ax.set_xticks([10, 25, 50, 75, 90, 99, 100])
+    ax.set_title(f"held-out imputation, atlas 70/30 (K = 20, {len(fs)} seed{'s' if len(fs) > 1 else ''})", fontsize=7, loc="left")
+    ax.legend(frameon=False, fontsize=5, loc="upper right")
+    ins = ax.inset_axes([0.42, 0.42, 0.55, 0.42])
+    A = d[d.entry_set == "all_covered"]
+    for k, lab, c, mk, ls in [("lf_bb", "LeafletFA posterior mean", LFA, "o", "-"), ("mb", "junction mean + own reads", GREY, "^", "-"), ("nmfm", "NMF mean-imputed", LC, "s", "--")]:
+        g = A.groupby("downsampling_pct")[f"median_pearson_{k}"].agg(["mean", "std"])
+        ins.errorbar(g.index, g["mean"], yerr=g["std"].fillna(0), fmt=mk + ls, color=c, ms=2, lw=1, capsize=1.5, label=lab)
+    ins.set_ylim(0, 1); ins.set_xticks([10, 50, 90, 100]); ins.tick_params(labelsize=4.5)
+    ins.set_title("all covered entries\n(cell's remaining reads used)", fontsize=4.8); ins.legend(frameon=False, fontsize=4, loc="lower left")
+    despine(ins)
 
 
 def main():
