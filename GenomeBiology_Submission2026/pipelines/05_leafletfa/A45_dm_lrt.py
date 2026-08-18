@@ -240,9 +240,15 @@ def main():
             phi = phi[s["rows"]]           # the fit covers all cells; align to the subsample
     else:
         s = load_sim(args.sim)
-        C = np.corrcoef(z["psi_mean"], s["tpsi"])[:K, K:]
-        r_, c_ = linear_sum_assignment(-np.nan_to_num(C))
-        pm = np.empty(K, int); pm[c_] = r_
+        Kt = int(np.asarray(s["tpsi"]).shape[0])
+        if K == Kt:
+            C = np.corrcoef(z["psi_mean"], s["tpsi"])[:K, K:]
+            r_, c_ = linear_sum_assignment(-np.nan_to_num(C))
+            pm = np.empty(K, int); pm[c_] = r_
+        else:
+            # misspecified rank: no one-to-one match exists, and the LRT uses phi only as a design
+            # matrix, whose column order is irrelevant -- keep the fit's order
+            pm = np.arange(K)
         phi = np.asarray(z["phi"], np.float32)[:, pm]
     conc = float(z["bb_conc"]) if np.isfinite(z["bb_conc"]) else 50.0
     n_atse = len(s["uq"])

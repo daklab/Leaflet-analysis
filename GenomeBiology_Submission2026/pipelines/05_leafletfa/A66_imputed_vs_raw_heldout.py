@@ -40,6 +40,7 @@ class Acc:
     def __init__(self, J, N):
         self.J = np.zeros((J, 6)); self.C = np.zeros((N, 6)); self.G = np.zeros(6)
     def add(self, cell, junc, x, y):
+        x = np.asarray(x, np.float64); y = np.asarray(y, np.float64)
         v = np.stack([np.ones_like(x), x, y, x * x, y * y, x * y], 1)
         np.add.at(self.J, junc, v); np.add.at(self.C, cell, v); self.G += v.sum(0)
     @staticmethod

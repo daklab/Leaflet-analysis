@@ -19,7 +19,7 @@ from programs import sp_order
 from _phi_rows import phi_row_of
 M = "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION"
 H5 = f"{M}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad"
-SEEDS = {0: f"{M}/IMPUTATION_DM/a66_all_cells", 1: f"{M}/IMPUTATION_DM/a66_all_cells_seed1", 2: f"{M}/IMPUTATION_DM/a66_all_cells_seed2"}
+SEEDS = {0: f"{M}/IMPUTATION_DM/a66_all_cells_phi0", 1: f"{M}/IMPUTATION_DM/a66_all_cells_seed1", 2: f"{M}/IMPUTATION_DM/a66_all_cells_seed2"}
 MINC = 30
 
 
@@ -27,13 +27,11 @@ def main():
     apply_theme()
     with h5py.File(H5, "r") as f:
         n = f["obs/tissue_cell_type"]; c = np.array([x.decode() for x in n["categories"][:]]); tct = c[n["codes"][:]]
-    import glob as _g
-    ref = sorted(_g.glob(f"{M}/IMPUTATION_DM/resampled_combined/RESAMPLED_10_*.h5mu"))[0]
-    with h5py.File(ref, "r") as f:
-        ho_ids = np.array([x.decode() for x in f["mod/splicing/obs/_index"][:]]).astype(int)   # atlas row indices of held-out cells
+    # atlas row of each held-out cell, in h5mu order (mapped through cell_id; obs/_index is NOT the atlas row)
+    ho_ids = np.load(f"{M}/IMPUTATION_DM/heldout_atlas_rows_in_h5mu_order.npy")
     avail = [s for s, d in SEEDS.items() if os.path.exists(f"{d}/phi_level_000.npy")]
     if not avail: raise SystemExit("no phi_level_000.npy yet -- A66 still queued")
-    fig, axes = plt.subplots(len(avail), 2, figsize=figsize("double", h=3.2 * len(avail)), squeeze=False)
+    fig, axes = plt.subplots(len(avail), 2, figsize=figsize("double", h=min(8.6, 2.85 * len(avail))), squeeze=False)
     for row, s in enumerate(avail):
         z = np.load(f"{M}/ATLAS_DM/runs_heldout70/dm_simplex_K20_seed{s}_b8192/fit.npz", allow_pickle=True)
         phi_tr = np.asarray(z["phi"]); prow = phi_row_of(z, len(tct)); tr = np.flatnonzero(prow >= 0)

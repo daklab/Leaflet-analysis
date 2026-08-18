@@ -64,6 +64,7 @@ def main_all(args):
     import sys; sys.path.insert(0, sys_path)
     from A66_imputed_vs_raw_heldout import Acc
     hvj = np.load(f"{args.dir}/hvj.npy")
+    bct = np.load(f"{args.dir}/cells_bct.npy", allow_pickle=True); types, tcode = np.unique(bct, return_inverse=True); T = len(types)
     files = {int(os.path.basename(p).split("_")[1]): p for p in glob.glob(f"{args.h5mu_dir}/RESAMPLED_*_PERCENT_test_*.h5mu")}
     ref = files[min(files)]
     with h5py.File(ref, "r") as f:
@@ -91,8 +92,10 @@ def main_all(args):
         acc.add(r, c, x, y); lost = C[r, c] == 0
         if lost.any(): acc_l.add(r[lost], c[lost], x[lost], y[lost])
         sub_y = rec[z["sub_cell"], z["sub_junc"]]
+        TLn = np.zeros((T, len(hvj))); TLp = np.zeros((T, len(hvj)))
+        np.add.at(TLn, (tcode[r], c), 1); np.add.at(TLp, (tcode[r], c), y.astype(np.float64))
         np.savez_compressed(f"{args.dir}/nmf_level_{lev:03d}.npz", level=lev, J_nmf=acc.J, C_nmf=acc.C, G_nmf=acc.G,
-                            Jlost_nmf=acc_l.J, Clost_nmf=acc_l.C, Glost_nmf=acc_l.G, sub_nmf=sub_y, n_iter=model.n_iter_)
+                            Jlost_nmf=acc_l.J, Clost_nmf=acc_l.C, Glost_nmf=acc_l.G, sub_nmf=sub_y, n_iter=model.n_iter_, TL_n=TLn, TL_nmf=TLp)
         wj = Acc.r(acc.J[acc.J[:, 0] >= 30]); wl = Acc.r(acc_l.J[acc_l.J[:, 0] >= 30]) if acc_l.G[0] > 0 else np.array([np.nan])
         print(f"level {lev:3d}% nmf: {time.time()-t0:.0f}s {model.n_iter_} it; all-entry r {Acc.r(acc.G):.3f}; within-junction median r {np.nanmedian(wj):.3f}; "
               f"no-reads-left within-junction {np.nanmedian(wl):.3f}", flush=True)

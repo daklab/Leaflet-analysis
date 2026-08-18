@@ -17,7 +17,7 @@ LFA, LC, GREY = METHOD_COLORS["LeafletFA"], METHOD_COLORS["NMF"], PALETTE["grey"
 
 def st(z, key, lost=False):
     p = "lost" if lost else ""
-    J = z[f"J{p}_{key}"]; C = z[f"C{p}_{key}"]; G = z[f"G{p}_{key}"]
+    J = z[f"J{p}_{key}"]; C = z[f"C{p}_{key}"]; G = J.sum(0)      # global from per-junction sums (float64; the stored G can overflow float32)
     if G[0] < 1000: return None
     return dict(r=Acc.r(G), wj=np.nanmedian(Acc.r(J[J[:, 0] >= 30])), wc=np.nanmedian(Acc.r(C[C[:, 0] >= 30])), n=int(G[0]))
 
@@ -27,7 +27,7 @@ def main():
     files = sorted(glob.glob(f"{D}/level_*.npz")); Z = [np.load(f) for f in files]
     NM = {int(np.load(f)["level"]): np.load(f) for f in glob.glob(f"{D}/nmf_level_*.npz")}
     rows = [("pure", "LeafletFA prior $\\phi\\cdot\\psi$\n(no reads from the cell)", PALETTE["olive"]), ("post", "LeafletFA\nDM posterior mean", LFA)] + ([("nmf", "NMF (rank 20,\nmean-imputed input)", LC)] if NM else []) + [("jmean", "junction mean\n(baseline)", GREY)]
-    fig, axes = plt.subplots(len(rows), len(Z), figsize=figsize("double", h=2.3 * len(rows)), squeeze=False)
+    fig, axes = plt.subplots(len(rows), len(Z), figsize=figsize("double", h=min(8.6, 2.15 * len(rows))), squeeze=False)
     tab = []
     for c, z in enumerate(Z):
         lev = int(z["level"]); obs = z["sub_obs"]

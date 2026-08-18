@@ -459,7 +459,12 @@ def main():
                 _n = _f["obs"]["broad_cell_type"]
                 _c = np.array([x.decode() if isinstance(x, bytes) else x
                                for x in _n["categories"][:]])
-                labels = _c[_n["codes"][:]][sub]
+                _lab_all = _c[_n["codes"][:]]
+                # phi rows are TRAINING cells only under --holdout-ids/--holdout-frac: map through
+                # train_idx, or the silhouette is computed on misaligned labels (was -0.3 on every
+                # held-out fit for this reason; the atlas fit, with all cells, was unaffected)
+                _tr = np.setdiff1d(np.arange(len(_lab_all)), ho_idx) if ho_idx is not None and len(ho_idx) else np.arange(len(_lab_all))
+                labels = _lab_all[_tr][sub]
         a = ad.AnnData(phi[sub].astype(np.float32))
         a.obsm["X_phi"] = a.X.copy()
         sc.pp.neighbors(a, use_rep="X_phi", n_neighbors=30, random_state=42)
