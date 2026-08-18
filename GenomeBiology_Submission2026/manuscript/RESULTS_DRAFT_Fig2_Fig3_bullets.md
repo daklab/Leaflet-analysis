@@ -30,10 +30,16 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   conservative (it demands TV > 0.15, not > 0).
 - At the atlas's overdispersion (conc 2; S2 v1-panels f): LFA 6.6/2.9/0.91× vs LC 5.4/4.3/4.0× at
   effects 0.25/0.5/1.0; power 0.52/0.79/0.95 vs 0.39/0.60/0.82.
-- Rank misspecification (S2 sim-K panel; true K 5, model K 3/5/10): ψ recovery robust (0.93–0.99);
-  under-K merges programs (silhouette 0.55–0.66) and over-K splits them (0.62–0.86); what suffers is
-  the POWER of the posterior test in both directions (effect 0.25: 0.02 / 0.54 / 0.01 at K 3/5/10)
-  because merged or split programs shrink Δφ. [numbers final when the LRT rerun lands]
+- Rank misspecification (S2 sim-K panel; true K 5, model K 3/5/10, 3 seeds): ψ recovery is robust
+  (r 0.93–0.99); under-K merges programs (φ silhouette 0.55–0.66 vs 0.67–0.87 at K 5), over-K splits
+  them (0.62–0.86); DS-ATSE AUROC 0.95–0.99 / 0.91–1.00 / 0.84–0.97. The tests react in opposite ways:
+  the LRT (φ as design) becomes over-conservative under-K (0.23–0.50×) and ANTI-conservative over-K
+  (3.6–3.9×: nine design columns overfit at these counts), while at K 5 it is 1.8× / 0.71× / 0.33× at
+  effects 0.25/0.5/1.0; the posterior test P(TV > 0.15) keeps its calibration under-K (2–3×) and
+  over-K (0.6–2×) but loses power in both directions (effect 0.5: 0.26 / 0.72 / 0.41 at K 3/5/10)
+  because merged or split programs shrink Δφ. Choosing K by program reproducibility across seeds and
+  ranks (Methods) and reporting the K sweep on the atlas is therefore part of the method, not a
+  tuning detail.
 - Choosing δ (S2 v1-panels d/e): δ = 0.15 derived from permuted negative-control ATSEs (floor p99 = 0.13
   on the atlas); δ 0.05 sits below ψ's own posterior sd (0.02–0.09) and is 5–6× anti-conservative;
   on LeafCutter's own atlas measurements 18% of (contrast, ATSE) pairs exceed TV 0.15 — the reach of the test.
@@ -48,7 +54,7 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
 - Imputation proper (S2 imputation-metrics): LeafletFA denoises usage at single-cell resolution by
   pooling across all cells and ATSEs. The prior φ·ψ alone recovers cell-type-level usage (within-
   junction r across cell types 0.39, all 3 seeds; 0.88 → 0.83 with the cell's own reads folded in at
-  0 → 90% removed; NMF 0.41). With remaining reads the posterior mean degrades gracefully (per-cell
+  0 → 90% removed; NMF 0.41 at both levels). With remaining reads the posterior mean degrades gracefully (per-cell
   within-junction r 0.95 / 0.90 / 0.66 at 10 / 50 / 90% removed vs junction-mean+reads 0.86 / 0.80 /
   0.51 and NMF 0.10 / 0.09 / 0.07). Because one cell's observed usage at one ATSE rests on ~2 effective
   molecules, per-cell estimates cannot be scored against per-cell observations (label-based cell-type
@@ -133,6 +139,5 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   ~20× overconfidence at source; measured, not assumed.
 
 ## Numbers still to fill (pending jobs)
-- S2 sim-K panel: LRT at K 3/10 (rerun running).
-- S2 imputation metrics: NMF cell-type-level r for seeds 1–2 (0.41 for seed 0).
+- S2 imputation metrics: NMF cell-type-level r = 0.41 (0 and 90% removed; one NMF fit per level, deterministic).
 - Per-dataset models (TMS-only, AB-only, human AB) — not part of Fig 2/3; feed Fig 4/5.

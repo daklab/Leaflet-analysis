@@ -24,7 +24,12 @@ Test (same simulations, same truth, same null tolerance).
   8x at 0.1. h power: LRT >= LeafCutter everywhere; posterior test conservative by construction.
 - conc-2 regime (supp): LFA 6.6/2.9/0.91 vs LC 5.4/4.3/4.0 at effects 0.25/0.5/1.0; power 0.52/0.79/
   0.95 vs 0.39/0.60/0.82.
-- K misspecification on sims (model K = 3, 10): fits done, scoring running -> supp panel.
+- K misspecification on sims (model K 3/5/10, 3 seeds; S2 sim-K panel): psi r 0.93-0.99 everywhere;
+  silhouette 0.55-0.66 / 0.67-0.87 / 0.62-0.86; LRT ratio under-K 0.23-0.50, K5 1.8/0.71/0.33,
+  over-K 3.6-3.9 (anti-conservative: 9 design columns overfit); posterior ratio 2-3 / 1.4-2.0 / 0.6-2.0
+  with power at effect 0.5 = 0.26 / 0.72 / 0.41. Programs transfer panel replaced imputation curve
+  as Fig 2i (Pearson 0.998 vs shuffled 0.49); imputation metrics in FIG2_supp_imputation_metrics
+  (cell-type-level r: prior 0.39, posterior mean 0.88/0.83, NMF 0.41).
 Imputation (i + supp).
 - 70/30 split (92,894 / 39,812 cells; test cells NEVER in training — verified 100% of the earlier
   numbers were on seen cells and were discarded). Reads removed at 10..100%. Imputed = DM posterior
