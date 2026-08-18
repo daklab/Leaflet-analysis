@@ -48,7 +48,7 @@ Story in three rows -- setup / recovery / test+imputation:
 | f | between-program delta-psi recovery vs NMF (best gauge) by effect | DONE | 0.21->0.85 vs 0.0->0.24 |
 | g | DS calibration: LFA LRT, LFA posterior P(TV>0.15) [from effect 0.25], LeafCutter | DONE | LFA tests reach 1.0 by effect 0.35; LeafCutter 2.2x at 1.0 |
 | h | DS power beside g | DONE | LRT >= LeafCutter everywhere; posterior conservative by design |
-| i | held-out atlas imputation: DM posterior mean vs NMF by % reads removed | A3 RUNNING (jobs 20621463-5) | plus SANITY_imputed_vs_raw_heldout.png: prior gets junction LEVEL (r 0.87) not within-junction ranking (0.11); posterior mean 0.98/0.95/0.74 at 10/50/90% removed; on entries with no reads left it reverts to the prior (0.14) |
+| i | programs TRANSFER to unseen cells: mean SP activity per (tissue-cell-type, SP), training 70% vs held-out 30% (E-step), Pearson 0.998 vs 0.49 shuffled | DONE | plus SANITY_imputed_vs_raw_heldout.png: prior gets junction LEVEL (r 0.87) not within-junction ranking (0.11); posterior mean 0.98/0.95/0.74 at 10/50/90% removed; on entries with no reads left it reverts to the prior (0.14) |
 
 To supplement from FIG2_final: concentration recovery, psi vs depth, phi by regime, delta trade-off,
 atlas reach, conc-2 DS. Cell-type-mean baseline DROPPED everywhere (uses labels).

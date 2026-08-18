@@ -148,32 +148,30 @@ def panel_h(ax):
 
 
 def panel_i(ax):
-    """held-out imputation on the atlas (A3, 70/30 split, 3 seeds where available).
-    Metric = median within-junction Pearson across held-out cells (does the method rank the cells of a
-    junction?), on entries whose reads were ALL removed -- the imputation task proper. Inset: the same
-    on all covered entries, where methods that keep the cell's own reads (LeafletFA posterior mean,
-    MeanBayes) are far above NMF and near each other. Cell-type-mean baseline dropped (uses labels)."""
-    import glob
-    fs = sorted(glob.glob(f"{M}/IMPUTATION_DM/results/a3_heldout70_seed*.csv"))
-    d = pd.concat([pd.read_csv(f).assign(seed=i) for i, f in enumerate(fs)]); d = d[d.dataset == "all"]
-    meth = [("lf", "LeafletFA (prior $\\phi\\cdot\\psi$)", LFA, "o", "-"), ("nmfm", "NMF, mean-imputed", LC, "s", "--"),
-            ("nmf0", "NMF, zero-imputed", PALETTE["indigo"], "s", ":"), ("mb", "junction mean", GREY, "^", "-")]
-    L = d[d.entry_set == "lost_to_downsampling"]
-    for k, lab, c, mk, ls in meth:
-        g = L.groupby("downsampling_pct")[f"median_pearson_{k}"].agg(["mean", "std"])
-        ax.errorbar(g.index, g["mean"], yerr=g["std"].fillna(0), fmt=mk + ls, color=c, ms=3, lw=1.3, capsize=2, label=lab)
-    ax.set_xlabel("% of reads removed from held-out cells"); ax.set_ylabel("within-junction Pearson\n(entries with NO reads left)")
-    ax.set_ylim(-0.005, 0.12); ax.set_xticks([10, 25, 50, 75, 90, 99, 100])
-    ax.set_title(f"held-out imputation, atlas 70/30 (K = 20, {len(fs)} seed{'s' if len(fs) > 1 else ''})", fontsize=7, loc="left")
-    ax.legend(frameon=False, fontsize=5, loc="upper right")
-    ins = ax.inset_axes([0.42, 0.42, 0.55, 0.42])
-    A = d[d.entry_set == "all_covered"]
-    for k, lab, c, mk, ls in [("lf_bb", "LeafletFA posterior mean", LFA, "o", "-"), ("mb", "junction mean + own reads", GREY, "^", "-"), ("nmfm", "NMF mean-imputed", LC, "s", "--")]:
-        g = A.groupby("downsampling_pct")[f"median_pearson_{k}"].agg(["mean", "std"])
-        ins.errorbar(g.index, g["mean"], yerr=g["std"].fillna(0), fmt=mk + ls, color=c, ms=2, lw=1, capsize=1.5, label=lab)
-    ins.set_ylim(0, 1); ins.set_xticks([10, 50, 90, 100]); ins.tick_params(labelsize=4.5)
-    ins.set_title("all covered entries\n(cell's remaining reads used)", fontsize=4.8); ins.legend(frameon=False, fontsize=4, loc="lower left")
-    despine(ins)
+    """Do the learned programs transfer to cells the model never saw? Atlas 70/30 split: for every
+    tissue-cell-type with >= 30 cells in both halves, mean SP activity in the training cells (from the
+    fit) vs in the held-out cells (E-step from their own reads only). One point per (type, SP);
+    shuffled-label control shown faintly. Imputation metrics themselves are in the supplement."""
+    import h5py
+    sys.path.insert(0, "/gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/pipelines/05_leafletfa")
+    from _phi_rows import phi_row_of
+    z = np.load(f"{M}/ATLAS_DM/runs_heldout70/dm_simplex_K20_seed0_b8192/fit.npz", allow_pickle=True)
+    tr = np.asarray(z["train_idx"]); phi_tr = np.asarray(z["phi"])
+    rows = np.load(f"{M}/IMPUTATION_DM/heldout_atlas_rows_in_h5mu_order.npy")
+    p0 = np.load(f"{M}/IMPUTATION_DM/a66_all_cells_phi0/phi_level_000.npy")
+    with h5py.File(f"{M}/MODEL_INPUT/20260526/train_splice_model_ready_2026-06-17.h5ad", "r") as f:
+        n = f["obs/tissue_cell_type"]; c = np.array([x.decode() for x in n["categories"][:]]); tct = c[n["codes"][:]]
+    types = [t for t in np.unique(tct) if (tct[tr] == t).sum() >= 30 and (tct[rows] == t).sum() >= 30]
+    A = np.vstack([phi_tr[np.isin(tr, np.flatnonzero(tct == t))].mean(0) for t in types])
+    B = np.vstack([p0[tct[rows] == t].mean(0) for t in types])
+    perm = np.random.default_rng(0).permutation(len(rows)); Bp = np.vstack([p0[perm][tct[rows] == t].mean(0) for t in types])
+    ax.scatter(A.ravel(), Bp.ravel(), s=4, color=GREY, alpha=0.25, lw=0, label=f"shuffled cell labels (r = {np.corrcoef(A.ravel(), Bp.ravel())[0,1]:.2f})")
+    ax.scatter(A.ravel(), B.ravel(), s=6, color=LFA, alpha=0.75, lw=0, label=f"held-out cells (r = {np.corrcoef(A.ravel(), B.ravel())[0,1]:.3f})")
+    ax.plot([0, 1], [0, 1], ls=":", color=PALETTE["rose"], lw=0.9)
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    ax.set_xlabel("mean SP activity, training cells (70%)"); ax.set_ylabel("mean SP activity, unseen cells (30%)\n$\\phi$ inferred from their own reads")
+    ax.set_title(f"programs transfer to unseen cells\n({len(types)} tissue-cell-types $\\times$ 20 SPs; K = 20)", fontsize=7, loc="left")
+    ax.legend(frameon=False, fontsize=5, loc="upper left", markerscale=2)
 
 
 def main():

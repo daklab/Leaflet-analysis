@@ -455,8 +455,9 @@ def main():
                if phi.shape[0] > 20000 else np.arange(phi.shape[0]))
         labels = None
         with h5py.File(args.h5, "r") as _f:
-            if "broad_cell_type" in _f["obs"]:
-                _n = _f["obs"]["broad_cell_type"]
+            _key = "tissue_cell_type" if "tissue_cell_type" in _f["obs"] else "broad_cell_type"
+            if _key in _f["obs"]:
+                _n = _f["obs"][_key]
                 _c = np.array([x.decode() if isinstance(x, bytes) else x
                                for x in _n["categories"][:]])
                 _lab_all = _c[_n["codes"][:]]

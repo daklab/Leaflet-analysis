@@ -27,22 +27,21 @@ effect can exceed δ), and LeafCutter on 7-vs-8 pseudobulks. Both LeafletFA test
 by effect 0.35; LeafCutter is 2.2× above nominal even at effect 1.0.
 **(h)** Power at α = 0.05, read together with (g): the LRT matches or exceeds LeafCutter at every
 effect; the posterior test is deliberately conservative (it asks for TV > 0.15, not TV > 0).
-**(i)** Held-out imputation on the atlas (30% of cells never seen in training; reads removed at
-increasing rates; K = 20, 70/30 fit, seeds averaged). Main axes: median within-junction Pearson
-across held-out cells on entries whose reads were *all* removed — the imputation task proper — for
-LeafletFA's prior φ·ψ, NMF at the same rank (mean- and zero-imputed input) and a per-junction mean:
-all near the floor (0.03–0.06), LeafletFA highest at heavy loss. Inset: on all covered entries,
-methods that keep the cell's remaining reads (LeafletFA posterior mean 0.85 → 0.50 at 10 → 90%
-removed; junction mean + own reads 0.89 → 0.51) sit far above NMF (0.10 → 0.07). Read together: LeafletFA
-denoises usage at single-cell resolution by pooling across all cells and ATSEs, but a single
-cell's observed usage at one ATSE rests on ~2 effective molecules, so per-cell estimates cannot be
-scored against per-cell observations (the label-based cell-type mean scores 0.04 on the same
-entries); they are validated where the noise averages out — per cell type and group (supplement:
-SP activity by cell type, training vs held-out; A66 cell-type-level usage) — and carry calibrated
-uncertainty (A68). Full-scale sanity plot on all 39,812 held-out cells:
-`plots/SANITY_imputed_vs_raw_heldout.png` (posterior mean / NMF / junction-mean rows; the
-"all entries" correlation of 0.86 for a per-junction constant shows why only within-junction
-numbers are quoted).
+**(i)** The learned programs transfer to cells the model never saw. Atlas split 70/30 (92,894 /
+39,812 cells); for every tissue-cell-type with ≥ 30 cells in both halves, mean SP activity in the
+training cells (from the fit) against the held-out cells, whose φ was inferred by the E-step from
+their own reads only (ψ, π, γ frozen). One point per (type, SP), 110 types × 20 SPs: Pearson 0.998
+(0.991 with 90% of the held-out cells' reads removed); with cell labels shuffled, 0.49. Held-out φ
+recovers the broad cell type by nearest training centroid 62% of the time over 21 classes. Imputation
+metrics proper are in the supplement (`FIG2_supp_imputation_metrics`, `_SP_train_vs_heldout`,
+`_imputation_uncertainty`, `_Fgfr2`): LeafletFA denoises usage at single-cell resolution by pooling
+across all cells and ATSEs — the prior φ·ψ alone recovers cell-type-level usage (within-junction
+r across cell types 0.39, 0.88 with the cell's own reads folded in; NMF 0.41 / —), degrades
+gracefully as reads are removed, and its per-cell uncertainty is calibrated against seed-to-seed
+variation (Spearman 0.88; 90% intervals cover 87%). Because a single cell's observed usage at one
+ATSE rests on ~2 effective molecules, per-cell estimates cannot be scored against per-cell
+observations (the label-based cell-type mean scores 0.04 on the same entries); they are validated
+where the noise averages out — per cell type and group — which is also where DS uses them.
 
 Caveats for the text: the simulations sit at median 33 reads/ATSE and DM concentration 50 (the
 atlas: 16 reads and an effective sample size of ~2 molecules), so power here is an optimistic
