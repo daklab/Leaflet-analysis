@@ -56,6 +56,8 @@ def arm_fits(root):
     out = {}
     for p in sorted(glob.glob(f"{root}/*/fit.npz")):
         n = os.path.basename(os.path.dirname(p))
+        if "INCOMPLETE" in n:
+            continue
         m = re.search(r"K(\d+)_seed(\d+)", n)
         if m:
             out[(int(m.group(1)), int(m.group(2)))] = p
