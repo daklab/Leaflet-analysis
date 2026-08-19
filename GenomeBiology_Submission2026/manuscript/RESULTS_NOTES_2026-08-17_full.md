@@ -115,3 +115,13 @@ Imputation (i + supp).
 - K=30 at the shipped lr (0.025) diverges repeatedly on the <60k-cell datasets; K30 for TMS-only,
   AB-only and human is being refit at lr 0.015 (state in Methods).
 - SP-by-cell-type heatmaps per dataset: figures/FIGURE4_programs/plots/SP_by_celltype_{TMSonly,ABonly,humanAB}_K20.
+
+## 2026-08-19: TMS-only imputation (A3 on the TMS 70/30 split, no cross-dataset batch leakage)
+- Seeds 1-2 done (seed 0 on a slow node, consistent so far). At every level the TMS-only model beats
+  the mixed-atlas model on all-covered within-junction r: posterior mean 0.92/0.88/0.68/0.32 at
+  10/50/90/99% removed vs atlas 0.85/0.77/0.50/0.22; junction-mean baseline is also higher on TMS
+  (0.95 vs 0.89) -- TMS junctions are more polarised, so part of the gain is the dataset, not the
+  model. Prior phi.psi 0.054 (vs atlas 0.072); NMF 0.12/0.04. Lost-entry floor unchanged (all
+  methods 0.01-0.05).
+- Reading: removing Allen Brain does not hurt imputation on TMS cells (if anything the pattern is
+  cleaner), consistent with programs being cell-type structure rather than batch artefacts.
