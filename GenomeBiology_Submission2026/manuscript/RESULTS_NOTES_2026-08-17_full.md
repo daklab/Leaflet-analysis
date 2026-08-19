@@ -108,9 +108,10 @@ Imputation (i + supp).
   __init__ exports, README, E-step and training driver still to be packaged (after the queue drains).
 
 ## 2026-08-18: per-dataset grids
-- Program replication across seeds at K=20 (r >= 0.9, Hungarian on psi): atlas 11/20, atlas 70/30
-  12/20, TMS-only 13/20, mouse-AB-only 14/20, human AB 12/20; at K=10: 6-8/10; K10->K20: 6-9/10.
-  Same effective-K picture on every dataset (median matched r 0.92-0.97).
+- Program replication across seeds (r >= 0.9, Hungarian on psi): K10 6-8/10; K20 atlas 11, 70/30 12,
+  TMS-only 13, AB-only 14, human 12 (of 20); K30 17-21/30; cross-K K10->K20 6-9/10, K20->K30 11-15/20.
+  Same effective-K picture on every dataset (median matched r 0.91-0.99). Atlas 70/30 K20 s0 passes
+  A57 index sanity 17/17.
 - K=30 at the shipped lr (0.025) diverges repeatedly on the <60k-cell datasets; K30 for TMS-only,
   AB-only and human is being refit at lr 0.015 (state in Methods).
 - SP-by-cell-type heatmaps per dataset: figures/FIGURE4_programs/plots/SP_by_celltype_{TMSonly,ABonly,humanAB}_K20.
