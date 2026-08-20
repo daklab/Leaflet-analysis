@@ -123,5 +123,8 @@ Imputation (i + supp).
   (0.95 vs 0.89) -- TMS junctions are more polarised, so part of the gain is the dataset, not the
   model. Prior phi.psi 0.054 (vs atlas 0.072); NMF 0.12/0.04. Lost-entry floor unchanged (all
   methods 0.01-0.05).
-- Reading: removing Allen Brain does not hurt imputation on TMS cells (if anything the pattern is
-  cleaner), consistent with programs being cell-type structure rather than batch artefacts.
+- FAIR comparison (same TMS test cells, per-dataset rows of A3): atlas model 0.919/0.870/0.668/0.301
+  vs TMS-only 0.923/0.876/0.678/0.316 at 10/50/90/99% removed -- essentially identical. The earlier
+  'TMS-only better' was the test population (the atlas eval averages in harder AB cells). Reading:
+  co-training with Allen Brain costs TMS imputation NOTHING -> the atlas stays the main model, and
+  this per-dataset comparison is the no-batch-leakage check (Fig 2 supp).

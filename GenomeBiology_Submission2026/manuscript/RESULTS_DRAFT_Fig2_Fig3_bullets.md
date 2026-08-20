@@ -60,6 +60,10 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   molecules, per-cell estimates cannot be scored against per-cell observations (label-based cell-type
   mean scores 0.04 on the same entries): all label-free methods sit at 0.03–0.06 there. Validation is
   where the noise averages out — per cell type and group — which is where DS uses ρ = φ·ψ.
+- No-leakage check (S2 imputation metrics / per-dataset): a model trained on TMS alone (same junctions)
+  imputes the same TMS test cells identically to the atlas model (posterior mean 0.923/0.876/0.678 vs
+  0.919/0.870/0.668 at 10/50/90% removed) -- co-training with Allen Brain costs nothing, so programs
+  are not batch artefacts.
 - Uncertainty is calibrated (S2 imputation-uncertainty): posterior sd of the imputed value tracks
   seed-to-seed sd (Spearman 0.88 over 7.5 M cell-junction pairs, 400 ATSEs); 90% credible intervals
   contain other seeds' values 87% (83–91% across sd deciles); sd is largest where the cell has no reads
