@@ -24,9 +24,19 @@
 - Program content (panel d): top junctions by |psi_aging - pi-weighted rest|; genes incl. Sos1,
   Frmd4b, Ppfibp2, Lipe, Plekhg5, Rps6ka3, Xiap, Fbln2, Cald1, Itga7 (seed 0 top-25).
   2025's annotation classes (GenAge overlap, RBP targets) can be layered on; RBP mediation excluded.
-- TO DO for the final figure: violins per age with per-mouse dots for all 3 seeds (supp); DS-based
-  content via the posterior test (aging-high vs aging-low cells) instead of raw dpsi ranking;
-  age-prediction ridge (2025 1b/1c) only if we decide to keep it.
+- Worked example (FIG4_example_Kcnip3, screened by A69b over the aging program's top-200 junctions x
+  all TMS tissue-cell-types with >= 25 covered cells at each of 3/18/24m): Kcnip3 ATSE 2 in marrow
+  hematopoietic progenitors -- J1 usage falls 0.35 -> 0.12 -> 0.03 across 3/18/24m (50/48/52 covered
+  cells; per-cell Spearman -0.26) while Kcnip3 expression is flat (Spearman 0.03). Genomic context +
+  age violins + GE violins. Runner-ups in ATLAS_DM/aging/a69b_example_candidates.tsv: Sash1 (GAT MSC,
+  0.44 -> 0.74 UP), Upp1 (marrow HSC, 0.11 -> 0.40 UP), Usp2 (bladder), Kcnq1 (lung SMC).
+- Panel notes addressed (2026-08-19): ANOVA heatmap annotates shares >= 0.05 (values are each term's
+  share of the model's explained SS; cell type IS tissue_cell_type, with tissue_cell_type:age and
+  sex:age interactions); violins carry median + IQR; per-mouse dots now both sexes (circles male,
+  triangles female -- the TEST stays males-only because 24m has no females); delta heatmap in the
+  2025 circle style (tile = 24m-3m, circle = median activity).
+- TO DO: 2025-style perplexity-by-age/sex and SP-correlation panels as supp if wanted; DS-based
+  program content via the posterior test; age-prediction ridge only if kept.
 
 ## Fig. 5 — Conservation of splicing programs between mouse and human brain
 
