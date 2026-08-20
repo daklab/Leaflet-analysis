@@ -114,7 +114,7 @@ Imputation (i + supp).
   A57 index sanity 17/17.
 - K=30 at the shipped lr (0.025) diverges repeatedly on the <60k-cell datasets; K30 for TMS-only,
   AB-only and human is being refit at lr 0.015 (state in Methods).
-- SP-by-cell-type heatmaps per dataset: figures/FIGURE4_programs/plots/SP_by_celltype_{TMSonly,ABonly,humanAB}_K20.
+- SP-by-cell-type heatmaps per dataset: figures/FIGURE4_aging/plots/SP_by_celltype_{TMSonly,ABonly,humanAB}_K20.
 
 ## 2026-08-19: TMS-only imputation (A3 on the TMS 70/30 split, no cross-dataset batch leakage)
 - Seeds 1-2 done (seed 0 on a slow node, consistent so far). At every level the TMS-only model beats

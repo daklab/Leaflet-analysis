@@ -2,7 +2,7 @@
 
 ## Fig. 4 — Splicing programs across cell types, and the aging program
 
-**Programs are cell-identity structure (Fig. 4 heatmaps; FIGURE4_programs/plots/SP_by_celltype_*)**
+**Programs are cell-identity structure (Fig. 4 heatmaps; FIGURE4_aging/plots/SP_by_celltype_*)**
 - Mean SP activity per tissue-cell-type, K=20, 3 seeds side by side, for the atlas fit and for models
   trained on TMS alone and mouse Allen Brain alone (same junctions, no cross-dataset leakage):
   SP1 myeloid, SP4 endothelial, SP6 lymphoid, SP9 mesenchymal, SP15 keratinocyte/basal, SP16
@@ -11,7 +11,7 @@
   70/30, TMS-only, AB-only, human); across ranks K10->K20 6-9/10, K20->K30 11-15/20. Effective K is
   a property of the data, not one fit.
 
-**The aging program (Fig. 4 aging draft: FIGURE4_programs/plots/FIG4_aging_draft)**
+**The aging program (Fig. 4 aging draft: FIGURE4_aging/plots/FIG4_aging_draft)**
 - Design guards: TMS only (allen_brain = all 2m, one lab -> excluded); 24m is MALE-only, so the
   primary test is per-MOUSE, males, 3m (5 mice) vs 24m (4 mice), Mann-Whitney; p floors at 0.016.
 - One program passes floor-p AND breadth in all 3 seeds: activity UP with age in 94/94/99% of
