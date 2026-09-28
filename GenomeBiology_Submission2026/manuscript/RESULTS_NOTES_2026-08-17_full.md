@@ -128,3 +128,15 @@ Imputation (i + supp).
   'TMS-only better' was the test population (the atlas eval averages in harder AB cells). Reading:
   co-training with Allen Brain costs TMS imputation NOTHING -> the atlas stays the main model, and
   this per-dataset comparison is the no-batch-leakage check (Fig 2 supp).
+
+## 2026-09-27: program stability on MEAN-CENTRED psi (A70) -- restricts program-specific claims
+- Rule (Karin): program-specific claims/panels only for programs matched at cosine >= 0.8 in BOTH other seeds,
+  Hungarian on psi centred by each seed's pi-weighted mean (raw cosine is ~0.98 for every program).
+- Atlas K=20 (shipped): 4 of 20 pass AND are used by a cell type (max cell-type mean phi >= 0.05):
+  SP5 hippocampal/excitatory (min cos 0.80), SP7 inhibitory neurons (0.83), SP8 cortical excitatory (0.85),
+  SP15 keratinocyte/basal epithelium (0.82). FAIL: SP1 myeloid/microglia 0.52, SP2 0.71, SP3 0.57,
+  SP4 endothelial/smooth muscle = the "aging program" 0.65, SP6 T cell 0.62, SP9 mesenchymal 0.67,
+  SP16 astro/oligo 0.76, SP17 hepatocyte 0.67, SP18 islet 0.21, SP19 intestine 0.61.
+- Dead programs (no cell type uses them) often "match" because they sit near the prior in every seed --
+  liveness must be required (same artefact as the cross-species dead-program match).
+- Table: ATLAS_DM/stability/a70_program_stability_centred.tsv (all grids; summary a70_summary.tsv).
