@@ -1,5 +1,14 @@
 # The aging-program replication claim: where it is made, the conflicting result, and two options
 
+> **DECIDED 2026-10-25 (Karin): option (b)** — soften to partial replication (centred cosine 0.65) and
+> move to the Supplement; program stability handled by (b) per-cell/ATSE claims + (a) consensus programs
+> for the four reproduced atlas programs. Text drafted on this branch: Methods (Program Reproducibility,
+> aging paragraph), `figures/FIGURE4_aging/CAPTION_FIG4.md` (now Supplementary Figure SX),
+> `RESULTS_DRAFT_Fig4_Fig5_bullets.md`, `RESULTS_DRAFT_Fig2_Fig3_bullets.md`, `CAPTION_FIG3.md`.
+> **Not yet done (figure work, needs Karin):** the new main Figure 4 (programs across cell types with the
+> four reproduced programs marked, from the existing SP-by-cell-type heatmaps and panel a); renumbering
+> supplementary figures; the age-confound caveat (4b98dae) beside the supplementary panels.
+
 Written 2026-10-25 for Karin's decision. Nothing in Figure 4, its caption or the aging text has been
 edited. Line numbers refer to branch `leafletfa-methods-fixes`.
 

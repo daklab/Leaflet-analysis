@@ -37,8 +37,8 @@ LeafCutter-measured effect; recall/precision on LeafCutter's own large-effect se
 0.75 vs 0.56 precision); posterior calls and LeafCutter agreement at K = 10/20/30.
 *Supplement (`FIG3_supp_program_sharing`, `FIG3_supp_effect_sizes_by_contrast`):* the posterior TV
 ceiling per contrast is 0.34‖Δφ̄‖₁ − 0.04 (r 0.95; bound ½‖Δφ̄‖₁ because ψ sums to 1 within an ATSE);
-29 of 70 contrasts have no posterior call at any ATSE; mean program activity per cell type (SP1 = largest
+29 of 70 contrasts have no posterior call at any ATSE; mean program activity per cell type (reproduced programs marked; SP1 = largest
 π); per-ATSE posterior TV vs LeafCutter TV vs observed pooled TV in six contrasts.
 *Supplement:* per-seed call counts and rank consistency (Spearman 0.90); Jaccard by m; the ungated
 counts and the coverage analysis behind the ≥ 25-cell gate; A63 at δ 0.10; A65 by call category; the
-Fbln2 program decomposition (SP-labelled).
+Fbln2 program decomposition (seed-0 programs, which individually do not reproduce across seeds; shown to illustrate how the program basis produces the posterior effect).

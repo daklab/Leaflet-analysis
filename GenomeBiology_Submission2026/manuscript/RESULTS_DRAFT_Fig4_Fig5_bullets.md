@@ -7,15 +7,22 @@
   trained on TMS alone and mouse Allen Brain alone (same junctions, no cross-dataset leakage):
   SP1 myeloid, SP4 endothelial, SP6 lymphoid, SP9 mesenchymal, SP15 keratinocyte/basal, SP16
   astrocyte/oligodendrocyte, SP17 hepatocyte, SP18 islet, SP20 intestinal (atlas numbering).
-- Program replication across seeds (A61, r >= 0.9 on psi): K20 11-14/20 on every dataset (atlas,
-  70/30, TMS-only, AB-only, human); across ranks K10->K20 6-9/10, K20->K30 11-15/20. Effective K is
-  a property of the data, not one fit.
+- Program replication across seeds (REVISED 2026-10-25; Methods, Program Reproducibility): matched
+  on CENTRED psi (cosine >= 0.8 in both other seeds) and used by a cell type. Atlas K20: 4 of 20
+  reproduce (SP5 hippocampal/excitatory, SP7 inhibitory, SP8 cortical excitatory, SP15
+  keratinocyte/basal) -> consensus programs; program-level statements are restricted to these.
+  The OLD figure (A61, raw psi r >= 0.9: 11-14/20) is withdrawn -- raw psi is ~0.98 similar for every
+  program. The per-cell representation is stable across seeds (kNN range <= 0.025, LeafletFA
+  validation 2026-10-25), and lower or higher K does not yield more reproducible programs (2-3 at
+  K10/20/30 on TMS).
 
-**The aging program (Fig. 4 aging draft: FIGURE4_aging/plots/FIG4_aging_draft)**
+**The aging-associated program -> SUPPLEMENT (decision 2026-10-25; FIGURE4_aging/plots/FIG4_aging_draft)**
 - Design guards: TMS only (allen_brain = all 2m, one lab -> excluded); 24m is MALE-only, so the
   primary test is per-MOUSE, males, 3m (5 mice) vs 24m (4 mice), Mann-Whitney; p floors at 0.016.
 - One program passes floor-p AND breadth in all 3 seeds: activity UP with age in 94/94/99% of
-  cell types (per-type Spearman median 0.37/0.46/0.64); psi-matched across seeds r 0.95-0.97.
+  cell types (per-type Spearman median 0.37/0.46/0.64). Its composition reproduces only PARTIALLY
+  across seeds: centred-psi cosine 0.65 vs both other seeds (threshold 0.8). Report as an
+  aging-associated trend shared by three fits, not as a reproducible program.
   Atlas seed-0 name: SP4 [check SP label per fit]. 3m mean 0.13 -> 24m 0.22 (seed 0).
 - Variance partition (Type-II ANOVA, panel a): cell type dominates every program; the aging program
   carries the largest age and cell-type x age shares [numbers in data_variance_partition.tsv].
@@ -62,7 +69,8 @@
 - RESULT: one conserved program pair, extremely stable -- the NON-NEURONAL / glial-vascular program:
   mouse SP13 (activity 0.92-0.97 in endothelial, microglia, VLMC, astrocytes, pericytes) matches
   human SP9 (0.76-0.84 in astrocytes and oligodendrocytes; human endothelial/microglia are nearly
-  absent, 30-147 cells) at r = 0.586-0.589 in ALL NINE seed pairs (~77% of the within-species
+  absent, 30-147 cells) at r = 0.581-0.589 in ALL NINE seed pairs (best match per seed pair; the
+  program carries different numbers in different seeds: mouse SP13/SP14, human SP8/SP9) (~77% of the within-species
   ceiling). All neuronal programs match weakly (0.06-0.27): mouse inhibitory <-> human LAMP5/VIP/
   PAX6 at 0.26 is the best of them.
 - Cell-type comparability across species (for the transfer arm and heatmaps): mouse AB = isocortex
