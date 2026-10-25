@@ -1,0 +1,7 @@
+field	levels	total_variation_distance	chi2_P
+Class	4	0.0128	0.007475421218637061
+Subclass	43	0.0298	0.005619888091770378
+Region	23	0.054	2.5605576399816004e-18
+Donor sex	3	0.0186	0.0019408400997081444
+Donor (528 levels; summarised)	528	0.1092	3.57559535244359e-17
+Donors represented (omitted / included)	453 / 526	max share of one donor (cells with metadata): 0.011 / 0.010	
