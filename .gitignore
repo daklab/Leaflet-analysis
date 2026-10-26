@@ -316,3 +316,6 @@ GenomeBiology_Submission2026/figures/supplemental/**/__pycache__/
 !GenomeBiology_Submission2026/figures/*/data/**/*.npz
 !GenomeBiology_Submission2026/figures/*/data/*.csv
 !GenomeBiology_Submission2026/figures/*/data/*.npz
+
+# notebook backup copies (rna_atlas_explore.ipynb.bak/.bak2 were committed in ccc32d4 and removed in f4f99b2)
+*.ipynb.bak*
