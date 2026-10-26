@@ -1,6 +1,6 @@
 # Results skeleton — Figures 4 and 5, bullet form (2026-08-19; drafts, numbers quotable)
 
-## Fig. 4 — Splicing programs across cell types, and the aging program
+## Fig. 4 — Splicing programs across cell types
 
 **Programs are cell-identity structure (Fig. 4 heatmaps; FIGURE4_aging/plots/SP_by_celltype_*)**
 - Mean SP activity per tissue-cell-type, K=20, 3 seeds side by side, for the atlas fit and for models
@@ -8,7 +8,7 @@
   SP1 myeloid, SP4 endothelial, SP6 lymphoid, SP9 mesenchymal, SP15 keratinocyte/basal, SP16
   astrocyte/oligodendrocyte, SP17 hepatocyte, SP18 islet, SP20 intestinal (atlas numbering).
 - Program replication across seeds (REVISED 2026-10-25; Methods, Program Reproducibility): matched
-  on CENTRED psi (cosine >= 0.8 in both other seeds) and used by a cell type. Atlas K20: 4 of 20
+  on CENTERED psi (cosine >= 0.8 in both other seeds) and used by a cell type. Atlas K20: 4 of 20
   reproduce (SP5 hippocampal/excitatory, SP7 inhibitory, SP8 cortical excitatory, SP15
   keratinocyte/basal) -> consensus programs; program-level statements are restricted to these.
   The OLD figure (A61, raw psi r >= 0.9: 11-14/20) is withdrawn -- raw psi is ~0.98 similar for every
@@ -16,36 +16,16 @@
   validation 2026-10-25), and lower or higher K does not yield more reproducible programs (2-3 at
   K10/20/30 on TMS).
 
-> **PENDING (Karin, 2026-10-25): age is confounded with sequencing batch; this aging text is to be replaced by draft (a) or (b) in manuscript/AGING_SUPPLEMENT_DRAFTS.md. Do not cite it as an aging result.**
-
-**The aging-associated program -> SUPPLEMENT (decision 2026-10-25; FIGURE4_aging/plots/FIG4_aging_draft)**
-- Design guards: TMS only (allen_brain = all 2m, one lab -> excluded); 24m is MALE-only, so the
-  primary test is per-MOUSE, males, 3m (5 mice) vs 24m (4 mice), Mann-Whitney; p floors at 0.016.
-- One program passes floor-p AND breadth in all 3 seeds: activity UP with age in 94/94/99% of
-  cell types (per-type Spearman median 0.37/0.46/0.64). Its composition reproduces only PARTIALLY
-  across seeds: centred-psi cosine 0.65 vs both other seeds (threshold 0.8). Report as an
-  aging-associated trend shared by three fits, not as a reproducible program.
-  Atlas seed-0 name: SP4 [check SP label per fit]. 3m mean 0.13 -> 24m 0.22 (seed 0).
-- Variance partition (Type-II ANOVA, panel a): cell type dominates every program; the aging program
-  carries the largest age and cell-type x age shares [numbers in data_variance_partition.tsv].
-- Aging shift by cell type (panel c): delta mean activity (24m - 3m, males) positive across nearly
-  all sufficiently covered tissue-cell-types [breadth from a69 delta_bytype].
-- Program content (panel d): top junctions by |psi_aging - pi-weighted rest|; genes incl. Sos1,
-  Frmd4b, Ppfibp2, Lipe, Plekhg5, Rps6ka3, Xiap, Fbln2, Cald1, Itga7 (seed 0 top-25).
-  2025's annotation classes (GenAge overlap, RBP targets) can be layered on; RBP mediation excluded.
-- Worked example (FIG4_example_Kcnip3, screened by A69b over the aging program's top-200 junctions x
-  all TMS tissue-cell-types with >= 25 covered cells at each of 3/18/24m): Kcnip3 ATSE 2 in marrow
-  hematopoietic progenitors -- J1 usage falls 0.35 -> 0.12 -> 0.03 across 3/18/24m (50/48/52 covered
-  cells; per-cell Spearman -0.26) while Kcnip3 expression is flat (Spearman 0.03). Genomic context +
-  age violins + GE violins. Runner-ups in ATLAS_DM/aging/a69b_example_candidates.tsv: Sash1 (GAT MSC,
-  0.44 -> 0.74 UP), Upp1 (marrow HSC, 0.11 -> 0.40 UP), Usp2 (bladder), Kcnq1 (lung SMC).
-- Panel notes addressed (2026-08-19): ANOVA heatmap annotates shares >= 0.05 (values are each term's
-  share of the model's explained SS; cell type IS tissue_cell_type, with tissue_cell_type:age and
-  sex:age interactions); violins carry median + IQR; per-mouse dots now both sexes (circles male,
-  triangles female -- the TEST stays males-only because 24m has no females); delta heatmap in the
-  2025 circle style (tile = 24m-3m, circle = median activity).
-- TO DO: 2025-style perplexity-by-age/sex and SP-correlation panels as supp if wanted; DS-based
-  program content via the posterior test; age-prediction ridge only if kept.
+**A partially reproducible program (Supplementary Fig. SX; decision 2026-10-26: the aging claim is removed)**
+- In Tabula Muris Senis, age coincides with sequencing campaign and library format (no plate contains two
+  ages; all 24-month mice are male), so age is not analyzed (Methods, Data; audit 4b98dae; STAGE5 §36.3, §91).
+- A program used mainly by endothelial and smooth-muscle cells (atlas seed-0 SP4) is found in all three
+  seeded fits, but its composition agrees only partly between them (centered cosine 0.65 vs seed-1 SP6 and
+  seed-2 SP8; threshold 0.8). Result sentence: "Programs that do not meet the reproducibility threshold can
+  still be found in every fit with partly different compositions (Supplementary Fig. SX); we restrict
+  program-level statements to the reproduced programs."
+- Withdrawn with the aging claim: the age test, the per-cell-type age shift, the age variance terms and the
+  Kcnip3 worked example (all carry the batch confound; Kcnip3 was selected from this program's age screen).
 
 ## Fig. 5 — Conservation of splicing programs between mouse and human brain
 

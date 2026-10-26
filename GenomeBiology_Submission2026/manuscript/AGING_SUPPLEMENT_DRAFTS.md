@@ -1,12 +1,21 @@
 # Aging supplement: evidence, mouse-level test, and two drafts for Karin's choice
 
+> **DECIDED 2026-10-26 (Karin): option (b), the aging claim is removed.** It is applied to Methods (Data
+> sentence; the aging subsection deleted; the partially-reproducible example in Program Reproducibility), the
+> Supplementary Fig. SX caption, the Results draft, the figure plan and the explainer. No PENDING markers
+> remain. Panels to build: `figures/FIGURE4_aging/BUILD_NOTES_partial_program.md`.
+>
+> **Correction found while applying (b):** by centered-ψ matching, seed-0 SP4 corresponds to **seed-1 SP6**
+> (cosine 0.645), not A69's seed-1 "aging" pick SP3. The seed-2 match is SP8, as A69 had it. A69's three
+> picks were therefore not one program across seeds. The §2 test used A69's picks. Its conclusion does not
+> change: specificity (S2) covers every live program in every seed, and most separate the age groups.
+
 Written 2026-10-25. The test was pre-registered in `AGING_CLAIM_OPTIONS.md` §6 (commit 93e16cb, before any
 computation).
 - Code: `figures/FIGURE4_aging/audit/aging_mouse_level_test.py`.
 - Outputs: `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/aging_mouse_level/`.
 
-**Until Karin chooses, the program is not called aging-related anywhere outside this decision.** The
-placeholders in `methods_CURRENT.tex`, `CAPTION_FIG4.md` and the results draft are marked PENDING.
+(Superseded by the decision above.)
 
 ## 1. Existing evidence that age is confounded with mouse and batch
 
@@ -141,13 +150,13 @@ Panel changes:
 > different compositions (Supplementary Fig. SX); we restrict program-level statements to the reproduced
 > programs.
 
-## 5. Text that must change under either option (not yet edited; PENDING markers placed)
+## 5. Text changed under option (b) (applied 2026-10-26)
 
 - `methods_CURRENT.tex`, subsection "The Aging Splicing Program" (L141–142): replaced by (a) or by (b).
 - `figures/FIGURE4_aging/CAPTION_FIG4.md`: replaced by the (a) or (b) caption.
 - `manuscript/RESULTS_DRAFT_Fig4_Fig5_bullets.md`, aging block: replaced by the (a) or (b) sentence.
 - `figures/FIGURE_PLAN_FINAL.md` L72–74 ("Figure 4 — Aging … Program 5 rises with age"): planning
-  document, marked PENDING.
-- `manuscript/LEAFLETFA_FOR_DUMMIES.md` L53 ("program 5 is an aging program"): explainer, marked PENDING.
+  document: now Figure 4 — Splicing programs across cell types.
+- `manuscript/LEAFLETFA_FOR_DUMMIES.md` L53: example changed to a keratinocyte program.
 - No abstract, introduction or discussion file exists yet in `manuscript/`. When they are written, the
   program must not be described as aging-related unless (a) is chosen, and then only with the batch caveat.

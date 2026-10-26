@@ -159,3 +159,12 @@ met** (5–10 of 6–11 live programs separate the age groups at > 2× the betwe
 3rd–7th); R3 met but processing-confounded. Recommendation by the rule: **option (b)**. Deviation: A69's
 "fifth" 3-month male is a pooled-cell label (`3_10_M/3_11_M`); with 4 vs 4 real mice the exact p is 0.029
 (its minimum), same conclusion.
+
+## 8. Final decision (Karin, 2026-10-26)
+Option (b) of AGING_SUPPLEMENT_DRAFTS.md: **the aging claim is removed.** Age and sequencing batch are the
+same thing in TMS: no plate contains two ages; 3-month mice and 18/24-month mice were sequenced in different
+campaigns and library formats; all 24-month mice are male. Technical covariates alone predict 18 vs 24 months
+as well as splicing does (F1 0.63 vs 0.65, STAGE5 §36.3), and nearly every program shifts between the age
+groups (§7). The program is kept only as an example of a partially reproducible program (centered cosine
+0.65). A Data sentence states that TMS age coincides with sequencing batch and is not analyzed.
+
