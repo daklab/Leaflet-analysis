@@ -69,6 +69,8 @@ enters through the posterior test, which is the only arm that uses what LeafletF
 | supp | per-ATSE effect sizes by contrast: posterior TV vs LeafCutter TV vs observed pooled TV, 6 contrasts | `code/build_effect_sizes_by_contrast.py` | LeafCutter TV tracks observed (Spearman 0.65-0.71); posterior TV saturates at a CONTRAST-SPECIFIC ceiling set by how far apart the groups' phi are (0.7 brain endo/oligo, 0.42 heart endo/fibro, ~0.1 skin basal/keratinocyte and intestine) -- cell types sharing programs cannot clear delta at any event. State as a property of the test |
 | g | worked examples with genomic context, SAME contrast (brain endothelial vs oligodendrocyte): Apbb2 (both) and Mbd3 (LeafletFA-only) | `code/build_examples_v2.py` -> `plots/FIG3_examples_v2.png` | junction arcs over transcripts + per-junction single-cell violins with per-mouse pseudobulk dots. Apbb2: LC q 3e-18, posterior TV 0.64-0.76, observed 0.98. Mbd3: 238/414 cells shift J1 0.19->0.37 (observed TV 0.35, posterior 0.25-0.28 all seeds) but the 7v8 pseudobulks overlap and LC q = 0.20. Examples gated on >=50 cells/arm AND observed TV >= 0.25. Gna13 (was here) and Usp54 (before that) both REMOVED: Usp54 was 14 covered cells, Gna13 was a program-only call. Fbln2 program decomposition moves to supp |
 
+> **PENDING (Karin, 2026-10-25): age is confounded with sequencing batch; this aging text is to be replaced by draft (a) or (b) in manuscript/AGING_SUPPLEMENT_DRAFTS.md. Do not cite it as an aging result.**
+
 ### Figure 4 — Aging  [TO-BUILD, biology]
 
 Program 5 (K20) rises with age in every cell type tested; complete separation 3m vs 24m in male

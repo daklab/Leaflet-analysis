@@ -2,6 +2,8 @@
 # Decision (Karin, 2026-10-25): option (b) of manuscript/AGING_CLAIM_OPTIONS.md -- soften to partial
 # replication (centred-psi cosine 0.65) and move from the main text to the Supplement.
 
+> **PENDING (Karin, 2026-10-25): age is confounded with sequencing batch; this aging text is to be replaced by draft (a) or (b) in manuscript/AGING_SUPPLEMENT_DRAFTS.md. Do not cite it as an aging result.**
+
 **Supplementary Figure SX. An aging-associated splicing program, partially reproducible across seeds.**
 All aging analyses use Tabula Muris Senis cells only (the Allen Brain dataset is entirely 2-month
 animals from one laboratory); ages are 3, 18 and 24 months, and because 24-month animals are all

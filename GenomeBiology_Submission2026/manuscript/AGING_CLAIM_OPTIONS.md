@@ -152,3 +152,10 @@ processing.
   - Otherwise option (b): remove the aging claim and keep the program only as an example of a partially
     reproducible program.
   - In both drafts the batch confound is stated explicitly.
+
+## 7. Result of the §6 test (2026-10-25) — see AGING_SUPPLEMENT_DRAFTS.md for the full tables and both drafts
+R1 met (complete separation of 3 m and 24 m mice in all 3 seeds; effect ~8× the between-mouse SD); **R2 not
+met** (5–10 of 6–11 live programs separate the age groups at > 2× the between-mouse SD; this program ranks
+3rd–7th); R3 met but processing-confounded. Recommendation by the rule: **option (b)**. Deviation: A69's
+"fifth" 3-month male is a pooled-cell label (`3_10_M/3_11_M`); with 4 vs 4 real mice the exact p is 0.029
+(its minimum), same conclusion.

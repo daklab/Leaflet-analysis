@@ -50,7 +50,7 @@ noisy, sparse, duplicated counts honestly.
 
 ### psi -- what a program IS
 `psi_kj` = program k's usage of junction j. **Global**: one value per (program, junction), shared by
-every cell. This is the dictionary. When we say "program 5 is an aging program", we mean psi_5 has a
+every cell. This is the dictionary. [PENDING 2026-10-25: the aging program is under review -- age is confounded with sequencing batch; see AGING_SUPPLEMENT_DRAFTS.md.] When we say "program 5 is an aging program", we mean psi_5 has a
 particular pattern of junction usages.
 
 Within each ATSE, psi_k is a composition -- it sums to 1 over the event's junctions. Enforced by

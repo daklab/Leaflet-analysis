@@ -16,6 +16,8 @@
   validation 2026-10-25), and lower or higher K does not yield more reproducible programs (2-3 at
   K10/20/30 on TMS).
 
+> **PENDING (Karin, 2026-10-25): age is confounded with sequencing batch; this aging text is to be replaced by draft (a) or (b) in manuscript/AGING_SUPPLEMENT_DRAFTS.md. Do not cite it as an aging result.**
+
 **The aging-associated program -> SUPPLEMENT (decision 2026-10-25; FIGURE4_aging/plots/FIG4_aging_draft)**
 - Design guards: TMS only (allen_brain = all 2m, one lab -> excluded); 24m is MALE-only, so the
   primary test is per-MOUSE, males, 3m (5 mice) vs 24m (4 mice), Mann-Whitney; p floors at 0.016.
