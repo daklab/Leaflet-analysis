@@ -101,3 +101,54 @@ Consequences:
   (centred min cosine 0.97 / 0.98, which passes) can still be stated as reproducible.
 - **The LeafletFA validation check 3** (seed stability of the new SpliceVI-split fits) now uses the
   centred metric as primary (pre-registration amendment 2), so its numbers will be comparable with A70.
+
+## 6. PRE-REGISTERED (2026-10-25, before any computation): mouse-level test of the aging program
+
+**Design fact (not a result):** in TMS, age is perfectly confounded with sequencing campaign and
+processing.
+- 3 m cells are campaign C1; 18 m and 24 m cells are a later campaign with different processing formats
+  (every 18 m mouse secondary-plate format, every 24 m mouse lane-demultiplexed; STAGE5 §27, §91;
+  `figures/FIGURE4_aging/audit/age_confound_audit.tsv`).
+- No plate spans two ages, and all 24 m mice are male.
+- So no test here can attribute a difference to age rather than batch. The test can only say whether the
+  age groups differ by more than mice of the same age differ from each other, and whether that
+  difference is specific to this program.
+
+**Data:**
+- Atlas fits `runs_final_deltaonly` K20, seeds 0–2 (the paper's fits); TMS cells only.
+- The aging program per seed is A69's selection: seed 0 program index 6 (SP4), seed 1 index 2 (SP3),
+  seed 2 index 9 (SP8).
+- Unit: mouse × tissue–cell type, mean φ of the program over the unit's cells (≥ 20 cells).
+
+**P1 (mixed model):** males, 3 m (5 mice) vs 24 m (4 mice).
+- Model: `unit_mean ~ age24 + C(tissue_cell_type) + (1 | mouse)` (statsmodels MixedLM, REML).
+- Report the age coefficient, its 95 % CI, the between-mouse SD within age (random-intercept SD), and
+  the ratio |age coefficient| / between-mouse SD.
+
+**P2 (exact mouse-level permutation):**
+- Unit means are residualised on tissue–cell type (type effects fitted on all male units), then
+  averaged per mouse, giving one value per mouse.
+- Observed statistic: the 24 m − 3 m difference of mouse means.
+- Exact two-sided p over all C(9, 4) = 126 assignments of the "24 m" label to 4 of the 9 male mice.
+  The minimum attainable p is 2/126 = 0.016.
+
+**S1 (within the later campaign, descriptive):** 18 m vs 24 m.
+- Males only: 2 vs 4 mice, 15 assignments, minimum p 0.13.
+- All 8 mice with sex as a covariate in the mixed model.
+- Direction only; it cannot reach significance, and processing still differs between these ages (§91).
+
+**S2 (specificity):** the P1 statistic (|age coefficient| / between-mouse SD) for every live program
+(argmax ≥ 1 % of TMS cells); the aging program's rank; and the share of live programs with a ratio > 2.
+
+**Reading, fixed now:**
+- **R1 — a mouse-level group difference exists:** P2 p ≤ 0.016 (its minimum) AND ratio > 2 AND the
+  same direction, in all 3 seeds.
+- **R2 — specific to this program:** the aging program ranks first among live programs by the ratio in
+  ≥ 2 of 3 seeds AND fewer than half of the live programs have a ratio > 2. If most programs separate the
+  age groups, the difference is a global group (campaign) shift, not an aging program.
+- **R3 — later-campaign direction:** 18 m < 24 m in all 3 seeds (descriptive).
+- **Recommendation rule:**
+  - Option (a), a caveated aging-associated trend, only if R1 and R2 hold and R3 agrees.
+  - Otherwise option (b): remove the aging claim and keep the program only as an example of a partially
+    reproducible program.
+  - In both drafts the batch confound is stated explicitly.
