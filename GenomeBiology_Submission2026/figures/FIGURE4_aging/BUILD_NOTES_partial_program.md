@@ -35,6 +35,10 @@ Everything is built from existing fits; no training. Follow `figures/FIGURE_THEM
   - seed 1: index 5 (SP6), cosine 0.645;
   - seed 2: index 9 (SP8), cosine 0.650.
 - Note: these are NOT A69's seed-1 "aging" pick (SP3). Use the centered matches.
+- **Built 2026-10-27:** `code/build_supp_partial_program.py` → `supplemental/partial_program/SX_partial_program.{pdf,png}` + `_data.tsv`.
+  The build found that the seed-2 composition match SP8 is used by epithelial cells (profile r 0.28); the
+  seed-2 program used by the same cells is SP15 (profile r 0.82, centered cosine 0.537). Panels a and c show
+  both. Panel c uses the top 8 junctions per program (top 15 was unreadable).
 
 ## Panels to build
 

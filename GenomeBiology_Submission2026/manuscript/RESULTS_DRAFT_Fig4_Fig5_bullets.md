@@ -19,9 +19,10 @@
 **A partially reproducible program (Supplementary Fig. SX; decision 2026-10-26: the aging claim is removed)**
 - In Tabula Muris Senis, age coincides with sequencing campaign and library format (no plate contains two
   ages; all 24-month mice are male), so age is not analyzed (Methods, Data; audit 4b98dae; STAGE5 §36.3, §91).
-- A program used mainly by endothelial and smooth-muscle cells (atlas seed-0 SP4) is found in all three
-  seeded fits, but its composition agrees only partly between them (centered cosine 0.65 vs seed-1 SP6 and
-  seed-2 SP8; threshold 0.8). Result sentence: "Programs that do not meet the reproducibility threshold can
+- A program used mainly by endothelial and smooth-muscle cells (atlas seed-0 SP4) has a counterpart used by
+  the same cell types in every fit (seed-1 SP6, seed-2 SP15), but the compositions agree only partly (centered
+  cosine 0.645 and 0.537; threshold 0.8); the seed-2 program closest in composition (SP8, 0.650) is used by
+  epithelial cells. Result sentence: "Programs that do not meet the reproducibility threshold can
   still be found in every fit with partly different compositions (Supplementary Fig. SX); we restrict
   program-level statements to the reproduced programs."
 - Withdrawn with the aging claim: the age test, the per-cell-type age shift, the age variance terms and the
