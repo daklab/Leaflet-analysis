@@ -69,12 +69,13 @@ enters through the posterior test, which is the only arm that uses what LeafletF
 | supp | per-ATSE effect sizes by contrast: posterior TV vs LeafCutter TV vs observed pooled TV, 6 contrasts | `code/build_effect_sizes_by_contrast.py` | LeafCutter TV tracks observed (Spearman 0.65-0.71); posterior TV saturates at a CONTRAST-SPECIFIC ceiling set by how far apart the groups' phi are (0.7 brain endo/oligo, 0.42 heart endo/fibro, ~0.1 skin basal/keratinocyte and intestine) -- cell types sharing programs cannot clear delta at any event. State as a property of the test |
 | g | worked examples with genomic context, SAME contrast (brain endothelial vs oligodendrocyte): Apbb2 (both) and Mbd3 (LeafletFA-only) | `code/build_examples_v2.py` -> `plots/FIG3_examples_v2.png` | junction arcs over transcripts + per-junction single-cell violins with per-mouse pseudobulk dots. Apbb2: LC q 3e-18, posterior TV 0.64-0.76, observed 0.98. Mbd3: 238/414 cells shift J1 0.19->0.37 (observed TV 0.35, posterior 0.25-0.28 all seeds) but the 7v8 pseudobulks overlap and LC q = 0.20. Examples gated on >=50 cells/arm AND observed TV >= 0.25. Gna13 (was here) and Usp54 (before that) both REMOVED: Usp54 was 14 covered cells, Gna13 was a program-only call. Fbln2 program decomposition moves to supp |
 
-### Figure 4 — Aging  [TO-BUILD, biology]
+### Figure 4 — Splicing programs across cell types  [TO-BUILD]
 
-Program 5 (K20) rises with age in every cell type tested; complete separation 3m vs 24m in male
-mice (p = 0.0159, the minimum attainable with n=5 vs 4); replicates in 5/7 fits; one of the
-reproducible programs (r 0.982). 2m EXCLUDED (all allen_brain -- a lab contrast, not age). Missing:
-what the program IS -- its high-psi junctions and genes on the final model. Redo on shipped fit.
+Decision 2026-10-26: no aging claim. In Tabula Muris Senis, age coincides with sequencing campaign and library
+format (no plate contains two ages; all 24-month mice are male), so age is not analyzed (audit 4b98dae; STAGE5
+§36.3, §91). Main Fig 4: program activity per tissue–cell type with the four reproduced programs marked
+(centered-ψ rule). The former aging program becomes Supplementary Fig. SX, a partially reproducible program
+(centered cosine 0.65); panels to build are listed in `FIGURE4_aging/BUILD_NOTES_partial_program.md`.
 
 ### Figure 5 — Human vs mouse brain  [TO-BUILD, biology, not scoped this session]
 

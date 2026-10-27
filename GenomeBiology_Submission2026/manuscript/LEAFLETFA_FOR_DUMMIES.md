@@ -50,8 +50,8 @@ noisy, sparse, duplicated counts honestly.
 
 ### psi -- what a program IS
 `psi_kj` = program k's usage of junction j. **Global**: one value per (program, junction), shared by
-every cell. This is the dictionary. When we say "program 5 is an aging program", we mean psi_5 has a
-particular pattern of junction usages.
+every cell. This is the dictionary. When we say "program 5 is a keratinocyte program", we mean psi_5 has a
+particular pattern of junction usages that keratinocytes load on.
 
 Within each ATSE, psi_k is a composition -- it sums to 1 over the event's junctions. Enforced by
 parameterising through a softmax over unconstrained logits eta:

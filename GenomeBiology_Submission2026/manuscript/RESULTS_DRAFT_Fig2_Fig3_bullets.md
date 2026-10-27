@@ -85,7 +85,7 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
 - Realised/nominal FDP at 0.05 by junction count: LeafCutter 3.2× (m = 2) → 11.4× (m = 9);
   LeafletFA 1.15× → 1.9×; identical across 3 seeds [3a]. Overall on their own nulls: 1.42× vs 4.48×
   (S3 a QQ). LeafletFA's null carries residual donor structure so its ratio is an upper bound.
-- At matched realised FDP: LeafletFA 840 vs LeafCutter 641 ATSEs per contrast (840/841/842 across
+- At matched realised FDP: LeafletFA 840 vs LeafCutter 641 ATSEs per contrast (MEDIAN over 70 contrasts) (840/841/842 across
   seeds); at nominal q ≤ 0.05 LeafCutter's 1,124 vs 197 is miscalibration, not sensitivity [3b].
   Framed as a data-design result: same test, same covariate, single cells vs pseudobulk.
 - Where they disagree (S3 calibration_and_K b): agreement rises with LeafCutter-measured effect (19%
@@ -102,8 +102,10 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   (observed < 0.15): the two groups' programs differ at the event but the arm's cells do not follow
   them. Canonical case Gna13 ATSE1 heart endothelial vs fibroblast: posterior 0.33–0.41 every seed,
   cells 0.09; the endothelial-vs-mesenchymal difference is real atlas-wide (0.55–0.77 vs 0.34–0.54,
-  ~0.15) but the model reports it 3× amplified because ψ_SP9 (mesenchymal) sits below every mesenchymal
-  type's observed usage. Wording: "program-level, amplified", not "wrong"; reported, not merged.
+  ~0.15) but the model reports it 3× amplified because the program composition that mesenchymal cells
+  load sits below every mesenchymal type's observed usage at this event (a basis-level effect; the
+  mesenchymal program itself does not reproduce across seeds, centred cosine 0.67, so it is not named).
+  Wording: "program-level, amplified", not "wrong"; reported, not merged.
 - Effect-size scale: TV_e = ½ Σ_j |Δ_j|, the fraction of the ATSE's splicing mass that moves; Δ_j sum
   to 0 within an ATSE; for two junctions |ΔPSI|; for a cassette exon |ΔPSI_skip| [Methods; worked K=2
   example].
@@ -133,7 +135,8 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   posterior 0.25–0.28 in all seeds); the 7 and 8 per-mouse pseudobulks overlap and LeafCutter reaches
   only q = 0.20 — the power the pseudobulk design gives up. Examples gated on ≥ 50 covered cells/arm and
   observed TV ≥ 0.25.
-- Fbln2 program decomposition (S3 Fbln2, SP-labelled): how ψ per program and Δφ̄ combine into the
+- Fbln2 program decomposition (S3 Fbln2; seed-0 programs, which individually do not reproduce
+  across seeds -- shown to illustrate the mechanism, not as named biology): how ψ per program and Δφ̄ combine into the
   predicted skip 0.55/0.10 vs LeafCutter 0.92/0.02; direction recovered in 3/3 seeds; ‖Δφ̄‖₁ 0.97 →
   ceiling 0.49.
 
