@@ -15,6 +15,13 @@
   program. The per-cell representation is stable across seeds (kNN range <= 0.025, LeafletFA
   validation 2026-10-25), and lower or higher K does not yield more reproducible programs (2-3 at
   K10/20/30 on TMS).
+- Usage vs content (validation check 6, 2026-10-26; decision 2026-10-27, option 1 of PROGRAM_STABILITY_WORDING.md):
+  programs that are not reproduced still have a counterpart used by the same cell types in each fit
+  (activity-profile r 0.81 TMS, 0.92 Allen) but share few defining junctions (top-50 Jaccard 0.19, 0.02);
+  splitting/merging rescues only Allen neuron programs. Result sentence: "Which cell types use which program
+  was reproducible across seeds, but for most programs the junction composition was not; we therefore make
+  program-level statements only for the programs whose composition reproduced (four on the atlas), and
+  otherwise rely on the per-cell representation and on ATSE-level tests."
 
 **A partially reproducible program (Supplementary Fig. SX; decision 2026-10-26: the aging claim is removed)**
 - In Tabula Muris Senis, age coincides with sequencing campaign and library format (no plate contains two

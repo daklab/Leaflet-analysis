@@ -1,4 +1,7 @@
-# Program-stability wording — draft for Karin's choice (not applied)
+# Program-stability wording — draft for Karin's choice
+
+> **DECIDED 2026-10-27 (Karin): option 1, applied** to `methods_CURRENT.tex` (Program Reproducibility) and
+> `RESULTS_DRAFT_Fig4_Fig5_bullets.md`.
 
 Written 2026-10-27, from LeafletFA validation check 6 (pre-registered as amendment 3 in
 `LeafletFA_validation/VALIDATION_PREREG.md`; results in `VALIDATION_REPORT.md`, "Check 6"). Nothing in
