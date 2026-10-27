@@ -1,6 +1,7 @@
 # Note: PCR-duplicated reads in Smart-seq2, and why they do not break the model
 
-Reference note, 2026-08-15. Not part of Methods; kept so the question "did you look at duplicate
+Reference note, 2026-08-15. **Now Supplementary Note 1** (`supplement/supplementary_notes.tex`, 2026-10-27), which
+relates it to the data-measured median (~1.2). Not part of Methods; kept so the question "did you look at duplicate
 reads?" has a written answer with numbers.
 
 ## The concern
