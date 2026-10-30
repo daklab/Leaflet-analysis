@@ -68,11 +68,15 @@ Each bullet = one claim, with the panel it rests on and the number to quote. Kar
   seed-to-seed sd (Spearman 0.88 over 7.5 M cell-junction pairs, 400 ATSEs); 90% credible intervals
   contain other seeds' values 87% (83–91% across sd deciles); sd is largest where the cell has no reads
   at the ATSE (0.012 vs 0.003 with > 5 reads).
-- Fgfr2 IIIb/IIIc (S2 Fgfr2, 3 seeds): the epithelial arm of the canonical switch is recovered
-  (imputed 0.90–0.97 vs raw ~1.0 across 14 epithelial types); the mesenchymal arm is direction-only
-  and seed-dependent (0.3–0.8 vs raw 0.0; 5–59 covered cells) because mesenchymal types also load
-  programs whose ψ at this event is unconstrained (their cells do not express Fgfr2). Mammary basal
-  cells cluster with mesenchymal types in all seeds (myoepithelial).
+- Fgfr2 IIIb/IIIc (S2 Fgfr2, 3 seeds; covered and uncovered cells shown separately): the epithelial
+  arm of the canonical switch is recovered (covered cells 0.80–0.99 vs raw 0.80–1.00; uncovered cells
+  0.64–0.95, 14 epithelial types). Covered mesenchymal cells track their reads (0.05–0.15 vs raw 0 in
+  12 of 13 types; 5–59 covered cells per type). Uncovered mesenchymal cells (98% of them) take the
+  mixture of programs their type uses, and some of those programs are shared with epithelial cells and
+  use IIIb at this event (ψ_IIIb ≈ 1), so they sit at 0.3–0.8 (seed means 0.35–0.63) rather than near 0.
+  The lineage ordering holds on the seed mean (every mesenchymal type below every epithelial type) but
+  not within every seed: in seeds 0 and 1 uncovered lung smooth muscle (0.81) exceeds mammary basal
+  cells (0.61, 0.53). Mammary basal cells cluster with mesenchymal types in all seeds (myoepithelial).
 
 ## Section: On the atlas, single-cell LeafletFA is calibrated where pseudobulk LeafCutter is not, and its posterior test asks a program-level question (Fig. 3)
 
