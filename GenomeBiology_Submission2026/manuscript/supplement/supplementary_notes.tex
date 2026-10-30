@@ -1,0 +1,59 @@
+% Supplementary Notes for the LeafletFA Genome Biology manuscript.
+% Same LaTeX conventions as manuscript/methods/methods_CURRENT.tex (\subsection*, tabular, \cite keys).
+% Supplementary Note 1 is derived from manuscript/NOTE_duplicate_reads.md (2026-08-15), updated 2026-10-27 to
+% relate its estimate to the data-measured median (SpliceVI2026, Supplementary Fig. S1).
+
+\section*{Supplementary Notes}
+
+\subsection*{Supplementary Note 1: Duplicate reads and the effective number of molecules per event}
+\label{suppnote:duplicates}
+
+\paragraph{Method.} Smart-seq2 libraries carry no unique molecular identifiers, so the reads a cell
+contributes to an ATSE are copies of a small number of cDNA molecules rather than independent
+observations. To measure this without fitting any model, we restricted to ATSEs whose pooled composition
+within one cell type (microglia, 3{,}000 cells) is clearly mixed, with the most-used junction's pooled
+usage between 0.2 and 0.8, so that alternative splicing occurs at the population level. For each cell
+covering such an event we asked whether all of its reads fall on a single junction, and compared the
+observed fraction with the fraction expected if reads were independent draws from the pooled composition.
+Treating the cell's reads as $M$ independent molecules, $P(\text{all reads on one junction}) = p^M + (1-p)^M$
+was solved for $M$ at $p \approx 0.5$.
+
+\paragraph{Result.} Across all mixed (cell, ATSE) pairs, 68\% place every read on one junction, at a median of
+48 reads per pair; under independent reads this would essentially never happen above 50 reads
+(Supplementary Note Table 1). The implied number of independent molecules rises from 1.7 to 3.1 per event
+as read counts rise from about 6 to about 124: reads increase 19-fold while molecules increase 2.5-fold,
+the signature of PCR duplication. The effect is the regime the whole atlas sits in, not a property of a
+few poor cells.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{rccc}
+\hline
+\textbf{Reads per cell and event} & \textbf{All reads on one junction} & \textbf{Expected if independent} & \textbf{Effective molecules $M$} \\
+\hline
+5--8 ($\sim$6)       & 0.632 & 0.054   & 1.66 \\
+10--18 ($\sim$14)    & 0.532 & 0.005   & 1.91 \\
+20--48 ($\sim$34)    & 0.434 & 0.0001  & 2.20 \\
+50--198 ($\sim$124)  & 0.238 & $\approx$0 & 3.07 \\
+\hline
+\end{tabular}
+\caption*{\textbf{Supplementary Note Table 1.} Fraction of cells placing all reads on one junction, in ATSEs
+with mixed pooled usage (microglia), by read depth; the fraction expected under independent reads; and the
+implied number of independent molecules ($p \approx 0.5$).}
+\end{table}
+
+\paragraph{Relation to the data-measured median and to the model's floor.} These estimates come from deeply
+covered events with mixed composition, chosen so that duplication is visible. Over all observed events,
+most of which have few reads and a skewed composition, the median number of effective molecules measured
+from the within-event correlation of reads is lower, about 1.2 (1.19 in Tabula Muris Senis and 1.26 in Allen
+Brain) \cite{SpliceVI2026}. The two estimates use different event sets and estimators, and agree that a cell
+contributes only one to three independent molecules to an event, far fewer than its read count. LeafletFA's
+per-event concentration floor of 2 matches the model-implied value (2.15 and 2.17 in the same figure); it
+permits less overdispersion than the data-measured median shows and is a modeling choice, not a
+measurement (Methods).
+
+\paragraph{Limits.} The molecule estimate assumes $p \approx 0.5$ on the events used, so it fixes an order of
+magnitude rather than a decimal. The all-or-nothing signature does not by itself separate technical
+duplication from genuine single-cell isoform commitment; under either, a low concentration is the correct
+description of the per-cell evidence.
