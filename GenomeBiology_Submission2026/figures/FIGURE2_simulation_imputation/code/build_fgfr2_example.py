@@ -7,8 +7,10 @@ Imputed = the DM posterior mean (gamma_e rho_cj + y_cj)/(gamma_e + N_ce), rho = 
 shipped K=20 fit; for cells with no reads at the event it equals the prior phi . psi.
 
 a  gene model with the two junctions as arcs
-b  epithelial and mesenchymal cell types (>= 5 covered cells): raw IIIb usage of covered cells (jitter + violin, left) and
-   imputed IIIb usage of ALL cells of that type (violin, right); types ordered by lineage then raw
+b  epithelial and mesenchymal cell types (>= 5 covered cells), each split into covered cells (reads at the event) and
+   uncovered cells: raw IIIb usage of covered cells (jitter + violin), LeafletFA posterior mean of the same covered cells,
+   and LeafletFA for uncovered cells (posterior = prior phi . psi, since no reads enter); cell counts under each type;
+   types ordered by lineage then raw. Per-type numbers go to data/fgfr2_IIIb_covered_uncovered.tsv
 c  mean phi of the same cell types, programs as SP1..SP20 (SP1 = largest pi)
 """
 import os, sys
@@ -133,36 +135,48 @@ def main():
     ax.set_xlabel(f"{chrom} ({strand})", fontsize=6); ax.ticklabel_format(axis="x", style="plain", useOffset=False); ax.tick_params(axis="x", labelsize=5.5)
     ax.set_title("$Fgfr2$ ATSE 3: mutually exclusive exons IIIb / IIIc", fontsize=8, loc="left"); panel_label(ax, "a", dx=-0.02)
 
-    # b: per cell type raw vs imputed (imputed = mean over the 3 seeds per cell; seed means as ticks)
+    # b: per cell type, covered vs uncovered cells. Covered: raw vs LeafletFA posterior of the same cells. Uncovered:
+    # LeafletFA only (posterior = prior phi . psi). Imputed = mean over the 3 seeds per cell; seed means as ticks.
     ax = fig.add_subplot(gs[1, :])
+    rows = []
+
+    def violin(vals, x, face, alpha, edge, hatch=None):
+        vp = ax.violinplot([vals], positions=[x], widths=0.27, showextrema=False, points=40)
+        for b in vp["bodies"]:
+            b.set_facecolor(face); b.set_alpha(alpha); b.set_edgecolor(edge); b.set_linewidth(0.5)
+            if hatch: b.set_hatch(hatch)
+        ax.hlines(vals.mean(), x - 0.13, x + 0.13, color="black", lw=1.1, zorder=5)
+
     for i, t in enumerate(types):
         s = df[(df.lab == t) & df.tr]; c = col[keep.loc[t, "lin"]]
-        v = s.raw.dropna().values; rng = np.random.default_rng(i)
-        vp = ax.violinplot([v], positions=[i - 0.28], widths=0.27, showextrema=False, points=40)
-        for b in vp["bodies"]: b.set_facecolor(c); b.set_alpha(0.3); b.set_edgecolor("none")
+        cv, uc = s[s.n > 0], s[s.n == 0]
+        v = cv.raw.values; rng = np.random.default_rng(i)
+        violin(v, i - 0.28, c, 0.3, "none")
         ax.scatter(i - 0.28 + rng.normal(0, 0.04, len(v)), v, s=2.5, color=c, alpha=0.6, lw=0)
-        ax.hlines(v.mean(), i - 0.41, i - 0.15, color="black", lw=1.1, zorder=5)
-        u = s.prior.dropna().values
-        vp = ax.violinplot([u], positions=[i], widths=0.27, showextrema=False, points=40)
-        for b in vp["bodies"]: b.set_facecolor("white"); b.set_alpha(1); b.set_edgecolor(c); b.set_linewidth(0.7); b.set_hatch("////")
-        ax.hlines(u.mean(), i - 0.13, i + 0.13, color="black", lw=1.1, zorder=5)
-        w = s.post.dropna().values
-        vp = ax.violinplot([w], positions=[i + 0.28], widths=0.27, showextrema=False, points=40)
-        for b in vp["bodies"]: b.set_facecolor(c); b.set_alpha(0.85); b.set_edgecolor("black"); b.set_linewidth(0.4)
-        ax.hlines(w.mean(), i + 0.15, i + 0.41, color="black", lw=1.1, zorder=5)
+        violin(cv.post.values, i, c, 0.85, "black")
         for k_ in range(3):
-            ax.plot(i + 0.45, s[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
-        ax.text(i, -0.12, f"{len(v)}", ha="center", fontsize=4.5, color=c)
-        ax.text(i, -0.2, f"{len(w):,}", ha="center", fontsize=4.5, color="black")
-    ax.text(-0.9, -0.12, "covered", ha="right", fontsize=4.5); ax.text(-0.9, -0.2, "all cells", ha="right", fontsize=4.5)
+            ax.plot(i + 0.15, cv[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
+        if len(uc):
+            violin(uc.post.values, i + 0.28, "white", 1, c, "////")
+            for k_ in range(3):
+                ax.plot(i + 0.43, uc[f"post_{k_}"].mean(), marker="_", ms=4, color="black", mew=0.8, zorder=6)
+        ax.text(i, -0.12, f"{len(cv):,}", ha="center", fontsize=4.5, color=c)
+        ax.text(i, -0.2, f"{len(uc):,}", ha="center", fontsize=4.5, color="black")
+        rows.append(dict(cell_type=t, lineage=keep.loc[t, "lin"], n_cells=len(s), n_covered=len(cv), n_uncovered=len(uc),
+                         raw_covered=v.mean(), lfa_posterior_covered=cv.post.mean(), lfa_prior_covered=cv.prior.mean(),
+                         lfa_uncovered=uc.post.mean() if len(uc) else np.nan,
+                         **{f"lfa_uncovered_seed{k_}": uc[f"post_{k_}"].mean() if len(uc) else np.nan for k_ in range(3)},
+                         **{f"lfa_posterior_covered_seed{k_}": cv[f"post_{k_}"].mean() for k_ in range(3)}))
+    pd.DataFrame(rows).to_csv(os.path.join(FIGROOT, "FIGURE2_simulation_imputation", "data", "fgfr2_IIIb_covered_uncovered.tsv"),
+                              sep="\t", index=False)
+    ax.text(-0.9, -0.12, "covered", ha="right", fontsize=4.5); ax.text(-0.9, -0.2, "uncovered", ha="right", fontsize=4.5)
     ax.set_xticks(range(len(types)))
     ax.set_xticklabels([t.replace("_", " ").replace("Non-Myeloid ", "").replace("Isocortex ", "").lower() for t in types], rotation=60, ha="right", fontsize=5)
     for lbl, t in zip(ax.get_xticklabels(), types): lbl.set_color(col[keep.loc[t, "lin"]])
-    ax.set_ylim(-0.25, 1.08); ax.set_xlim(-1.2, len(types) - 0.4); ax.set_ylabel("IIIb usage per cell")
-    from matplotlib.lines import Line2D
-    h = [mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.3, label="raw, covered cells (jitter + violin)"),
-         mpatches.Patch(facecolor="white", edgecolor=PALETTE["grey"], hatch="////", label="LeafletFA prior $\\phi\\cdot\\psi$ (no reads used), all cells"),
-         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="LeafletFA posterior mean (prior + own reads), all cells; ticks = each seed")]
+    ax.set_ylim(-0.25, 1.08); ax.set_yticks(np.arange(0, 1.01, 0.2)); ax.set_xlim(-1.2, len(types) - 0.4); ax.set_ylabel("IIIb usage per cell")
+    h = [mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.3, label="covered cells: raw (jitter + violin)"),
+         mpatches.Patch(facecolor=PALETTE["grey"], alpha=0.85, edgecolor="black", label="covered cells: LeafletFA posterior mean; ticks = each seed"),
+         mpatches.Patch(facecolor="white", edgecolor=PALETTE["grey"], hatch="////", label="uncovered cells: LeafletFA (= prior $\\phi\\cdot\\psi$); ticks = each seed")]
     h += [mpatches.Patch(facecolor=col[k], label=k) for k in ["epithelial", "mesenchymal"]]
     ax.legend(handles=h, frameon=False, fontsize=4.8, ncol=3, loc="upper right", bbox_to_anchor=(1, 1.14))
     despine(ax); panel_label(ax, "b", dx=-0.02)
