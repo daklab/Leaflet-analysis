@@ -1,4 +1,4 @@
-# LeafletFA — Bioinformatics Original Paper plan
+# LeafletFA — Bioinformatics plan: cell-type-resolved splicing atlas (Original Paper; Application Note fallback)
 
 2026-11-01. Companion to the SpliceVI paper; both are submitted together by **30 November 2026**; writing starts **15 November**.
 The Genome Biology manuscript (`GenomeBiology_Submission2026/`) was never submitted. It is source material only and stays
@@ -21,117 +21,77 @@ Bioinformatics2026/
 
 ---
 
-## 1. Title, abstract, figures
+## 1. Format, title, abstract, figures (Karin, 2026-11-01)
 
-### Title options
-1. **LeafletFA: a probabilistic factor model and event catalog for sparse single-cell splicing** (working title in the .tex)
-2. Modeling duplicated, sparse junction reads in single cells with a Dirichlet-multinomial factor model
-3. ATSEmapper and LeafletFA: consistent splicing events and per-cell splicing representations for full-length single-cell data
-4. A validated factor model of single-cell junction usage
+**Format: Original Paper (resource + method)** if check 10 (amendment 6) passes 10.1 and 10.2 a/b; **Application Note**
+as fallback. The resource is the **ATSE catalog with cell-type-resolved junction usage**: for every ATSE × cell type
+(TMS tissue–cell types; Allen subclasses), LeafletFA cell-type ψ with an uncertainty interval and a cell-type-specific
+flag. Programs are no longer the headline; consensus programs move to the supplement. Human brain and bulk catalogs:
+supplement and portal only.
 
-**Decided (Karin, 2026-11-01): option 1.**
+### Title (working; final after check 10)
+**A cell-type-resolved atlas of alternative splicing in mouse full-length single-cell data with LeafletFA**
+(Earlier options 1–4 superseded.)
 
-### Structured abstract (outline; Bioinformatics, ≤ 250 words)
-- **Motivation:** single-cell splicing arrives as a few PCR-duplicated reads per event, detected mainly where the gene is
-  expressed. A per-cell model needs (i) events defined the same way in every cell and dataset and (ii) a likelihood that
-  does not count duplicate reads as independent evidence.
-- **Results:**
-  - ATSEmapper defines alternative transcript structure events (ATSEs) from junction reads. The released catalog covers
-    \CatalogATSEsMouse{} ATSEs in \CatalogCellsMouse{} mouse cells, plus human brain and bulk catalogs.
-  - LeafletFA is a Dirichlet-multinomial factor model. Junction usage is a simplex within each ATSE, and a per-event
-    concentration floor caps the weight duplicate reads carry.
-  - Its per-cell representation reads junction usage rather than detection (accuracy drops \KnnDropRatiosTMS{} when ratios
-    are redrawn). It fits held-out reads better than population, cell-type and one-program nulls in two atlases.
-  - The representation is stable across seeds (kNN range \SeedKnnRangeTMS{}), and per-cell imputed junction usage
-    reproduces across 15 seeds (r \PerCellPsiSeedR{}) although individual programs do not. On data simulated from the model at
-    full-length depth, one fit recovers the parameters (ψ r \SimPsiR{}, per-cell φ r \SimPhiR{}).
-  - Programs that recur across 15 seeds are broad lineage axes. For two of them (brain, epithelial), top events are
-    confirmed by pseudobulk tests. Consensus over seeds plus a pseudobulk check is the recommended route to program-level claims.
-- **Availability:** the LeafletFA toolkit, two repositories (ATSEmapper, LeafletFA) on GitHub; catalog and fitted models on
-  Zenodo.
+### Structured abstract (outline)
+- **Motivation:** cell-type splicing from full-length single-cell data is measured as a few duplicated reads per event;
+  pseudobulk per cell type is noisy for small or shallow types and gives no uncertainty.
+- **Results:** ATSEmapper defines events; LeafletFA, a Dirichlet-multinomial factor model, estimates junction usage per
+  cell and per cell type with intervals. Against held-out pseudobulk it is [TBD: as or more accurate, most for small /
+  shallow types] (10.1); its cell-type-specific calls [TBD: replicate across mice] (10.2); known switches (*Fgfr2*,
+  *Ptprc*, *Nrxn* SS4) are recovered (10.4). Its per-cell representation reads junction usage, beats fair nulls on
+  held-out reads, and per-cell usage reproduces across 15 seeds (r \PerCellPsiSeedR{}) although programs do not.
+- **Availability:** catalog (Zenodo) with a static portal; ATSEmapper and LeafletFA (two repositories, one toolkit).
 
-### Main figures (4). Every panel mapped to an existing figure, table or script
+### Main figures (Original Paper)
 
-Status: **built** = exists in a usable form; **plot** = data exist, panel to draw in paper style; **build** = needs new work.
-
-**Figure 1 — ATSEmapper and the ATSE catalog**
-
-| Panel | Content | Source | Status |
+| Fig | Content | Panels and sources | Status |
 |---|---|---|---|
-| a | Schematic: junction reads → splice graph → ATSE; annotation against the long-read GTF | none (GB Fig. 1 plan, `figures/FIGURE_PLAN_FINAL.md`); draw in Affinity | build |
-| b | Catalog per dataset: cells, junctions, ATSEs, genes (mouse TMS + Allen, human Allen, bulk RNA atlas) | `supplemental/data_quality/supp_dataset_coverage.py` → `output/supp_dataset_coverage_*_summary.csv` | plot |
-| c | ATSE structure: junctions per ATSE (44 % two-junction, mean 3.26) and ATSEs per gene | `supp_exons_vs_atses.py` → `output/supp_exons_vs_atses_*.csv`; cells `db4acb28`, `57b82209` of `Archive/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1/FIGURE1.ipynb` (2025 submission; old atlas) | plot (re-derive 44 % / 3.26 into the ledger) |
-| d | Coverage: junctions detected per cell (median 3,349), reads per observed event | `supp_dataset_coverage_mouse_smartseq2_summary.csv` | plot |
-| e | Duplicate reads: fraction of (cell, ATSE) pairs with every read on one junction vs read depth, against the independent-read expectation (\DuplicateAllOnOne{}; \DuplicateMolecules{} molecules) | Supplementary Note 1 (`GenomeBiology_Submission2026/manuscript/supplement/supplementary_notes.tex`), from `NOTE_duplicate_reads.md`; producing script to locate (ledger rows pending) | build. **If the script is not found or rebuilt by Sun 8 Nov, drop this panel** and cite SpliceVI Supp. Fig. S1 for the data-measured molecules per event (Karin, 2026-11-01) |
+| **1 ATSEmapper and the catalog** | events, catalog size, coverage | a schematic (draw); b catalog per dataset, mouse only (`supplemental/data_quality/output/supp_dataset_coverage_mouse_smartseq2_summary.csv`); c junctions per ATSE, ATSEs per gene (`supp_exons_vs_atses_*.csv`); d coverage per cell; e duplicate reads (drop if not rebuilt by 8 Nov; cite SpliceVI Supp. Fig. S1) | plot / draw |
+| **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); c ratio redrawing, kNN (checks 2–3, `c2_K_prior.tsv`, `c3_*_seed_knn.tsv`); d per-cell ψ across 15 seeds (r 0.998; `c9a_jaccard.tsv`, recompute on all cells) next to program recurrence (check 8); e benchmark: time and memory, LeafletFA vs scQuint, LeafletSC, LeafCutter catalog (10.6) | plot; benchmark to run |
+| **3 Cell-type ψ accuracy vs pseudobulk** | the resource is more accurate than the obvious alternative | a error vs TEST pseudobulk by type size; b by read depth; c interval coverage (10.3); d example events | check 10.1, 10.3 (to run) |
+| **4 Cell-type-specific splicing** | calls, replication, known biology, portal | a δ and number of specific (event, type) per type; b replication across mice vs permuted null (10.2a/b), across seeds (10.2c); c *Fgfr2*, *Ptprc*, *Nrxn1–3* SS4 (10.4; *Fgfr2* rebuilt on TMS fits); d portal screenshot | check 10.2, 10.4 (to run); portal |
 
-**Figure 2 — The model and what its per-cell representation reads**
+**Supplement:** simulation recovery (check 4), consensus programs as broad lineage axes (check 8, CP1/CP3 pseudobulk
+confirmed; keratinocyte two-composition example of usage reproducing while content does not), program stability (check 6),
+K and prior (check 2), held-out likelihood verification, DS calibration note (check 9), human brain and bulk catalogs,
+Supplementary Note 1 (duplicate reads), catalog filter chain (`CATALOG_NUMBERS.md`).
 
-| Panel | Content | Source | Status |
-|---|---|---|---|
-| a | Model: ψ simplex per ATSE, φ per cell, Dirichlet-multinomial likelihood with per-ATSE concentration (floor 2); E-step for new cells | none; `METHODS_LEAFLETFA_CURRENT.md` (LeafletFA) | build (schematic) |
-| b | Held-out log-likelihood gain per read over the population, cell-type (supervised) and K = 1 nulls, TMS and Allen, 95 % CI over mice | check 1: `tsv/c1_{TMS,Allen}_K20_s0_gains.tsv` (`c1_score.py`, `c1_nulls.py`) | plot |
-| c | Cell-type kNN accuracy on real data, with ratios redrawn and at the exact average, K = 5/10/20/30 | check 2: `tsv/c2_K_prior.tsv` (`c2_summary.py`, `knn_check.py`) | plot |
-| d | Seed stability: kNN real / redrawn per seed, TMS and Allen | check 3: `tsv/c3_{TMS,Allen}_seed_knn.tsv` (`seed_replication.py`) | plot |
-| e | **Per-cell junction usage is identifiable even though programs are not:** cross-seed Pearson r of imputed ρ = φ·ψ over 15 TMS fits (105 pairs; r 0.996–0.9996, median 0.998), beside the programs' recurrence (check 8: 4 of 110 live-program clusters recur in ≥ 60 % of fits) | check 9a: `tsv/c9a_jaccard.tsv` column `rho_r` (`c9_ds_seeds.py`); check 8 `tsv/c8_clusters.tsv` | plot; **recompute on all training cells and all junctions** (currently 500 cells per contrast × tested-ATSE junctions of 5 contrasts) before the number is final |
+### Application Note (fallback if check 10 fails 10.1 or 10.2 a/b)
+One figure: a ATSEmapper and catalog; b model; c estimation accuracy vs pseudobulk by cell-type size; d specificity
+replication and known-biology examples; e representation checks (ratio redrawing, held-out likelihood, per-cell ψ across
+seeds). Two pages; the portal and catalog as the deliverable; claims limited to what passed.
 
-The ratio-redrawing test is the SpliceVI paper's (Section 3). The validation numbers use the **all-20-program** embedding
-(`knn_check.py`). SpliceVI's Fig. 1 uses LeafletFA's **live** programs. **Decided 2026-11-01:** this paper quotes all 20
-programs, and its Methods state that the SpliceVI paper's comparison uses the live programs.
+### Paper center (Original Paper)
+1. The catalog: cell-type ψ with intervals, more accurate than pseudobulk where data are thin (10.1, 10.3).
+2. Cell-type-specific splicing that replicates across mice, with known biology recovered (10.2, 10.4).
+3. The model's per-cell representation is sound: reads junction usage, beats fair nulls, per-cell usage reproduces
+   across seeds although programs do not.
+4. ATSEmapper and the toolkit; the portal.
 
-**Figure 3 — Recovery on data simulated from the model**
+### Portal (start now; Karin, 2026-11-01)
+- Static site in `Bioinformatics2026/portal/` (build script; local preview; no GitHub repo, not published).
+- Data: precomputed per-gene JSON and one small JSON index per cell type, generated from the catalog export.
+- **Gene view:** search; per ATSE the junction structure, cell-type ψ heatmap with intervals and specific flags;
+  client-side filters by tissue, broad lineage, name, minimum cells and reads, "specific only".
+- **Cell-type view:** pick one or several cell types; list every ATSE flagged specific, sortable by Δψ and coverage,
+  linking to the gene view.
+- Download links to Zenodo. Build report: total size, largest file, build time. Later option (not built): one Parquet of
+  the full catalog queried with DuckDB-WASM (feasibility and size noted in the build report).
 
-| Panel | Content | Source | Status |
-|---|---|---|---|
-| a | True vs fitted ψ, live programs (median r 0.979; centered cosine 0.884; 6 of 7 programs) | check 4: `tsv/c4_recovery.tsv`, `c4_recovery_programs.tsv`; arrays `LeafletFA_validation/check4/` (`c4_simulate.py`, `c4_recover.py`) | plot |
-| b | True vs fitted per-cell φ (r 0.982) | `check4/truth.npz`, `check4/fit_simA/` | plot |
-| c | Depth limit: same at EasySci-like depth (×0.011): ψ r 0.745, 0 of 7 programs | `c4_recovery.tsv` (sim B), `check4/fit_simB/` | plot |
+### Benchmarks (check 10.6)
+Wall-clock and peak memory, hardware recorded: LeafletFA fit at TMS and atlas size and E-step; scQuint on TMS; LeafletSC if
+it runs; LeafCutter producing the same cell type × event catalog (one-vs-rest per type, total). No claims beyond the
+measured numbers. The atlas-size LeafletFA fit needs ~0.5 GPU-h (approval).
 
-**Figure 4 — Consensus programs are broad lineage axes (and imputation at a known event)**
-
-| Panel | Content | Source | Status |
-|---|---|---|---|
-| a | Consensus programs over 15 TMS fits: mean φ per tissue–cell type for CP1–CP4; recurrence (15, 12, 11, 10 of 15) and top-50 Jaccard marked | check 8: `tsv/c8_celltype_usage.tsv`, `c8_consensus_programs.tsv` (`c8_consensus.py`) | plot |
-| b | Pseudobulk confirmation of top ATSEs, CP1 (brain, 9/10) and CP3 (epithelial, 8/10), against random ATSEs (0.20–0.23) | `tsv/c8_pseudobulk_top_atses.tsv`, `c8_pseudobulk_null.tsv` | plot |
-| c | *Fgfr2* IIIb/IIIc: covered vs uncovered cells, raw vs LeafletFA, epithelial and mesenchymal types | `FIGURE2_simulation_imputation/code/build_fgfr2_example.py` panel b (branch `leafletfa-methods-fixes`, 52499bd); `data/fgfr2_IIIb_covered_uncovered.tsv` | built (GB theme); port to paper style |
-
-### Programs section (Karin, 2026-11-01)
-
-**Paper center**, in order:
-1. The per-cell representation reads junction usage, and per-cell imputed usage reproduces across seeds (r 0.998,
-   check 9a) even though individual programs do not: **programs are not identifiable, per-cell junction usage is.**
-2. Held-out likelihood beats fair nulls.
-3. Simulation recovery at full-length depth.
-4. Consensus programs.
-5. The ATSE catalog and ATSEmapper.
-
-**The paper is not framed around named programs.** Programs appear as broad lineage axes, as the 15-seed consensus found them
-(check 8: 4 clusters recur in ≥ 60 % of fits; 3 keep their top-50 junctions, Jaccard ≥ 0.5; the pre-registered bar of 8
-was not met).
-
-| Consensus program | Lineage axis | Recurrence | How the text uses it |
-|---|---|---|---|
-| CP1 | brain glia and neurons | 15 / 15 | **example confirmed by pseudobulk**: 9 of 10 top ATSEs confirmed (random ATSEs 0.23) |
-| CP3 | intestinal and kidney epithelium, hepatocytes | 11 / 15 | **example confirmed by pseudobulk**: 8 of 10 (random 0.20) |
-| CP2 | endothelial cells, lung smooth muscle | 12 / 15 | lineage axis only, **no junction-level claim** (used by 95 of 96 cell types, so the pseudobulk test has one non-user type) |
-| CP4 | stromal and mesenchymal cells | 10 / 15 | lineage axis only, **no junction-level claim** (top-50 Jaccard 0.42) |
-
-- **Supplement:** the keratinocyte/basal program is the worked example of **usage reproducing while content does not**. It
-  is in 14 of 15 fits, in two compositions (centered cosine 0.77, never both in one fit), with the same top cell types.
-  Show it with check 6's usage-vs-content table (S5–S6).
-- **Recommended user workflow for program-level claims** (Methods and package docs): fit several seeds; build consensus
-  programs over seeds (`c8_consensus.py` becomes a package function); make a program-level claim only for consensus
-  programs; check a program's top ATSEs with a pseudobulk test between the cell types that use it and those that do not.
-  A single fit's programs are not claims.
-- **Figure 4** becomes "Consensus programs are broad lineage axes": a = cell-type usage of CP1–CP4 (recurrence marked);
-  b = pseudobulk confirmation for CP1 and CP3 against random ATSEs. *Fgfr2* (c) stays as the imputation example, or moves
-  to S8 if pages are short.
-- Resolved: the check 6 four (with keratinocyte/basal) is not used.
-- **Differential splicing is out of the paper** (Karin, 2026-11-01; no LRT check). The Discussion keeps one line: LeafletFA's
-  posterior effect-size test is very conservative at this depth (calibrated on a real-data null, but few calls and
-  those not reproducible across seeds).
-- **Figure 3 stays the simulation (check 9, 2026-11-01).** The shipped posterior DS test calls almost nothing in the
-  Fig. 3b contrasts and its calls do not reproduce across 15 seeds (median Jaccard 0.0; pass needed 0.7). It is
-  calibrated on a real-data null (0 calls in 100 splits). DS stays out of the main text; per-cell ψ reproduces (r 0.998).
+### Check 10 compute (CPU) and target
+| Part | Estimate |
+|---|---|
+| TMS seed 0: estimates, intervals (200 draws), leave-one-out, δ, halves A/B, 20 permutations, calibration, known biology | ~6–8 CPU-h |
+| Allen seed 0: same | ~8–10 CPU-h |
+| Seeds 1–14 (TMS) and 1–2 (Allen), call sets for 10.2c | ~1 CPU-h each, ~16 CPU-h |
+| Benchmarks: LeafCutter one-vs-rest catalog on TMS (≈ 130 runs × ~1 h × 4 cores); scQuint; LeafletSC | ~550 core-h (≈ 6 h wall at 25 concurrent) + ~3 h |
+| **Total** | **~40 CPU-h analysis + ~550 core-h benchmark; target Tue 10 Nov** |
 
 ### Toolkit: two repositories, described as one (Karin, 2026-11-01)
 No package merge before submission. ATSEmapper and LeafletFA are released as **two repositories presented as one
@@ -314,7 +274,11 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 2. ~~Fit set for *Fgfr2*~~ — resolved 2026-11-01: rebuild on the TMS per-dataset fits (seeds 0–2, training cells).
 3. ~~DS vs LeafCutter~~ — 2026-11-01: re-verify as candidate main Fig. 3 (check 9, amendment 5: seed reproducibility, median Jaccard ≥ 0.7; real-data null, false-call rate ≤ 0.05). If it passes, simulation recovery moves to the supplement. GB simulation vs NMF: dropped.
 4. ~~LeafletFA color~~ — resolved 2026-11-01: ochre in both papers.
-5. ~~Title~~ — resolved 2026-11-01: option 1.
+5. ~~Title~~ — working title 2026-11-01: "A cell-type-resolved atlas of alternative splicing in mouse full-length single-cell
+   data with LeafletFA"; final after check 10.
 7. ~~DS~~ — resolved 2026-11-01: out of the paper, no LRT check; one Discussion line.
 8. ~~ATSEmapper tag~~ — resolved 2026-11-01: tag `v0.1.0` on 29 Nov with the Zenodo release.
 6. Author list and order (left as placeholders).
+9. Allen cell types for the catalog: subclass = Allen cluster label without its number (`cell_ontology_class`), as
+   pre-registered; say if you prefer another level.
+10. Atlas-size LeafletFA benchmark fit: ~0.5 GPU-h (b6k) — approve or use the existing dense atlas fit's log.
