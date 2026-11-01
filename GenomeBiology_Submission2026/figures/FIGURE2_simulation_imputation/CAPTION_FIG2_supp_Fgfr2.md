@@ -4,8 +4,10 @@ Built by `code/build_fgfr2_example.py` (full-atlas K = 20 fits, seeds 0–2); pe
 `data/fgfr2_IIIb_covered_uncovered.tsv`.
 
 **Fgfr2 IIIb / IIIc: LeafletFA recovers the lineage direction; for cells without reads it reports a program mixture.**
-**(a)** *Fgfr2* ATSE 3 (chr7, minus strand): the shared upstream exon is spliced to exon IIIb (epithelial
-isoform) or exon IIIc (mesenchymal isoform). Arcs mark the two junctions; transcripts below.
+**(a)** *Fgfr2* ATSE 3 (chr7, minus strand), the **upstream junction pair of the IIIb/IIIc mutually exclusive exons**:
+the shared upstream exon (exon 7) is spliced to exon IIIb (epithelial isoform) or exon IIIc (mesenchymal isoform). The
+downstream pair (IIIb or IIIc to the next exon) is a separate ATSE, because an ATSE links junctions that share a splice
+site and the two pairs share none. Arcs mark the two junctions; transcripts below.
 **(b)** IIIb usage per cell in 14 epithelial and 13 mesenchymal tissue cell types (types with ≥ 5 cells
 carrying reads at the event), each split into covered cells (≥ 1 read at the event) and uncovered cells.
 Left: raw usage of covered cells (points and violin). Middle: LeafletFA posterior mean for the same
