@@ -29,9 +29,7 @@ Bioinformatics2026/
 3. ATSEmapper and LeafletFA: consistent splicing events and per-cell splicing representations for full-length single-cell data
 4. A validated factor model of single-cell junction usage
 
-Option 1 names both deliverables (model + catalog). Option 2 leads with the modeling problem. Option 3 suits the
-two-repository toolkit. **Title decided after check 9 (Tue 10 Nov);** if DS passes, add an option that names per-cell
-differential splicing.
+**Decided (Karin, 2026-11-01): option 1.**
 
 ### Structured abstract (outline; Bioinformatics, ≤ 250 words)
 - **Motivation:** single-cell splicing arrives as a few PCR-duplicated reads per event, detected mainly where the gene is
@@ -44,7 +42,8 @@ differential splicing.
     concentration floor caps the weight duplicate reads carry.
   - Its per-cell representation reads junction usage rather than detection (accuracy drops \KnnDropRatiosTMS{} when ratios
     are redrawn). It fits held-out reads better than population, cell-type and one-program nulls in two atlases.
-  - The representation is stable across seeds (kNN range \SeedKnnRangeTMS{}). On data simulated from the model at
+  - The representation is stable across seeds (kNN range \SeedKnnRangeTMS{}), and per-cell imputed junction usage
+    reproduces across 15 seeds (r \PerCellPsiSeedR{}) although individual programs do not. On data simulated from the model at
     full-length depth, one fit recovers the parameters (ψ r \SimPsiR{}, per-cell φ r \SimPhiR{}).
   - Programs that recur across 15 seeds are broad lineage axes. For two of them (brain, epithelial), top events are
     confirmed by pseudobulk tests. Consensus over seeds plus a pseudobulk check is the recommended route to program-level claims.
@@ -73,6 +72,7 @@ Status: **built** = exists in a usable form; **plot** = data exist, panel to dra
 | b | Held-out log-likelihood gain per read over the population, cell-type (supervised) and K = 1 nulls, TMS and Allen, 95 % CI over mice | check 1: `tsv/c1_{TMS,Allen}_K20_s0_gains.tsv` (`c1_score.py`, `c1_nulls.py`) | plot |
 | c | Cell-type kNN accuracy on real data, with ratios redrawn and at the exact average, K = 5/10/20/30 | check 2: `tsv/c2_K_prior.tsv` (`c2_summary.py`, `knn_check.py`) | plot |
 | d | Seed stability: kNN real / redrawn per seed, TMS and Allen | check 3: `tsv/c3_{TMS,Allen}_seed_knn.tsv` (`seed_replication.py`) | plot |
+| e | **Per-cell junction usage is identifiable even though programs are not:** cross-seed Pearson r of imputed ρ = φ·ψ over 15 TMS fits (105 pairs; r 0.996–0.9996, median 0.998), beside the programs' recurrence (check 8: 4 of 110 live-program clusters recur in ≥ 60 % of fits) | check 9a: `tsv/c9a_jaccard.tsv` column `rho_r` (`c9_ds_seeds.py`); check 8 `tsv/c8_clusters.tsv` | plot; **recompute on all training cells and all junctions** (currently 500 cells per contrast × tested-ATSE junctions of 5 contrasts) before the number is final |
 
 The ratio-redrawing test is the SpliceVI paper's (Section 3). The validation numbers use the **all-20-program** embedding
 (`knn_check.py`). SpliceVI's Fig. 1 uses LeafletFA's **live** programs. **Decided 2026-11-01:** this paper quotes all 20
@@ -97,7 +97,8 @@ programs, and its Methods state that the SpliceVI paper's comparison uses the li
 ### Programs section (Karin, 2026-11-01)
 
 **Paper center**, in order:
-1. The per-cell representation reads junction usage.
+1. The per-cell representation reads junction usage, and per-cell imputed usage reproduces across seeds (r 0.998,
+   check 9a) even though individual programs do not: **programs are not identifiable, per-cell junction usage is.**
 2. Held-out likelihood beats fair nulls.
 3. Simulation recovery at full-length depth.
 4. Consensus programs.
@@ -125,6 +126,9 @@ was not met).
   b = pseudobulk confirmation for CP1 and CP3 against random ATSEs. *Fgfr2* (c) stays as the imputation example, or moves
   to S8 if pages are short.
 - Resolved: the check 6 four (with keratinocyte/basal) is not used.
+- **Differential splicing is out of the paper** (Karin, 2026-11-01; no LRT check). The Discussion keeps one line: LeafletFA's
+  posterior effect-size test is very conservative at this depth (calibrated on a real-data null, but few calls and
+  those not reproducible across seeds).
 - **Figure 3 stays the simulation (check 9, 2026-11-01).** The shipped posterior DS test calls almost nothing in the
   Fig. 3b contrasts and its calls do not reproduce across 15 seeds (median Jaccard 0.0; pass needed 0.7). It is
   calibrated on a real-data null (0 calls in 100 splits). DS stays out of the main text; per-cell ψ reproduces (r 0.998).
@@ -134,7 +138,8 @@ No package merge before submission. ATSEmapper and LeafletFA are released as **t
 toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge into one package after acceptance.
 
 - **ATSEmapper** (daklab/ATSEmapper):
-  - Version tag (proposed `v0.1.0`, matching `pyproject.toml`).
+  - Version tag `v0.1.0` (matching `pyproject.toml`) **at the final checks on 29 Nov, together with the Zenodo release**
+    (Karin, 2026-11-01); not before.
   - Clean repository root: remove the stray output folders (`LeafletFA_ATSE_mapper_output_2026051*`) and the `.csv` /
     `.tsv` files there (`multi_gene_junctions_*.csv`, `singleton_junctions.tsv`, `filtered_low_usage_junctions.tsv`), and
     the stale `leafletfa_utils.egg-info`.
@@ -164,7 +169,7 @@ toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge i
 | Former aging program as a partially reproducible program (Supp. SX, `build_supp_partial_program.py`) | **drop** | only existed to replace the aging claim |
 | Named non-reproducing programs: SP-by-cell-type heatmaps with names, *Fbln2* decomposition, program sharing, *Gna13* | **drop** | fail checks 3, 6 and 8 |
 | Human vs mouse conservation (GB Fig. 5) | **drop** | not built; the conserved-pair number did not reproduce (check 5b) |
-| Differential splicing vs LeafCutter (GB Fig. 3) | **out of the main text** (check 9 failed 9a, 2026-11-01); a one-paragraph limitation in the Discussion, details in the supplement if wanted | posterior test: 0–1 calls at seed 0 in the 5 Fig. 3b contrasts, calls do not reproduce across seeds (median Jaccard 0.0); calibrated on the real-data null. The LRT behind GB Fig. 3b was not tested |
+| Differential splicing vs LeafCutter (GB Fig. 3) | **out of the paper** (check 9 failed 9a; no LRT check; Karin 2026-11-01); one Discussion line: the posterior test is very conservative at this depth | posterior test: 0–1 calls at seed 0 in the 5 Fig. 3b contrasts, calls do not reproduce across seeds (median Jaccard 0.0); calibrated on the real-data null. The LRT behind GB Fig. 3b was not tested |
 | GB simulation vs NMF and DS calibration (GB Fig. 2 a–h) | **drop** (Karin, 2026-11-01) | not validated (check 5b: "not checked"); different simulation from check 4 |
 | Held-out imputation grid, uncertainty calibration (GB S10, `_imputation_uncertainty`) | **hold** | "not checked" in 5b; re-score on the validated fits if wanted |
 | Catalog (GB S1 data quality), duplicate reads (Supp. Note 1) | **keep, main Fig. 1** | descriptive; reproduced (5b atlas size) |
@@ -309,5 +314,7 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 2. ~~Fit set for *Fgfr2*~~ — resolved 2026-11-01: rebuild on the TMS per-dataset fits (seeds 0–2, training cells).
 3. ~~DS vs LeafCutter~~ — 2026-11-01: re-verify as candidate main Fig. 3 (check 9, amendment 5: seed reproducibility, median Jaccard ≥ 0.7; real-data null, false-call rate ≤ 0.05). If it passes, simulation recovery moves to the supplement. GB simulation vs NMF: dropped.
 4. ~~LeafletFA color~~ — resolved 2026-11-01: ochre in both papers.
-5. Title — decided after check 9 (Tue 10 Nov). If DS passes, add an option naming per-cell differential splicing.
+5. ~~Title~~ — resolved 2026-11-01: option 1.
+7. ~~DS~~ — resolved 2026-11-01: out of the paper, no LRT check; one Discussion line.
+8. ~~ATSEmapper tag~~ — resolved 2026-11-01: tag `v0.1.0` on 29 Nov with the Zenodo release.
 6. Author list and order (left as placeholders).

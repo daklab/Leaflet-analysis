@@ -48,7 +48,7 @@
 
 %\subtitle{Subject Section} % TODO: Bioinformatics subject section (Gene expression, or Sequence analysis)
 
-% Working title; options in BIOINFORMATICS_PLAN.md section 1.
+% Title decided 2026-11-01 (BIOINFORMATICS_PLAN.md option 1).
 \title[LeafletFA]{LeafletFA: a probabilistic factor model and event catalog for sparse single-cell splicing}
 
 \author[1]{\todo{authors and order}}
@@ -106,12 +106,14 @@
 \subsection{LeafletFA's per-cell representation reads junction usage and fits held-out reads}
 % Held-out gain per read over the population null: \HeldoutGainPopulationTMS{} (TMS), \HeldoutGainPopulationAllen{} (Allen).
 % Ratios redrawn: kNN drops by \KnnDropRatiosTMS{}. Seed range \SeedKnnRangeTMS{} / \SeedKnnRangeAllen{}.
+% Per-cell imputed usage (rho = phi . psi) reproduces across 15 seeds: r \PerCellPsiSeedR{} over 105 fit pairs (Fig. 2e),
+% while only 4 of the live-program clusters recur (check 8): programs are not identifiable, per-cell junction usage is.
 \todo{Fig.~\ref{fig:2}.}
 
 \begin{figure*}[!t]
 \centering
 %\includegraphics[width=\textwidth]{Figures/fig2.pdf}
-\caption{\textbf{The model and what its per-cell representation reads.} \todo{caption}}
+\caption{\textbf{The model and what its per-cell representation reads.} \todo{caption; panel e: per-cell usage reproduces across seeds}}
 \label{fig:2}
 \end{figure*}
 
@@ -142,6 +144,8 @@
 \section{Discussion}
 % Limits stated: duplicated reads cap per-cell resolution; programs beyond the broad lineages are seed-specific; depth limit (EasySci);
 % the per-cell representation and the catalog are the supported outputs. Companion: SpliceVI \cite{SpliceVI2026}.
+% One line (Karin, 2026-11-01): LeafletFA's posterior effect-size test for differential splicing is very conservative at this
+% depth (no calls on a real-data null, few calls between cell types, not reproducible across seeds); DS is not part of this paper.
 \todo{Discussion.}
 
 \section{Data availability}

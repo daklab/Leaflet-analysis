@@ -71,6 +71,7 @@ inputs:
     seed_knn_tms: c3_TMS_seed_knn.tsv
     seed_knn_allen: c3_Allen_seed_knn.tsv
     seed_replication_tms: c3_TMS_seed_replication_centred.tsv
+    percell_psi_seeds: c9a_jaccard.tsv              # column rho_r: cross-seed r of rho = phi . psi
     sim_recovery: c4_recovery.tsv
     sim_recovery_programs: c4_recovery_programs.tsv
     stability_programs: c6_programs.tsv
@@ -108,8 +109,8 @@ figures:
   "2":
     title: "The model and what its per-cell representation reads"
     width: double
-    panels: {2a: {w: 70, h: 55}, 2b: {w: 106, h: 55}, 2c: {w: 86, h: 50}, 2d: {w: 86, h: 50}}
-    layout: [[2a, 2b], [2c, 2d]]
+    panels: {2a: {w: 70, h: 55}, 2b: {w: 106, h: 55}, 2c: {w: 58, h: 50}, 2d: {w: 58, h: 50}, 2e: {w: 58, h: 50}}
+    layout: [[2a, 2b], [2c, 2d, 2e]]   # e = per-cell usage reproduces across 15 seeds while programs do not (check 9a + 8)
   "3":
     title: "Recovery on data simulated from the model"
     width: double
