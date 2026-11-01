@@ -73,7 +73,8 @@ Status: **built** = exists in a usable form; **plot** = data exist, panel to dra
 | d | Seed stability: kNN real / redrawn per seed, TMS and Allen | check 3: `tsv/c3_{TMS,Allen}_seed_knn.tsv` (`seed_replication.py`) | plot |
 
 The ratio-redrawing test is the SpliceVI paper's (Section 3). The validation numbers use the **all-20-program** embedding
-(`knn_check.py`). SpliceVI's Fig. 1 uses LeafletFA's **live** programs. Quote one embedding per sentence and say which.
+(`knn_check.py`). SpliceVI's Fig. 1 uses LeafletFA's **live** programs. **Decided 2026-11-01:** this paper quotes all 20
+programs, and its Methods state that the SpliceVI paper's comparison uses the live programs.
 
 **Figure 3 — Recovery on data simulated from the model**
 
@@ -253,7 +254,7 @@ In the LeafletFA paper:
   - Liberation Sans fonts (OFL).
   - `ledger/results_ledger.tsv`: 28 rows; 26 final with source md5, 2 pending (duplicate-read source).
   - `scripts/make_numbers_tex.py` (writes `numbers.tex` and copies it into `manuscript/`).
-- **Color decision for Karin:** LeafletFA is ochre in SpliceVI's figures, and teal is SpliceVI. I kept ochre here so a
+- **Color (decided 2026-11-01): ochre in both papers.** LeafletFA is ochre in SpliceVI's figures, and teal is SpliceVI; so a
   reader of both papers sees one color per method. The LeafletFA theme would make it teal.
 
 ---
@@ -262,7 +263,7 @@ In the LeafletFA paper:
 
 | # | What | Kind | Est. |
 |---|---|---|---|
-| 1 | **Decide the fit set for Fig. 4c.** Validated fits are per-dataset (TMS, Allen); the *Fgfr2* panel uses the pooled atlas fits. Recommend: rebuild *Fgfr2* on the TMS fits (seeds 0–2, training cells) so every result is on validated fits. | decision + CPU | < 1 h |
+| 1 | **Rebuild *Fgfr2* on the TMS fits** (seeds 0–2, training cells; Karin 2026-11-01), so every result is on validated fits | CPU | < 1 h |
 | 2 | **Reconcile catalog numbers** with SpliceVI (Section 3) and put them in the ledger | check | 2 h |
 | 3 | **Fig. 1:** schematic; panels b–d from the data-quality outputs; re-derive "44 % two-junction, mean 3.26" | plot + draw | 1 day |
 | 4 | **Duplicate reads:** locate the script behind `NOTE_duplicate_reads.md`, recompute, ledger md5 (Fig. 1e, Supp. Note 1) | CPU | half day |
@@ -270,7 +271,7 @@ In the LeafletFA paper:
 | 6 | **Fig. 3:** a–c from `check4/` arrays | plot | half day |
 | 7 | **Fig. 4:** a–b from the check 8 tables; c ported (or rebuilt, item 1) in paper style | plot | 1 day |
 | 8 | **Package:** move ATSEmapper in; fix `pyproject`; CLI; tests; catalog export script and Zenodo draft | code | 2–3 days |
-| 9 | **DS vs LeafCutter and the GB simulation:** re-verify for the supplement, or drop | decision (+ CPU if kept) | — |
+| 9 | **DS checks (check 9) and CATALOG_NUMBERS.md** — due Tue 10 Nov | CPU | running |
 | 10 | **Bibliography:** the GB `.bib` is not on this filesystem (an Overleaf project?). Build ours from SpliceVI's plus additions | text | half day |
 | 11 | **SpliceVI side:** cross-citation edits and the catalog numbers (coordinate with the SpliceVI session) | text | 1 h |
 
@@ -280,8 +281,8 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 
 ## Decisions for Karin
 1. ~~Programs to report~~ — resolved 2026-11-01: consensus lineage axes; CP1 and CP3 as pseudobulk-confirmed examples.
-2. Fit set for *Fgfr2* (Fig. 4c): rebuild on the TMS fits (recommended) or keep the atlas fits and say so.
-3. DS vs LeafCutter and the GB simulation: re-verify for the supplement, or drop.
-4. LeafletFA color: ochre (consistent with SpliceVI, current) or teal (LeafletFA theme).
+2. ~~Fit set for *Fgfr2*~~ — resolved 2026-11-01: rebuild on the TMS per-dataset fits (seeds 0–2, training cells).
+3. ~~DS vs LeafCutter~~ — 2026-11-01: re-verify as candidate main Fig. 3 (check 9, amendment 5: seed reproducibility, median Jaccard ≥ 0.7; real-data null, false-call rate ≤ 0.05). If it passes, simulation recovery moves to the supplement. GB simulation vs NMF: dropped.
+4. ~~LeafletFA color~~ — resolved 2026-11-01: ochre in both papers.
 5. Title.
 6. Author list and order (left as placeholders).
