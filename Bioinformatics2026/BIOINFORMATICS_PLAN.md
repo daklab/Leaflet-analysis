@@ -125,8 +125,9 @@ was not met).
   b = pseudobulk confirmation for CP1 and CP3 against random ATSEs. *Fgfr2* (c) stays as the imputation example, or moves
   to S8 if pages are short.
 - Resolved: the check 6 four (with keratinocyte/basal) is not used.
-- **Figure 3 is pending the DS checks** (amendment 5, below). If differential splicing passes, it may take main Figure 3
-  and the simulation moves into Fig. 2 or the supplement. If it fails, DS stays out of the main text.
+- **Figure 3 stays the simulation (check 9, 2026-11-01).** The shipped posterior DS test calls almost nothing in the
+  Fig. 3b contrasts and its calls do not reproduce across 15 seeds (median Jaccard 0.0; pass needed 0.7). It is
+  calibrated on a real-data null (0 calls in 100 splits). DS stays out of the main text; per-cell ψ reproduces (r 0.998).
 
 ### Toolkit: two repositories, described as one (Karin, 2026-11-01)
 No package merge before submission. ATSEmapper and LeafletFA are released as **two repositories presented as one
@@ -163,7 +164,7 @@ toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge i
 | Former aging program as a partially reproducible program (Supp. SX, `build_supp_partial_program.py`) | **drop** | only existed to replace the aging claim |
 | Named non-reproducing programs: SP-by-cell-type heatmaps with names, *Fbln2* decomposition, program sharing, *Gna13* | **drop** | fail checks 3, 6 and 8 |
 | Human vs mouse conservation (GB Fig. 5) | **drop** | not built; the conserved-pair number did not reproduce (check 5b) |
-| Differential splicing vs LeafCutter (GB Fig. 3) | **candidate main Fig. 3 via check 9** (amendment 5); if it fails, out of the main text | not yet in a pre-registered check (5b re-derived only the 840 vs 641 count); check 9 tests seed reproducibility and calibration on a real-data null |
+| Differential splicing vs LeafCutter (GB Fig. 3) | **out of the main text** (check 9 failed 9a, 2026-11-01); a one-paragraph limitation in the Discussion, details in the supplement if wanted | posterior test: 0–1 calls at seed 0 in the 5 Fig. 3b contrasts, calls do not reproduce across seeds (median Jaccard 0.0); calibrated on the real-data null. The LRT behind GB Fig. 3b was not tested |
 | GB simulation vs NMF and DS calibration (GB Fig. 2 a–h) | **drop** (Karin, 2026-11-01) | not validated (check 5b: "not checked"); different simulation from check 4 |
 | Held-out imputation grid, uncertainty calibration (GB S10, `_imputation_uncertainty`) | **hold** | "not checked" in 5b; re-score on the validated fits if wanted |
 | Catalog (GB S1 data quality), duplicate reads (Supp. Note 1) | **keep, main Fig. 1** | descriptive; reproduced (5b atlas size) |
@@ -229,6 +230,11 @@ toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge i
     cell against LeafCutter; here we address the sparse regime of combinatorial-indexing atlases."
   - In LeafletFA: "The companion paper (SpliceVI2026) evaluates differential splicing against LeafCutter in sparse
     combinatorial-indexing data; here we test it per cell on full-length Smart-seq2 data."
+  - **Update after check 9:** LeafletFA's DS is not in the main text, so the LeafletFA sentence becomes a Discussion
+    pointer instead: "For differential splicing between groups of cells, see the companion paper (SpliceVI2026); here,
+    LeafletFA's posterior effect-size test was calibrated on a real-data null but its calls did not reproduce across
+    seeds (Supplementary Note), so we use LeafletFA for per-cell representation and imputation." The SpliceVI sentence
+    should then drop the reference to LeafletFA's DS.
 
 **Proposed cross-citation wording**
 
@@ -290,7 +296,7 @@ In the LeafletFA paper:
 | 6 | **Fig. 3:** a–c from `check4/` arrays | plot | half day |
 | 7 | **Fig. 4:** a–b from the check 8 tables; c ported (or rebuilt, item 1) in paper style | plot | 1 day |
 | 8 | **Toolkit (two repos, by Sun 15 Nov):** ATSEmapper tag + clean root + README (10x status, singleton limitation) + tests; LeafletFA pyproject description and version, `consensus_programs()`, Zenodo catalog export script. No merge before acceptance | code | 2 days |
-| 9 | **DS checks (check 9) and CATALOG_NUMBERS.md** — due Tue 10 Nov | CPU | running |
+| 9 | **DS checks (check 9) and CATALOG_NUMBERS.md** — done 2026-11-01 (check 9 fails 9a; LeafCutter null still running) | CPU | done |
 | 10 | **Bibliography:** the GB `.bib` is not on this filesystem (an Overleaf project?). Build ours from SpliceVI's plus additions | text | half day |
 | 11 | **SpliceVI side:** cross-citation edits and the catalog numbers (coordinate with the SpliceVI session) | text | 1 h |
 
