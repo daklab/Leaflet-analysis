@@ -1,0 +1,305 @@
+% references.bib for the LeafletFA Bioinformatics paper. Seeded 2026-11-01 from the SpliceVI paper's references.bib
+% (the entries below are copied verbatim); the Genome Biology bibliography was never on this filesystem.
+
+@INPROCEEDINGS{LeafletSC,
+  title     = "Investigating {RNA} splicing as a source of cellular diversity
+               using a binomial mixture model",
+  author    = "Isaev, Keren and Knowles, David A",
+  editor    = "Knowles, David A and Mostafavi, Sara",
+  booktitle = "Proceedings of the 18th Machine Learning in Computational Biology
+               meeting",
+  publisher = "PMLR",
+  volume    =  240,
+  pages     = "163--175",
+  abstract  = "Alternative splicing (AS) contributes significantly to RNA and
+               protein variability yet its role in defining cellular diversity
+               is not fully understood. While Smart-seq2 offers enhanced
+               coverage across transcripts compared to 10X single cell
+               RNA-sequencing (scRNA-seq), current computational methods often
+               miss the full complexity of AS. Most approaches for single cell
+               based differential splicing analysis focus on simple AS events
+               such as exon skipping, and rely on predefined cell type labels or
+               low-dimensional gene expression representations. This limits
+               their ability to detect more complex AS events and makes them
+               dependent on prior knowledge of cell classifications. Here, we
+               present Leaflet, a splice junction centric approach inspired by
+               Leafcutter, our tool for quantifying RNA splicing variation with
+               bulk RNA-seq. Leaflet is a probabilistic mixture model designed
+               to infer AS-driven cell states without the need for cell type
+               labels. We detail Leaflet’s generative model, inference
+               methodology, and its efficiency in detecting differentially
+               spliced junctions. By applying Leaflet to the Tabula Muris brain
+               cell dataset, we highlight cell-state specific splicing patterns,
+               offering a deeper insight into cellular diversity beyond that
+               captured by gene expression alone.",
+  series    = "Proceedings of Machine Learning Research",
+  year      =  2024
+}
+
+@ARTICLE{Leafcutter,
+  title    = "Annotation-free quantification of {RNA} splicing using
+              {LeafCutter}",
+  author   = "Li, Yang I and Knowles, David A and Humphrey, Jack and Barbeira,
+              Alvaro N and Dickinson, Scott P and Im, Hae Kyung and Pritchard,
+              Jonathan K",
+  journal  = "Nat. Genet.",
+  volume   =  50,
+  number   =  1,
+  pages    = "151--158",
+  abstract = "The excision of introns from pre-mRNA is an essential step in mRNA
+              processing. We developed LeafCutter to study sample and population
+              variation in intron splicing. LeafCutter identifies variable
+              splicing events from short-read RNA-seq data and finds events of
+              high complexity. Our approach obviates the need for transcript
+              annotations and circumvents the challenges in estimating relative
+              isoform or exon usage in complex splicing events. LeafCutter can
+              be used both to detect differential splicing between sample groups
+              and to map splicing quantitative trait loci (sQTLs). Compared with
+              contemporary methods, our approach identified 1.4-2.1 times more
+              sQTLs, many of which helped us ascribe molecular effects to
+              disease-associated variants. Transcriptome-wide associations
+              between LeafCutter intron quantifications and 40 complex traits
+              increased the number of associated disease genes at a 5\% false
+              discovery rate by an average of 2.1-fold compared with that
+              detected through the use of gene expression levels alone.
+              LeafCutter is fast, scalable, easy to use, and available online.",
+  month    =  jan,
+  year     =  2018,
+  language = "en"
+}
+
+@ARTICLE{scquint,
+  title    = "Robust and annotation-free analysis of alternative splicing across
+              diverse cell types in mice",
+  author   = "Benegas, Gonzalo and Fischer, Jonathan and Song, Yun S",
+  journal  = "Elife",
+  volume   =  11,
+  abstract = "Although alternative splicing is a fundamental and pervasive
+              aspect of gene expression in higher eukaryotes, it is often
+              omitted from single-cell studies due to quantification challenges
+              inherent to commonly used short-read sequencing technologies.
+              Here, we undertake the analysis of alternative splicing across
+              numerous diverse murine cell types from two large-scale
+              single-cell datasets-the Tabula Muris and BRAIN Initiative Cell
+              Census Network-while accounting for understudied technical
+              artifacts and unannotated events. We find strong and general
+              cell-type-specific alternative splicing, complementary to total
+              gene expression but of similar discriminatory value, and identify
+              a large volume of novel splicing events. We specifically highlight
+              splicing variation across different cell types in primary motor
+              cortex neurons, bone marrow B cells, and various epithelial cells,
+              and we show that the implicated transcripts include many genes
+              which do not display total expression differences. To elucidate
+              the regulation of alternative splicing, we build a custom
+              predictive model based on splicing factor activity, recovering
+              several known interactions while generating new hypotheses,
+              including potential regulatory roles for novel alternative
+              splicing events in critical genes like Khdrbs3 and Rbfox1. We make
+              our results available using public interactive browsers to spur
+              further exploration by the community.",
+  month    =  mar,
+  year     =  2022,
+  keywords = "Tabula Muris; alternative splicing; chromosomes; computational
+              biology; gene expression; mouse; primary motor cortex neurons;
+              single-cell RNA-seq; splicing factors; systems biology",
+  language = "en"
+}
+
+@ARTICLE{Tabula_Muris_Consortium2020-ga,
+  title    = "A single-cell transcriptomic atlas characterizes ageing tissues in
+              the mouse",
+  author   = "{Tabula Muris Consortium}",
+  journal  = "Nature",
+  volume   =  583,
+  number   =  7817,
+  pages    = "590--595",
+  abstract = "Ageing is characterized by a progressive loss of physiological
+              integrity, leading to impaired function and increased
+              vulnerability to death1. Despite rapid advances over recent years,
+              many of the molecular and cellular processes that underlie the
+              progressive loss of healthy physiology are poorly understood2. To
+              gain a better insight into these processes, here we generate a
+              single-cell transcriptomic atlas across the lifespan of Mus
+              musculus that includes data from 23 tissues and organs. We found
+              cell-specific changes occurring across multiple cell types and
+              organs, as well as age-related changes in the cellular composition
+              of different organs. Using single-cell transcriptomic data, we
+              assessed cell-type-specific manifestations of different hallmarks
+              of ageing-such as senescence3, genomic instability4 and changes in
+              the immune system2. This transcriptomic atlas-which we denote
+              Tabula Muris Senis, or 'Mouse Ageing Cell Atlas'-provides
+              molecular information about how the most important hallmarks of
+              ageing are reflected in a broad range of tissues and cell types.",
+  month    =  jul,
+  year     =  2020,
+  language = "en"
+}
+
+@ARTICLE{mouse-allen-brain-ssv4,
+  title     = "A taxonomy of transcriptomic cell types across the isocortex and
+               hippocampal formation",
+  author    = "Yao, Zizhen and van Velthoven, Cindy T J and Nguyen, Thuc Nghi
+               and Goldy, Jeff and Sedeno-Cortes, Adriana E and Baftizadeh,
+               Fahimeh and Bertagnolli, Darren and Casper, Tamara and Chiang,
+               Megan and Crichton, Kirsten and Ding, Song-Lin and Fong, Olivia
+               and Garren, Emma and Glandon, Alexandra and Gouwens, Nathan W and
+               Gray, James and Graybuck, Lucas T and Hawrylycz, Michael J and
+               Hirschstein, Daniel and Kroll, Matthew and Lathia, Kanan and Lee,
+               Changkyu and Levi, Boaz and McMillen, Delissa and Mok, Stephanie
+               and Pham, Thanh and Ren, Qingzhong and Rimorin, Christine and
+               Shapovalova, Nadiya and Sulc, Josef and Sunkin, Susan M and Tieu,
+               Michael and Torkelson, Amy and Tung, Herman and Ward, Katelyn and
+               Dee, Nick and Smith, Kimberly A and Tasic, Bosiljka and Zeng,
+               Hongkui",
+  journal   = "Cell",
+  publisher = "Elsevier BV",
+  volume    =  184,
+  number    =  12,
+  pages     = "3222--3241.e26",
+  abstract  = "The isocortex and hippocampal formation (HPF) in the mammalian
+               brain play critical roles in perception, cognition, emotion, and
+               learning. We profiled ∼1.3 million cells covering the entire
+               adult mouse isocortex and HPF and derived a transcriptomic
+               cell-type taxonomy revealing a comprehensive repertoire of
+               glutamatergic and GABAergic neuron types. Contrary to the
+               traditional view of HPF as having a simpler cellular
+               organization, we discover a complete set of glutamatergic types
+               in HPF homologous to all major subclasses found in the
+               six-layered isocortex, suggesting that HPF and the isocortex
+               share a common circuit organization. We also identify large-scale
+               continuous and graded variations of cell types along isocortical
+               depth, across the isocortical sheet, and in multiple dimensions
+               in hippocampus and subiculum. Overall, our study establishes a
+               molecular architecture of the mammalian isocortex and hippocampal
+               formation and begins to shed light on its underlying relationship
+               with the development, evolution, connectivity, and function of
+               these two brain structures.",
+  month     =  jun,
+  year      =  2021,
+  keywords  = "GABAergic; cell type; cortex; excitatory neuron; glutamatergic;
+               hippocampus; interneuron; single-cell RNA sequencing; single-cell
+               transcriptomics",
+  language  = "en"
+}
+
+@ARTICLE{regtools,
+  title     = "Integrated analysis of genomic and transcriptomic data for the
+               discovery of splice-associated variants in cancer",
+  author    = "Cotto, Kelsy C and Feng, Yang-Yang and Ramu, Avinash and
+               Richters, Megan and Freshour, Sharon L and Skidmore, Zachary L
+               and Xia, Huiming and McMichael, Joshua F and Kunisaki, Jason and
+               Campbell, Katie M and Chen, Timothy Hung-Po and Rozycki, Emily B
+               and Adkins, Douglas and Devarakonda, Siddhartha and Sankararaman,
+               Sumithra and Lin, Yiing and Chapman, William C and Maher,
+               Christopher A and Arora, Vivek and Dunn, Gavin P and Uppaluri,
+               Ravindra and Govindan, Ramaswamy and Griffith, Obi L and
+               Griffith, Malachi",
+  journal   = "Nat. Commun.",
+  publisher = "Nature Publishing Group",
+  volume    =  14,
+  number    =  1,
+  pages     =  1589,
+  abstract  = "Somatic mutations within non-coding regions and even exons may
+               have unidentified regulatory consequences that are often
+               overlooked in analysis workflows. Here we present RegTools (
+               www.regtools.org ), a computationally efficient, free, and
+               open-source software package designed to integrate somatic
+               variants from genomic data with splice junctions from bulk or
+               single cell transcriptomic data to identify variants that may
+               cause aberrant splicing. We apply RegTools to over 9000 tumor
+               samples with both tumor DNA and RNA sequence data. RegTools
+               discovers 235,778 events where a splice-associated variant
+               significantly increases the splicing of a particular junction,
+               across 158,200 unique variants and 131,212 unique junctions. To
+               characterize these somatic variants and their associated splice
+               isoforms, we annotate them with the Variant Effect Predictor,
+               SpliceAI, and Genotype-Tissue Expression junction counts and
+               compare our results to other tools that integrate genomic and
+               transcriptomic data. While many events are corroborated by the
+               aforementioned tools, the flexibility of RegTools also allows us
+               to identify splice-associated variants in known cancer drivers,
+               such as TP53, CDKN2A, and B2M, and other genes.",
+  month     =  mar,
+  year      =  2023,
+  language  = "en"
+}
+
+@ARTICLE{Schertzer2025-lw,
+  title    = "Perplexity as a metric for isoform diversity in the human
+              transcriptome",
+  author   = "Schertzer, Megan D and Park, Stella H and Su, Jiayu and Sheynkman,
+              Gloria M and Knowles, David A",
+  journal  = "bioRxiv",
+  pages    = "2025.07.02.662769",
+  abstract = "Abstract Long-read sequencing (LRS) has revealed a far greater
+              diversity of RNA isoforms than earlier technologies, increasing
+              the critical need to determine which, and how many, isoforms per
+              gene are biologically meaningful. To define the space of relevant
+              isoforms from LRS, many existing analysis pipelines rely on
+              arbitrary expression cutoffs, but a single threshold cannot
+              accommodate the broad variability in isoform complexity across
+              genes, cell-types, and disease states captured by LRS. To address
+              this, we propose using perplexity–an interpretable measure derived
+              from entropy–that quantifies the effective number of isoforms per
+              gene based on the full, unfiltered isoform ratio distribution.
+              Calculating perplexity for 124 ENCODE4 PacBio LRS datasets
+              spanning 55 human cell types, we show that it provides intuitive
+              assessments of isoform diversity and captures uncertainty across
+              genes with varying complexity. Perplexity can be calculated at
+              multiple gene regulatory levels–from transcript to protein–to
+              compare how isoform diversity is reduced across stages of gene
+              expression. On average, genes have an ORF-level perplexity of 2.1,
+              indicating production of two distinct protein isoforms. We
+              extended this analysis to evaluate expression variation across
+              tissues and identified 4,593 ORFs across 3,102 genes with moderate
+              to extreme tissue-specificity. We propose perplexity as a
+              consistent, quantitative metric for interpreting isoform diversity
+              across genes, cell types, and disease states. All results are
+              compiled into a community resource to enable cross-study
+              comparisons of novel isoforms.",
+  month    =  jul,
+  year     =  2025,
+  language = "en"
+}
+
+s
+
+@article{Pan2008,
+  title        = {Deep surveying of alternative splicing complexity in the human transcriptome by high-throughput sequencing},
+  author       = {Pan, Qun and Shai, Ofer and Lee, Leo J and Frey, Brendan J and Blencowe, Benjamin J},
+  journal      = {Nature Genetics},
+  volume       = {40},
+  number       = {12},
+  pages        = {1413--1415},
+  year         = {2008},
+  doi          = {10.1038/ng.259}
+}
+
+@article{Wang2008,
+  title        = {Alternative isoform regulation in human tissue transcriptomes},
+  author       = {Wang, Eric T and Sandberg, Rickard and Luo, Shujun and Khrebtukova, Irina and Zhang, Lu and Mayr, Christine and Kingsmore, Stephen F and Schroth, Gary P and Burge, Christopher B},
+  journal      = {Nature},
+  volume       = {456},
+  number       = {7221},
+  pages        = {470--476},
+  year         = {2008},
+  doi          = {10.1038/nature07509}
+}
+
+% Companion paper: update with the bioRxiv DOI / journal details once SpliceVI is posted.
+@unpublished{SpliceVI2026,
+  author = {Vaidyanathan, Smriti and Isaev, Keren and Zweig, Aaron and Knowles, David A.},
+  title  = {{SpliceVI}: joint modeling of sparse single-cell alternative splicing and gene expression},
+  note   = {Companion manuscript, submitted together with this paper},
+  year   = {2026}
+}
+
+% TO VERIFY before submission (entered from memory, not from a database).
+@article{Kotliar2019,
+  author  = {Kotliar, Dylan and Veres, Adrian and Nagy, M. Aurel and Tabrizi, Shervin and Hodis, Eran and Melton, Douglas A. and Sabeti, Pardis C.},
+  title   = {Identifying gene expression programs of cell-type identity and cellular activity with single-cell {RNA-Seq}},
+  journal = {eLife},
+  volume  = {8},
+  pages   = {e43803},
+  year    = {2019}
+}

@@ -1,0 +1,156 @@
+%% LeafletFA -- Bioinformatics (OUP) Original Paper, companion to SpliceVI (submitted together).
+%% Skeleton created 2026-11-01 from BIOINFORMATICS_PLAN.md. Source material: GenomeBiology_Submission2026/ (never submitted; kept).
+
+%% Layout: same class options as the SpliceVI paper (SpliceVI_paper_overleaf/bioinformatics_main.tex):
+%% traditional + large = 178 mm text width, two 86 mm columns; namedate = author-year citations.
+\documentclass[webpdf,traditional,large,namedate]{oup-authoring-template}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{url}
+\usepackage{xurl}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{xr}
+\externaldocument[S-]{leafletfa_supplement} % supplement labels: \ref{S-<label>}
+
+\newcommand{\societylogo}{}
+\let\cite\citep
+
+% Result numbers come from numbers.tex (generated from paper/ledger/results_ledger.tsv; do not hand-edit).
+% Red fallbacks show until numbers.tex defines the macro.
+\InputIfFileExists{numbers}{}{}
+\providecommand{\DuplicateAllOnOne}{\textcolor{red}{68\%}}
+\providecommand{\DuplicateMolecules}{\textcolor{red}{1.7--3.1}}
+
+% Drafting markup (red in the PDF); remove before submission
+\newcommand{\unsure}[1]{\textcolor{red}{#1}}
+\newcommand{\todocite}[1]{\textcolor{red}{[cite: #1]}}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+
+\begin{document}
+
+\journaltitle{Bioinformatics}
+\DOI{DOI added during production}
+\copyrightyear{2026}
+\pubyear{2026}
+\vol{XX}
+\issue{x}
+\access{Published: Date added during production}
+\appnotes{Original Paper}
+
+\firstpage{1}
+
+%\subtitle{Subject Section} % TODO: Bioinformatics subject section (Gene expression, or Sequence analysis)
+
+% Working title; options in BIOINFORMATICS_PLAN.md section 1.
+\title[LeafletFA]{LeafletFA: a probabilistic factor model and event catalog for sparse single-cell splicing}
+
+\author[1]{\todo{authors and order}}
+\address[1]{\todo{affiliations}}
+\corresp[$\ast$]{Corresponding author. \todo{email}}
+
+\received{Date}{0}{Year}
+\revised{Date}{0}{Year}
+\accepted{Date}{0}{Year}
+
+\abstract{\mdseries
+\textbf{Motivation:} \todo{Single-cell splicing is measured as a few duplicated reads per event; per-cell methods need an event definition that works across cells and a likelihood that does not treat duplicate reads as independent evidence.}\\
+\textbf{Results:} \todo{ATSEmapper and the ATSE catalog (\CatalogATSEsMouse{} events, \CatalogCellsMouse{} mouse cells); LeafletFA, a Dirichlet-multinomial factor model; its per-cell representation reads junction usage, fits held-out reads better than fair nulls, is stable across seeds, and recovers the generating parameters at full-length depth; programs that recur across seeds are the broad lineages.}\\
+\textbf{Availability and Implementation:} \todo{one package (ATSEmapper + LeafletFA), GitHub, PyPI, Zenodo DOI for the catalog and fits}\\
+\textbf{Contact:} \todo{email}\\
+\textbf{Supplementary Information:} Supplementary data are available at \textit{Bioinformatics} online.}
+
+\maketitle
+
+\section{Introduction}
+% P1 why single-cell splicing; P2 what the data are (few duplicated reads per event; detection follows expression, cite SpliceVI2026 for the measurement);
+% P3 what exists (LeafCutter pseudobulk, scQuint, SpliceVI as companion); P4 what this paper provides (catalog + model + validation).
+\todo{Introduction, four paragraphs (plan section 1).}
+
+\section{Methods}
+\subsection{Data}
+% TMS and Allen Brain Smart-seq2; one description shared in substance with the companion paper, written fresh here (plan section 3).
+\todo{Data.}
+
+\subsection{ATSEmapper and the ATSE catalog}
+\todo{Junction extraction, ATSE construction, annotation, filters; catalog release.}
+
+\subsection{Model}
+% Dirichlet-multinomial likelihood, within-ATSE simplex psi, per-ATSE concentration floored at 2 (a modeling choice; Supplementary Note 1),
+% Dirichlet prior on phi with concentration pinned at K, alpha_pi ~ Gamma(1,1); stochastic variational inference; frozen-global E-step for new cells.
+\todo{Model (from methods\_CURRENT.tex, rewritten to Bioinformatics length).}
+
+\subsection{Validation design}
+% Pre-registered checks (LeafletFA_validation/VALIDATION_PREREG.md): held-out likelihood (event split), kNN with ratios redrawn,
+% seed stability, simulation recovery, consensus programs.
+\todo{Validation design.}
+
+\section{Results}
+
+\subsection{ATSEmapper defines splicing events consistently across cells and datasets}
+\todo{Fig.~\ref{fig:1}.}
+
+\begin{figure*}[!t]
+\centering
+%\includegraphics[width=\textwidth]{Figures/fig1.pdf}
+\caption{\textbf{ATSEmapper and the ATSE catalog.} \todo{caption from paper/captions/fig1.md}}
+\label{fig:1}
+\end{figure*}
+
+\subsection{LeafletFA's per-cell representation reads junction usage and fits held-out reads}
+% Held-out gain per read over the population null: \HeldoutGainPopulationTMS{} (TMS), \HeldoutGainPopulationAllen{} (Allen).
+% Ratios redrawn: kNN drops by \KnnDropRatiosTMS{}. Seed range \SeedKnnRangeTMS{} / \SeedKnnRangeAllen{}.
+\todo{Fig.~\ref{fig:2}.}
+
+\begin{figure*}[!t]
+\centering
+%\includegraphics[width=\textwidth]{Figures/fig2.pdf}
+\caption{\textbf{The model and what its per-cell representation reads.} \todo{caption}}
+\label{fig:2}
+\end{figure*}
+
+\subsection{On data simulated from the model, one fit recovers the programs at full-length depth}
+% \SimPsiR{}, \SimCenteredCos{}, \SimProgramsRecovered{} programs, per-cell phi r \SimPhiR{}; \SimProgramsRecoveredEasySci{} at EasySci-like depth.
+\todo{Fig.~\ref{fig:3}.}
+
+\begin{figure*}[!t]
+\centering
+%\includegraphics[width=\textwidth]{Figures/fig3.pdf}
+\caption{\textbf{Recovery on data simulated from the model.} \todo{caption}}
+\label{fig:3}
+\end{figure*}
+
+\subsection{Programs that recur across seeds are broad lineages; imputation follows reads where a cell has them}
+% Consensus over 15 seeds: \ConsensusLivePrograms{} live programs, \ConsensusRecurring{} recur, \ConsensusPassing{} keep their junctions;
+% pseudobulk confirms \PseudobulkConfirmedBrain{} (brain) and \PseudobulkConfirmedEpithelial{} (epithelial).
+% Fgfr2: covered mesenchymal \FgfrCoveredMesenchymal{}, uncovered \FgfrUncoveredMesenchymal{}.
+\todo{Fig.~\ref{fig:4}.}
+
+\begin{figure*}[!t]
+\centering
+%\includegraphics[width=\textwidth]{Figures/fig4.pdf}
+\caption{\textbf{Programs that recur across seeds, and imputation at a known event.} \todo{caption}}
+\label{fig:4}
+\end{figure*}
+
+\section{Discussion}
+% Limits stated: duplicated reads cap per-cell resolution; programs beyond the broad lineages are seed-specific; depth limit (EasySci);
+% the per-cell representation and the catalog are the supported outputs. Companion: SpliceVI \cite{SpliceVI2026}.
+\todo{Discussion.}
+
+\section{Data availability}
+\todo{TMS (AWS), Allen (GEO GSE185862), catalog + fits on Zenodo.}
+
+\section{Acknowledgements}
+\section{Funding}
+
+\bibliographystyle{oup-abbrvnat}
+\bibliography{references}
+
+\end{document}

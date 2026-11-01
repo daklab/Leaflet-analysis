@@ -1,0 +1,122 @@
+# paper_config.yaml -- single source of truth for the LeafletFA paper figures (Bioinformatics, companion to SpliceVI).
+# Style, palette and the methods / data / misc conventions are copied from the SpliceVI paper
+# (SpliceVI-utils kisaev/paper-fig1, manuscript/paper/paper_config.yaml, 2026-11-01) so the two companion papers look the same.
+# Do not change a shared style value here without changing it in SpliceVI's config too. Figure code reads only this file.
+
+output_dir: /gpfs/commons/groups/knowles_lab/Karin/LeafletFA_bioinformatics/paper_figures
+
+style:
+  # Theme = Karin's LeafletFA figure theme (Leaflet-analysis GenomeBiology_Submission2026/figures/FIGURE_THEME.md, _common/leaflet_theme.py
+  # md5 f00ee406), so SpliceVI and LeafletFA figures look the same: palette, fonts, sizes, line weights, no gridlines, despined.
+  journal: target journal (page widths, resolution and fonts below)
+  width_mm: {single: 86, double: 178}      # column widths; panels are sized to fit these
+  max_height_mm: 225                        # usable page height
+  dpi: {color: 350, line: 1200, review: 150}
+  font:
+    family: [Arial, Helvetica, Liberation Sans, DejaVu Sans]   # theme stack; first available wins; missing glyphs (Δ, κ, ψ, ≥) fall back down the list
+    files: [/nfs/sw/root/root-6.08/fonts/arial.ttf, /nfs/sw/root/root-6.08/fonts/arialbd.ttf,
+            /nfs/sw/root/root-6.08/fonts/ariali.ttf, /nfs/sw/root/root-6.08/fonts/arialbi.ttf,   # cluster Arial; registered at run time, never copied into the repo
+            figures/fonts/LiberationSans-Regular.ttf, figures/fonts/LiberationSans-Bold.ttf]      # metric-compatible Arial substitute (SIL OFL, in repo) for machines without Arial; relative = to this file
+    size_pt: 7               # axis labels, legend titles
+    small_pt: 6              # tick labels, legend text, annotations (theme floor 5 pt after scaling)
+    panel_label_pt: 9        # bold panel letters (preview only; final letters set in Affinity)
+  line:
+    axes_pt: 0.5             # axes and ticks
+    data_pt: 1.0
+    reference_pt: 0.5        # reference / threshold lines (dashed)
+    marker_pt: 3.5
+  panel_label: {case: lower, bold: true}   # "a", "b", ... (keep one case throughout)
+
+# Theme palette (CIELAB lightness ladder; color-blind and grayscale safe). Hard limit: five series colors per panel;
+# gray = non-focal context only, never a compared series; rose = null / shuffled / negative control only.
+palette: {teal: "#006865", indigo: "#657BB5", ochre: "#B79B51", rose: "#ECB0CA", olive: "#3A4621", gray: "#6E7478", ink: "#222222", dark_gray: "#262A2E", light_gray: "#B8BEC3", yellow: "#F2BE2E"}   # yellow = SpliceVI splicing only (close to the original logo yellow #FFD454, a bit deeper so thin lines and dots show on white; L* 80, like rose); dark_gray = the standard reference method (LeafCutter); L* 17, >= 8 from every series color
+
+# How every plotted thing looks (same rules as SpliceVI: each key defined once; colors are palette tokens; panel code reads
+# them with style.color / style.method_style). LeafletFA keeps the SpliceVI papers' ochre so a reader of both papers sees
+# one color per method (decision for Karin: the LeafletFA theme makes the paper's own model teal; see BIOINFORMATICS_PLAN.md).
+methods:
+  leafletfa:        {label: "LeafletFA",                         color: ochre,     marker: "^", linestyle: "-",  filled: true}
+  leafletfa_seed:   {label: "LeafletFA, other seeds",            color: ochre,     marker: "^", linestyle: "--", filled: false}
+  consensus:        {label: "Consensus programs (15 seeds)",     color: olive,     marker: D,   linestyle: "-",  filled: true}
+  null_population:  {label: "Population ψ (null)",               color: rose,      marker: x,   linestyle: ":",  filled: true}
+  null_celltype:    {label: "Cell-type ψ (supervised)",          color: indigo,    marker: s,   linestyle: "--", filled: false}
+  null_k1:          {label: "K = 1",                             color: gray,      marker: o,   linestyle: ":",  filled: false}
+  leafcutter:       {label: "LeafCutter",                        color: dark_gray, marker: s,   linestyle: "-",  filled: true}
+  splicevi:         {label: "SpliceVI",                          color: teal,      marker: o,   linestyle: "-",  filled: true}   # only if a panel cites the companion paper
+  baseline:         {label: "Depth-matched baseline",            color: light_gray, marker: o,  linestyle: "--", filled: false}
+
+data:
+  tms_data:         {label: "TMS",                               color: ink,       marker: s,   linestyle: "-",  filled: true}
+  allen_data:       {label: "Allen Brain",                       color: ink,       marker: o,   linestyle: "--", filled: false}
+  truth:            {label: "Simulated truth",                   color: gray,      marker: o,   linestyle: "--", filled: true}
+  raw_reads:        {label: "Raw reads",                         color: gray,      marker: o,   linestyle: "-",  filled: false}
+
+misc:
+  good: teal              # improvement / pass
+  bad: ochre              # decline / fail
+  connector: light_gray   # lines joining paired points, guide lines (non-focal)
+  band: light_gray        # chance band, highlighted region (drawn with transparency, `band_alpha`)
+band_alpha: {chance: 0.35, region: 0.15}
+
+cmaps: {sequential: mako, diverging: BrBG, psi: mako, sequential_light: cividis}   # theme: mako (seaborn; `import seaborn` registers it), BrBG symmetric about 0, PSI fixed 0-1
+
+# ---------------------------------------------------------------------------------------------------------------
+# Inputs. Paths to analysis outputs (never to raw data); each figure module documents which keys it reads.
+inputs:
+  validation:                  # pre-registered validation (LeafletFA branch leafletfa-validation, scripts/validation/)
+    dir: /gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/tsv
+    heldout_gains_tms: c1_TMS_K20_s0_gains.tsv
+    heldout_gains_allen: c1_Allen_K20_s0_gains.tsv
+    k_prior: c2_K_prior.tsv
+    seed_knn_tms: c3_TMS_seed_knn.tsv
+    seed_knn_allen: c3_Allen_seed_knn.tsv
+    seed_replication_tms: c3_TMS_seed_replication_centred.tsv
+    sim_recovery: c4_recovery.tsv
+    sim_recovery_programs: c4_recovery_programs.tsv
+    stability_programs: c6_programs.tsv
+    consensus_programs: c8_consensus_programs.tsv
+    consensus_celltype_usage: c8_celltype_usage.tsv
+    consensus_clusters: c8_clusters.tsv
+    consensus_sensitivity: c8_sensitivity.tsv
+    consensus_pseudobulk: c8_pseudobulk_top_atses.tsv
+    consensus_pseudobulk_null: c8_pseudobulk_null.tsv
+  catalog:                     # ATSE catalog summaries (Leaflet-analysis GenomeBiology_Submission2026/figures/supplemental/data_quality)
+    dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/supplemental/data_quality/output
+    coverage_mouse: supp_dataset_coverage_mouse_smartseq2_summary.csv
+    coverage_human: supp_dataset_coverage_human_allen_brain_summary.csv
+    exons_vs_atses_tms: supp_exons_vs_atses_mouse_tms.csv
+    exons_vs_atses_allen_mouse: supp_exons_vs_atses_mouse_allen_brain.csv
+    exons_vs_atses_allen_human: supp_exons_vs_atses_human_allen_brain.csv
+    exons_vs_atses_rna_atlas: supp_exons_vs_atses_rna_atlas.csv
+  fgfr2:                       # covered vs uncovered cells (Leaflet-analysis leafletfa-methods-fixes 52499bd)
+    dir: /gpfs/commons/home/kisaev/Leaflet-analysis-methods-fixes/GenomeBiology_Submission2026/figures/FIGURE2_simulation_imputation/data
+    by_type: fgfr2_IIIb_covered_uncovered.tsv
+    cells: fgfr2_cells.npz
+
+numbers:
+  ledger: ledger/results_ledger.tsv          # relative = to this file
+  overleaf_repo_root: /gpfs/commons/home/kisaev/Leaflet-analysis-bioinformatics/Bioinformatics2026/manuscript/   # numbers.tex is copied here
+
+# Figures: sizes in mm (double = 178). Panel letters and contents follow BIOINFORMATICS_PLAN.md; panels without code
+# (schematics) take the row height. Sizes are first drafts.
+figures:
+  "1":
+    title: "ATSEmapper and the ATSE catalog"
+    width: double
+    panels: {1a: {w: 70, h: 50}, 1b: {w: 106, h: 50}, 1c: {w: 58, h: 45}, 1d: {w: 58, h: 45}, 1e: {w: 58, h: 45}}
+    layout: [[1a, 1b], [1c, 1d, 1e]]
+  "2":
+    title: "The model and what its per-cell representation reads"
+    width: double
+    panels: {2a: {w: 70, h: 55}, 2b: {w: 106, h: 55}, 2c: {w: 86, h: 50}, 2d: {w: 86, h: 50}}
+    layout: [[2a, 2b], [2c, 2d]]
+  "3":
+    title: "Recovery on data simulated from the model"
+    width: double
+    panels: {3a: {w: 58, h: 48}, 3b: {w: 58, h: 48}, 3c: {w: 58, h: 48}}
+    layout: [[3a, 3b, 3c]]
+  "4":
+    title: "Programs that recur across seeds, and imputation at a known event"
+    width: double
+    panels: {4a: {w: 106, h: 70}, 4b: {w: 70, h: 70}, 4c: {w: 178, h: 60}}
+    layout: [[4a, 4b], [4c]]

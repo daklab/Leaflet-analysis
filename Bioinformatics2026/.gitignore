@@ -1,0 +1,12 @@
+# The repo ignores *.tsv / *.pdf / *.png globally; the paper's ledger and fonts are source files here.
+!paper/ledger/*.tsv
+!paper/figures/fonts/*
+__pycache__/
+manuscript/*.aux
+manuscript/*.log
+manuscript/*.bbl
+manuscript/*.blg
+manuscript/*.fls
+manuscript/*.fdb_latexmk
+manuscript/*.out
+manuscript/*.synctex.gz

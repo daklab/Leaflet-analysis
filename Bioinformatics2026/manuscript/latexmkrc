@@ -1,0 +1,9 @@
+# xr cross-references run one way: leafletfa_main.tex -> leafletfa_supplement.tex.
+# When the main file needs the supplement's .aux, build the supplement first.
+add_cus_dep('tex', 'aux', 0, 'makeexternaldocument');
+sub makeexternaldocument {
+    # skip the file this latexmk run is already building (avoids a loop)
+    if (!($root_filename eq $_[0])) {
+        system("latexmk -pdf \"$_[0]\"");
+    }
+}

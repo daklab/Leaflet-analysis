@@ -1,0 +1,38 @@
+%% LeafletFA -- Supplementary Material (Bioinformatics). Skeleton 2026-11-01; contents listed in BIOINFORMATICS_PLAN.md section 2.
+%% Supplementary Note 1 (duplicate reads) is ported from GenomeBiology_Submission2026/manuscript/supplement/supplementary_notes.tex.
+\documentclass[webpdf,traditional,large,namedate]{oup-authoring-template}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\newcommand{\societylogo}{}
+\let\cite\citep
+\InputIfFileExists{numbers}{}{}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+
+\begin{document}
+\journaltitle{Bioinformatics}
+\title[LeafletFA]{Supplementary Material: LeafletFA}
+\maketitle
+
+\section*{Supplementary Methods}
+\todo{Full model, inference settings, E-step, validation protocol (pre-registration and amendments 1--4).}
+
+\section*{Supplementary Note 1: Duplicate reads and the effective number of molecules per event}
+\label{suppnote:duplicates}
+\todo{Port from supplementary\_notes.tex; numbers via the ledger.}
+
+\section*{Supplementary Figures}
+% One figure per item in BIOINFORMATICS_PLAN.md section 2 (S1--S8). Labels fig:S<n> are referenced from the main text as \ref{S-fig:S<n>}.
+\begin{figure}[H]
+\caption{\todo{Catalog coverage per dataset}}\label{fig:S1}
+\end{figure}
+
+\bibliographystyle{oup-abbrvnat}
+\bibliography{references}
+\end{document}
