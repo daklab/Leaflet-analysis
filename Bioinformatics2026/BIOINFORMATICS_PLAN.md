@@ -30,7 +30,8 @@ Bioinformatics2026/
 4. A validated factor model of single-cell junction usage
 
 Option 1 names both deliverables (model + catalog). Option 2 leads with the modeling problem. Option 3 suits the
-one-package framing.
+two-repository toolkit. **Title decided after check 9 (Tue 10 Nov);** if DS passes, add an option that names per-cell
+differential splicing.
 
 ### Structured abstract (outline; Bioinformatics, ≤ 250 words)
 - **Motivation:** single-cell splicing arrives as a few PCR-duplicated reads per event, detected mainly where the gene is
@@ -47,7 +48,8 @@ one-package framing.
     full-length depth, one fit recovers the parameters (ψ r \SimPsiR{}, per-cell φ r \SimPhiR{}).
   - Programs that recur across 15 seeds are broad lineage axes. For two of them (brain, epithelial), top events are
     confirmed by pseudobulk tests. Consensus over seeds plus a pseudobulk check is the recommended route to program-level claims.
-- **Availability:** one Python package (ATSEmapper + LeafletFA) on GitHub/PyPI; catalog and fitted models on Zenodo.
+- **Availability:** the LeafletFA toolkit, two repositories (ATSEmapper, LeafletFA) on GitHub; catalog and fitted models on
+  Zenodo.
 
 ### Main figures (4). Every panel mapped to an existing figure, table or script
 
@@ -61,7 +63,7 @@ Status: **built** = exists in a usable form; **plot** = data exist, panel to dra
 | b | Catalog per dataset: cells, junctions, ATSEs, genes (mouse TMS + Allen, human Allen, bulk RNA atlas) | `supplemental/data_quality/supp_dataset_coverage.py` → `output/supp_dataset_coverage_*_summary.csv` | plot |
 | c | ATSE structure: junctions per ATSE (44 % two-junction, mean 3.26) and ATSEs per gene | `supp_exons_vs_atses.py` → `output/supp_exons_vs_atses_*.csv`; cells `db4acb28`, `57b82209` of `Archive/LeafletFA_Submission2025/Mouse_Splicing_Foundation/Figures/FIGURE1/FIGURE1.ipynb` (2025 submission; old atlas) | plot (re-derive 44 % / 3.26 into the ledger) |
 | d | Coverage: junctions detected per cell (median 3,349), reads per observed event | `supp_dataset_coverage_mouse_smartseq2_summary.csv` | plot |
-| e | Duplicate reads: fraction of (cell, ATSE) pairs with every read on one junction vs read depth, against the independent-read expectation (\DuplicateAllOnOne{}; \DuplicateMolecules{} molecules) | Supplementary Note 1 (`GenomeBiology_Submission2026/manuscript/supplement/supplementary_notes.tex`), from `NOTE_duplicate_reads.md`; producing script to locate (ledger rows pending) | build (locate script, recompute, ledger) |
+| e | Duplicate reads: fraction of (cell, ATSE) pairs with every read on one junction vs read depth, against the independent-read expectation (\DuplicateAllOnOne{}; \DuplicateMolecules{} molecules) | Supplementary Note 1 (`GenomeBiology_Submission2026/manuscript/supplement/supplementary_notes.tex`), from `NOTE_duplicate_reads.md`; producing script to locate (ledger rows pending) | build. **If the script is not found or rebuilt by Sun 8 Nov, drop this panel** and cite SpliceVI Supp. Fig. S1 for the data-measured molecules per event (Karin, 2026-11-01) |
 
 **Figure 2 — The model and what its per-cell representation reads**
 
@@ -126,23 +128,30 @@ was not met).
 - **Figure 3 is pending the DS checks** (amendment 5, below). If differential splicing passes, it may take main Figure 3
   and the simulation moves into Fig. 2 or the supplement. If it fails, DS stays out of the main text.
 
-### One package
-- **What:** one GitHub repository and one PyPI package, `leafletfa`.
-  - `leafletfa.mapper`: ATSEmapper, moved in with its history (`git subtree add --prefix leafletfa/mapper ATSEmapper main`;
-    daklab/ATSEmapper stays as an archived pointer).
-  - `leafletfa` (model, E-step, differential splicing).
-  - `leafletfa.catalog`: loader for the released catalog, e.g. `leafletfa.catalog.load("mouse_smartseq2_2026")`. It
-    downloads from Zenodo and checks the md5.
-- **CLI:** `leafletfa map` (ATSEmapper), `leafletfa fit`, `leafletfa embed` (E-step).
-- **Catalog release (Zenodo):** per dataset, an ATSE table and the model-ready matrices' var tables.
-  - ATSE table columns: event id, gene, junction coordinates, annotation status, cells observed, reads.
-  - Also released: the fitted models (TMS and Allen K20 seeds 0–2, the 15-seed consensus fit) and the validation tables.
-- **Fixes the package needs before release:**
-  - `pyproject.toml` says "Bayesian Beta-Dirichlet Factor Analysis" (stale: the model is Dirichlet-multinomial).
-  - The version reads 0.1.0 in `pyproject.toml` but 0.2.0 in the run records.
-  - ATSEmapper's README still says 10x support is "under development".
-  - The catalog definition drops real constitutive junctions at shared splice sites (the singleton limitation, e.g.
-    *COL1A1*). Document it.
+### Toolkit: two repositories, described as one (Karin, 2026-11-01)
+No package merge before submission. ATSEmapper and LeafletFA are released as **two repositories presented as one
+toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge into one package after acceptance.
+
+- **ATSEmapper** (daklab/ATSEmapper):
+  - Version tag (proposed `v0.1.0`, matching `pyproject.toml`).
+  - Clean repository root: remove the stray output folders (`LeafletFA_ATSE_mapper_output_2026051*`) and the `.csv` /
+    `.tsv` files there (`multi_gene_junctions_*.csv`, `singleton_junctions.tsv`, `filtered_low_usage_junctions.tsv`), and
+    the stale `leafletfa_utils.egg-info`.
+  - README: no cluster paths; state 10x status (not supported in this release); document the singleton limitation
+    (junctions at shared splice sites that form no alternative event are dropped, which removes real constitutive
+    junctions such as *COL1A1*'s); tests pass.
+  - The uncommitted demo rework already in the working tree (chr19 example, `setup_sample_data.sh`, `run_example.sh`,
+    junction-parser columns) is reviewed and committed first.
+- **LeafletFA** (daklab/LeafletFA):
+  - `pyproject.toml`: description fixed (no "Beta-Dirichlet": a Dirichlet-multinomial factor model of junction usage);
+    one version everywhere (`pyproject.toml`, `leafletfa.__version__`, run records).
+  - `consensus_programs()` as a package function (from `scripts/validation/c8_consensus.py`): pool live centered ψ over
+    fits, cluster, keep recurring clusters, return consensus ψ / π / concentration ready for the E-step; plus the
+    pseudobulk check as a helper.
+  - A Zenodo catalog export script: per dataset, the ATSE table (event id, gene, junction coordinates, annotation status,
+    cells observed, reads) and the model-ready var tables, plus the fitted models (TMS and Allen K20 seeds 0–2, the
+    15-seed consensus fit) and the validation tables, with md5s.
+- **Text:** the paper names "the LeafletFA toolkit (ATSEmapper and LeafletFA)" with both repository URLs and one Zenodo DOI.
 
 ---
 
@@ -154,8 +163,8 @@ was not met).
 | Former aging program as a partially reproducible program (Supp. SX, `build_supp_partial_program.py`) | **drop** | only existed to replace the aging claim |
 | Named non-reproducing programs: SP-by-cell-type heatmaps with names, *Fbln2* decomposition, program sharing, *Gna13* | **drop** | fail checks 3, 6 and 8 |
 | Human vs mouse conservation (GB Fig. 5) | **drop** | not built; the conserved-pair number did not reproduce (check 5b) |
-| Differential splicing vs LeafCutter on the atlas (GB Fig. 3) | **hold; supplement only if re-verified by 15 Nov, else drop** | not in a pre-registered check (5b re-derived only the 840 vs 641 count); also the SpliceVI paper's ground |
-| GB simulation vs NMF and DS calibration (GB Fig. 2 a–h) | **hold; supplement only if re-verified** | not validated (check 5b: "not checked"); different simulation from check 4 |
+| Differential splicing vs LeafCutter (GB Fig. 3) | **candidate main Fig. 3 via check 9** (amendment 5); if it fails, out of the main text | not yet in a pre-registered check (5b re-derived only the 840 vs 641 count); check 9 tests seed reproducibility and calibration on a real-data null |
+| GB simulation vs NMF and DS calibration (GB Fig. 2 a–h) | **drop** (Karin, 2026-11-01) | not validated (check 5b: "not checked"); different simulation from check 4 |
 | Held-out imputation grid, uncertainty calibration (GB S10, `_imputation_uncertainty`) | **hold** | "not checked" in 5b; re-score on the validated fits if wanted |
 | Catalog (GB S1 data quality), duplicate reads (Supp. Note 1) | **keep, main Fig. 1** | descriptive; reproduced (5b atlas size) |
 | Held-out likelihood, kNN with ratios redrawn, seed stability, simulation recovery | **keep, main Figs 2–3** | checks 1–4 passed |
@@ -210,6 +219,16 @@ was not met).
 - **LeafletFA kNN numbers:** live programs (SpliceVI Fig. 1) vs all 20 programs (this paper's checks 2–3).
 - **K sentence:** "K = 20 performed as well as K = 10 and better than K = 30" (SpliceVI Methods). Same fact here; reword,
   do not copy.
+
+**Both papers compare to LeafCutter** (no head-to-head between SpliceVI and LeafletFA):
+- SpliceVI does differential splicing on sparse EasySci metacells (and on Allen thinned to EasySci depth); LeafletFA does
+  per-cell differential splicing on the full-length atlas (check 9 pending).
+- Different data and depth regimes; neither paper compares the two methods' DS calls.
+- Cross-citation sentences:
+  - In SpliceVI: "On full-length data at atlas depth, the companion paper (LeafletFA2026) tests differential splicing per
+    cell against LeafCutter; here we address the sparse regime of combinatorial-indexing atlases."
+  - In LeafletFA: "The companion paper (SpliceVI2026) evaluates differential splicing against LeafCutter in sparse
+    combinatorial-indexing data; here we test it per cell on full-length Smart-seq2 data."
 
 **Proposed cross-citation wording**
 
@@ -266,11 +285,11 @@ In the LeafletFA paper:
 | 1 | **Rebuild *Fgfr2* on the TMS fits** (seeds 0–2, training cells; Karin 2026-11-01), so every result is on validated fits | CPU | < 1 h |
 | 2 | **Reconcile catalog numbers** with SpliceVI (Section 3) and put them in the ledger | check | 2 h |
 | 3 | **Fig. 1:** schematic; panels b–d from the data-quality outputs; re-derive "44 % two-junction, mean 3.26" | plot + draw | 1 day |
-| 4 | **Duplicate reads:** locate the script behind `NOTE_duplicate_reads.md`, recompute, ledger md5 (Fig. 1e, Supp. Note 1) | CPU | half day |
+| 4 | **Duplicate reads:** locate the script behind `NOTE_duplicate_reads.md`, recompute, ledger md5 (Fig. 1e, Supp. Note 1). **Deadline Sun 8 Nov**, else drop Fig. 1e and cite SpliceVI Supp. Fig. S1 | CPU | half day |
 | 5 | **Fig. 2:** model schematic; b–d from the check 1–3 tables | plot + draw | 1 day |
 | 6 | **Fig. 3:** a–c from `check4/` arrays | plot | half day |
 | 7 | **Fig. 4:** a–b from the check 8 tables; c ported (or rebuilt, item 1) in paper style | plot | 1 day |
-| 8 | **Package:** move ATSEmapper in; fix `pyproject`; CLI; tests; catalog export script and Zenodo draft | code | 2–3 days |
+| 8 | **Toolkit (two repos, by Sun 15 Nov):** ATSEmapper tag + clean root + README (10x status, singleton limitation) + tests; LeafletFA pyproject description and version, `consensus_programs()`, Zenodo catalog export script. No merge before acceptance | code | 2 days |
 | 9 | **DS checks (check 9) and CATALOG_NUMBERS.md** — due Tue 10 Nov | CPU | running |
 | 10 | **Bibliography:** the GB `.bib` is not on this filesystem (an Overleaf project?). Build ours from SpliceVI's plus additions | text | half day |
 | 11 | **SpliceVI side:** cross-citation edits and the catalog numbers (coordinate with the SpliceVI session) | text | 1 h |
@@ -284,5 +303,5 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 2. ~~Fit set for *Fgfr2*~~ — resolved 2026-11-01: rebuild on the TMS per-dataset fits (seeds 0–2, training cells).
 3. ~~DS vs LeafCutter~~ — 2026-11-01: re-verify as candidate main Fig. 3 (check 9, amendment 5: seed reproducibility, median Jaccard ≥ 0.7; real-data null, false-call rate ≤ 0.05). If it passes, simulation recovery moves to the supplement. GB simulation vs NMF: dropped.
 4. ~~LeafletFA color~~ — resolved 2026-11-01: ochre in both papers.
-5. Title.
+5. Title — decided after check 9 (Tue 10 Nov). If DS passes, add an option naming per-cell differential splicing.
 6. Author list and order (left as placeholders).
