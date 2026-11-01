@@ -95,10 +95,28 @@ were re-derived on the surviving junctions; this dropped a further 9,065 singlet
 partners failed the filter of at least 75 cells. Mutually exclusive exons appear as two ATSEs, one for the upstream and one
 for the downstream junction pair (Supplementary Table~\ref{S-tab:eventtypes}).
 
-\subsection{Model}
+\subsection{Model}\label{sec:model}
 % Dirichlet-multinomial likelihood, within-ATSE simplex psi, per-ATSE concentration floored at 2 (a modeling choice; Supplementary Note 1),
 % Dirichlet prior on phi with concentration pinned at K, alpha_pi ~ Gamma(1,1); stochastic variational inference; frozen-global E-step for new cells.
 \todo{Model (from methods\_CURRENT.tex, rewritten to Bioinformatics length).}
+
+\subsection{Ratio-redrawing test}
+% Self-contained (Karin, 2026-11-01); the SpliceVI companion paper applies the same test across methods. Settings from
+% LeafletFA scripts/splicevi_baseline/knn_check.py and the shared test inputs (SpliceVI STAGE5 §170). \unsure = to verify.
+Because a cell detects an event mostly when its gene is expressed, a splicing representation can separate cell types from
+which events are detected rather than from how their junctions are used. To measure what the representation reads, we
+built a null version of the held-out test cells that keeps, for every cell, which events have reads and how many reads
+each has, but removes cell-type information from the junction ratios: the reads of each observed (cell, event) pair were
+redrawn from a multinomial with the cell's own read total and the event's population junction ratios
+\unsure{(estimated on the training cells)}. A second null set the reads to the read total times the population ratios
+exactly, without sampling noise. LeafletFA embedded the real and the null test cells with the same frozen fit (E-step,
+Section~\ref{sec:model}), and each cell was represented by its centered log program weights (all $K$ programs; weights
+clipped at $10^{-6}$; standardized). Cell-type accuracy is that of a $k$-nearest-neighbor classifier ($k = 15$) with labels
+of tissue and broad cell type, in four folds grouped by mouse with a fixed fold assignment, averaged over folds. The drop
+in accuracy from the real cells to the redrawn null measures how much of the representation's cell-type structure depends
+on junction usage rather than on detection; a drop of at least 0.10 was pre-specified as reading junction usage
+\cite{SpliceVI2026}. The companion paper \cite{SpliceVI2026} applies this test to SpliceVI and other splicing models, using
+LeafletFA's programs used by cells (mean training weight $> 0.01$); here we report all $K$ programs.
 
 \subsection{Validation design}
 % Pre-registered checks (LeafletFA_validation/VALIDATION_PREREG.md): held-out likelihood (event split), kNN with ratios redrawn,

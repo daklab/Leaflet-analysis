@@ -48,7 +48,7 @@ supplement and portal only.
 | Fig | Content | Panels and sources | Status |
 |---|---|---|---|
 | **1 ATSEmapper and the catalog** | events, catalog size, coverage | a schematic (draw); b catalog per dataset, mouse only (`supplemental/data_quality/output/supp_dataset_coverage_mouse_smartseq2_summary.csv`); c junctions per ATSE, ATSEs per gene (`supp_exons_vs_atses_*.csv`); d coverage per cell; e duplicate reads (drop if not rebuilt by 8 Nov; cite SpliceVI Supp. Fig. S1) | plot / draw |
-| **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); c ratio redrawing, kNN (checks 2–3, `c2_K_prior.tsv`, `c3_*_seed_knn.tsv`); d per-cell ψ across 15 seeds (r 0.998; `c9a_jaccard.tsv`, recompute on all cells) next to program recurrence (check 8); e benchmark: time and memory, LeafletFA vs scQuint, LeafletSC, LeafCutter catalog (10.6) | plot; benchmark to run |
+| **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); c ratio redrawing, kNN (checks 2–3, `c2_K_prior.tsv`, `c3_*_seed_knn.tsv`); d per-cell ψ across 15 seeds (r 0.998; `c9a_jaccard.tsv`, recompute on all cells) next to program recurrence (check 8); e benchmark: time and memory, LeafletFA vs scQuint and the LeafCutter catalog (10.6) | plot; benchmark to run |
 | **3 Cell-type ψ accuracy vs pseudobulk** | the resource is more accurate than the obvious alternative | a error vs TEST pseudobulk by type size; b by read depth; c interval coverage (10.3); d example events | check 10.1, 10.3 (to run) |
 | **4 Cell-type-specific splicing** | calls, replication, known biology, portal | a δ and number of specific (event, type) per type; b replication across mice vs permuted null (10.2a/b), across seeds (10.2c); c *Fgfr2* (the upstream junction pair of the IIIb/IIIc mutually exclusive exons), *Ptprc*, *Nrxn1–3* SS4 (10.4; *Fgfr2* rebuilt on TMS fits); d portal screenshot | check 10.2, 10.4 (to run); portal |
 
@@ -86,13 +86,15 @@ coverage is reported prominently (main Fig. 3c, abstract if it falls short), and
 from per-draw TV.
 
 ### Methods text shared with SpliceVI
+The ratio-redrawing test is described in full in the LeafletFA Methods (self-contained: null construction, embedding,
+kNN protocol, reading), citing the SpliceVI companion paper as where it is applied across methods (Karin, 2026-11-01).
 The ATSE definition paragraph in `manuscript/leafletfa_main.tex` (Methods, "ATSEmapper and the ATSE catalog"; from
 `DEFINITIONS.md`) is the wording both papers use for the definition. The event-type table is Supplementary Table
 (`tab:eventtypes`).
 
 ### Benchmarks (check 10.6)
-Wall-clock and peak memory, hardware recorded: LeafletFA fit at TMS and atlas size and E-step; scQuint on TMS; LeafletSC if
-it runs; LeafCutter producing the same cell type × event catalog (one-vs-rest per type, total). No claims beyond the
+Wall-clock and peak memory, hardware recorded: LeafletFA fit at TMS and atlas size and E-step; scQuint on TMS; LeafCutter
+producing the same cell type × event catalog (one-vs-rest per type, total). LeafletSC (original Leaflet) dropped (Karin, 2026-11-01). No claims beyond the
 measured numbers. The atlas-size LeafletFA fit needs ~0.5 GPU-h (approval).
 
 ### Check 10 compute (CPU) and target
@@ -101,7 +103,7 @@ measured numbers. The atlas-size LeafletFA fit needs ~0.5 GPU-h (approval).
 | TMS seed 0: estimates, intervals (200 draws), leave-one-out, δ, halves A/B, 20 permutations, calibration, known biology | ~6–8 CPU-h |
 | Allen seed 0: same | ~8–10 CPU-h |
 | Seeds 1–14 (TMS) and 1–2 (Allen), call sets for 10.2c | ~1 CPU-h each, ~16 CPU-h |
-| Benchmarks: LeafCutter one-vs-rest catalog on TMS (≈ 130 runs × ~1 h × 4 cores); scQuint; LeafletSC | ~550 core-h (≈ 6 h wall at 25 concurrent) + ~3 h |
+| Benchmarks: LeafCutter one-vs-rest catalog on TMS (≈ 130 runs × ~1 h × 4 cores); scQuint | ~550 core-h (≈ 6 h wall at 25 concurrent) + ~2 h |
 | **Total** | **~40 CPU-h analysis + ~550 core-h benchmark; target Tue 10 Nov** |
 
 ### Toolkit: two repositories, described as one (Karin, 2026-11-01)
