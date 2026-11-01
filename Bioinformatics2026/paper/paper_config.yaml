@@ -81,6 +81,14 @@ inputs:
     consensus_sensitivity: c8_sensitivity.tsv
     consensus_pseudobulk: c8_pseudobulk_top_atses.tsv
     consensus_pseudobulk_null: c8_pseudobulk_null.tsv
+  fig1:                        # written by scripts/fig1_catalog_summaries.py (June 2026 build)
+    dir: /gpfs/commons/groups/knowles_lab/Karin/LeafletFA_bioinformatics/paper_figures/data
+    catalog: fig1b_catalog.tsv
+    event_types: fig1c_event_types.tsv
+    junctions_per_atse: fig1c_junctions_per_atse.tsv
+    per_cell: fig1d_per_cell.tsv.gz
+    reads_per_event: fig1d_reads_per_event.tsv
+    quantiles: fig1d_quantiles.tsv
   catalog:                     # ATSE catalog summaries (Leaflet-analysis GenomeBiology_Submission2026/figures/supplemental/data_quality)
     dir: /gpfs/commons/home/kisaev/Leaflet-analysis/GenomeBiology_Submission2026/figures/supplemental/data_quality/output
     coverage_mouse: supp_dataset_coverage_mouse_smartseq2_summary.csv
@@ -104,12 +112,17 @@ figures:
   "1":
     title: "ATSEmapper and the ATSE catalog"
     width: double
-    panels: {1a: {w: 70, h: 50}, 1b: {w: 106, h: 50}, 1c: {w: 58, h: 45}, 1d: {w: 58, h: 45}, 1e: {w: 58, h: 45}}
-    layout: [[1a, 1b], [1c, 1d, 1e]]
+    formats: [pdf, svg, png]
+    # 1a = ATSEmapper schematic, drawn by Karin in Affinity: slot 70 x 50 mm. 1e = duplicate reads: placeholder until
+    # 8 Nov (rebuilt or dropped, then SpliceVI Supp. Fig. S1 is cited).
+    panels: {1a: {w: 70, h: 50, note: "ATSEmapper schematic\n(Karin, Affinity)"}, 1b: {w: 106, h: 50}, 1c: {w: 88, h: 48}, 1d: {w: 88, h: 48},
+             1e: {w: 58, h: 40, note: "duplicate reads\n(rebuild or drop by 8 Nov)"}}
+    layout: [[1a, 1b], [1c, 1d], [1e]]
   "2":
     title: "The model and what its per-cell representation reads"
     width: double
-    panels: {2a: {w: 70, h: 55}, 2b: {w: 106, h: 55}, 2c: {w: 58, h: 50}, 2d: {w: 58, h: 50}, 2e: {w: 58, h: 50}}
+    # 2a = model schematic, drawn by Karin in Affinity: slot 70 x 55 mm.
+    panels: {2a: {w: 70, h: 55, note: "model schematic\n(Karin, Affinity)"}, 2b: {w: 106, h: 55}, 2c: {w: 58, h: 50}, 2d: {w: 58, h: 50}, 2e: {w: 58, h: 50}}
     layout: [[2a, 2b], [2c, 2d, 2e]]   # e = per-cell usage reproduces across 15 seeds while programs do not (check 9a + 8)
   "3":
     title: "Recovery on data simulated from the model"

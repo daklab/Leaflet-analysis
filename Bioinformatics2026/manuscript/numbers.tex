@@ -26,5 +26,23 @@
 \newcommand{\FgfrCoveredMesenchymal}{0.05--0.15}  % Fgfr2 IIIb usage, LeafletFA posterior, covered mesenchymal cells, 12 of 13 types (raw 0); seed mean of atlas K20 seeds 0-2 | fgfr2_IIIb_covered_uncovered.tsv | job  | CAPTION_FIG2_supp_Fgfr2.md
 \newcommand{\FgfrUncoveredMesenchymal}{0.35--0.63}  % Fgfr2 IIIb usage, LeafletFA, uncovered mesenchymal cells (prior = posterior), seed mean range over 13 types | fgfr2_IIIb_covered_uncovered.tsv | job  | CAPTION_FIG2_supp_Fgfr2.md
 \newcommand{\PerCellPsiSeedR}{0.998}  % median cross-seed Pearson r of per-cell imputed usage rho = phi . psi over 15 TMS K20 fits (105 fit pairs x 5 contrasts; range 0.9961-0.9996); 500 sampled cells per contrast, junctions of tested ATSEs; to be recomputed on all training cells and junctions | c9a_jaccard.tsv | job 22596837 | VALIDATION_REPORT.md check 9a
+\newcommand{\CatalogCellsTMS}{78,135}  % cells in TMS (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogJunctionsTMS}{77,562}  % junctions with >= 1 read in TMS (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogATSEsTMS}{24,390}  % atses with >= 1 read in TMS (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogGenesTMS}{11,210}  % genes with >= 1 read in TMS (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogCellsAllen}{54,571}  % cells in Allen (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogJunctionsAllen}{77,204}  % junctions with >= 1 read in Allen (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogATSEsAllen}{24,162}  % atses with >= 1 read in Allen (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\CatalogGenesAllen}{11,050}  % genes with >= 1 read in Allen (TRAIN + TEST, June 2026 build) | fig1b_catalog.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianJunctionsPerCellTMS}{1,667}  % median junctions with reads per cell, TMS, all cells (q25 1,052, q75 2,799) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianATSEsPerCellTMS}{1,249}  % median atses with reads per cell, TMS, all cells (q25 800, q75 2,064) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianReadsPerObservedATSETMS}{20}  % median reads per observed atse, TMS, all cells (q25 7, q75 53) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianJunctionsPerCellAllen}{8,034}  % median junctions with reads per cell, Allen, all cells (q25 6,290, q75 9,753) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianATSEsPerCellAllen}{5,660}  % median atses with reads per cell, Allen, all cells (q25 4,491, q75 6,767) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\MedianReadsPerObservedATSEAllen}{4}  % median reads per observed atse, Allen, all cells (q25 2, q75 10) | fig1d_quantiles.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\EventShareAltThree}{24\%}  % share of the 24,475 ATSEs classified alt 3' site (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\EventShareAltFive}{20\%}  % share of the 24,475 ATSEs classified alt 5' site (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\EventShareSkippedExon}{23\%}  % share of the 24,475 ATSEs classified skipped exon (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\EventShareComplex}{33\%}  % share of the 24,475 ATSEs classified complex (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
 % not final (Overleaf fallback stays): DuplicateAllOnOne
 % not final (Overleaf fallback stays): DuplicateMolecules

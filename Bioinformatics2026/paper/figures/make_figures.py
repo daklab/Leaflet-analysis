@@ -28,7 +28,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "panels"))
 from style import DEFAULT_CONFIG, MM, Slot, apply_style, load_config, save  # noqa: E402
 
-FIGURE_MODULES = {}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
+FIGURE_MODULES = {"1": "fig1"}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
 
 
 def panels_of(fig_id):
@@ -111,7 +111,7 @@ def build_assembled(cfg, fig_id, gap_mm=2.0):
                 else:
                     page.patches.append(plt.Rectangle((x / page_w, (yc - h - dy) / page_h), w / page_w, h / page_h,
                                                       transform=page.transFigure, color="#EEEEEE", zorder=-1))
-                    page.text((x + w / 2) / page_w, (yc - h / 2 - dy) / page_h, f"{pid}: schematic\n(Affinity)", ha="center", va="center", color="#777777")
+                    page.text((x + w / 2) / page_w, (yc - h / 2 - dy) / page_h, f"{pid}: " + fc["panels"].get(pid, {}).get("note", "schematic\n(Affinity)") + f"\n{w:g} x {h:g} mm", ha="center", va="center", color="#777777")
                 page.text(x / page_w, yc / page_h, letter(cfg, pid), ha="left", va="top", fontsize=st["font"]["panel_label_pt"],
                           fontweight="bold" if cfg["style"]["panel_label"]["bold"] else "normal")
                 yc -= h + gap_mm
