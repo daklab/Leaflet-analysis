@@ -145,13 +145,13 @@ def reference_line(cfg, ax, y=None, x=None, **kw):
 def save(cfg, fig, path_base, formats=("pdf", "tiff", "png")):
     """PDF (vector, editable text), TIFF at the color dpi, PNG at the review dpi; "svg" on request (text kept as text)."""
     os.makedirs(os.path.dirname(path_base), exist_ok=True)
-    if "pdf" in formats:
-        fig.savefig(path_base + ".pdf")
+    if "pdf" in formats:     # clean metadata: no creator / producer / date (and so no paths or versions)
+        fig.savefig(path_base + ".pdf", metadata={"Creator": None, "Producer": None, "CreationDate": None})
     if "svg" in formats:
-        fig.savefig(path_base + ".svg")
+        fig.savefig(path_base + ".svg", metadata={"Creator": None, "Date": None})
     if "tiff" in formats:
         fig.savefig(path_base + ".tiff", dpi=cfg["style"]["dpi"]["color"], pil_kwargs={"compression": "tiff_lzw"})
     if "png" in formats:
-        fig.savefig(path_base + "_review.png", dpi=cfg["style"]["dpi"]["review"])
+        fig.savefig(path_base + "_review.png", dpi=cfg["style"]["dpi"]["review"], metadata={"Software": None})
     plt.close(fig)
     return path_base + ".pdf"
