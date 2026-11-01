@@ -50,7 +50,7 @@ supplement and portal only.
 | **1 ATSEmapper and the catalog** | events, catalog size, coverage | a schematic (draw); b catalog per dataset, mouse only (`supplemental/data_quality/output/supp_dataset_coverage_mouse_smartseq2_summary.csv`); c junctions per ATSE, ATSEs per gene (`supp_exons_vs_atses_*.csv`); d coverage per cell; e duplicate reads (drop if not rebuilt by 8 Nov; cite SpliceVI Supp. Fig. S1) | plot / draw |
 | **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); c ratio redrawing, kNN (checks 2–3, `c2_K_prior.tsv`, `c3_*_seed_knn.tsv`); d per-cell ψ across 15 seeds (r 0.998; `c9a_jaccard.tsv`, recompute on all cells) next to program recurrence (check 8); e benchmark: time and memory, LeafletFA vs scQuint, LeafletSC, LeafCutter catalog (10.6) | plot; benchmark to run |
 | **3 Cell-type ψ accuracy vs pseudobulk** | the resource is more accurate than the obvious alternative | a error vs TEST pseudobulk by type size; b by read depth; c interval coverage (10.3); d example events | check 10.1, 10.3 (to run) |
-| **4 Cell-type-specific splicing** | calls, replication, known biology, portal | a δ and number of specific (event, type) per type; b replication across mice vs permuted null (10.2a/b), across seeds (10.2c); c *Fgfr2*, *Ptprc*, *Nrxn1–3* SS4 (10.4; *Fgfr2* rebuilt on TMS fits); d portal screenshot | check 10.2, 10.4 (to run); portal |
+| **4 Cell-type-specific splicing** | calls, replication, known biology, portal | a δ and number of specific (event, type) per type; b replication across mice vs permuted null (10.2a/b), across seeds (10.2c); c *Fgfr2* (the upstream junction pair of the IIIb/IIIc mutually exclusive exons), *Ptprc*, *Nrxn1–3* SS4 (10.4; *Fgfr2* rebuilt on TMS fits); d portal screenshot | check 10.2, 10.4 (to run); portal |
 
 **Supplement:** simulation recovery (check 4), consensus programs as broad lineage axes (check 8, CP1/CP3 pseudobulk
 confirmed; keratinocyte two-composition example of usage reproducing while content does not), program stability (check 6),
@@ -78,6 +78,17 @@ seeds). Two pages; the portal and catalog as the deliverable; claims limited to 
   linking to the gene view.
 - Download links to Zenodo. Build report: total size, largest file, build time. Later option (not built): one Parquet of
   the full catalog queried with DuckDB-WASM (feasibility and size noted in the build report).
+
+### Interval caution (Karin, 2026-11-01)
+The cell-type intervals come from the variational posterior (draws of q(φ) and q(ψ); amendment 6 note 2), which is often
+too narrow. **10.3 interval coverage against TEST pseudobulk and the mouse-half replication are the primary safeguards**;
+coverage is reported prominently (main Fig. 3c, abstract if it falls short), and specificity calls use P(TV > δ) ≥ 0.95
+from per-draw TV.
+
+### Methods text shared with SpliceVI
+The ATSE definition paragraph in `manuscript/leafletfa_main.tex` (Methods, "ATSEmapper and the ATSE catalog"; from
+`DEFINITIONS.md`) is the wording both papers use for the definition. The event-type table is Supplementary Table
+(`tab:eventtypes`).
 
 ### Benchmarks (check 10.6)
 Wall-clock and peak memory, hardware recorded: LeafletFA fit at TMS and atlas size and E-step; scQuint on TMS; LeafletSC if

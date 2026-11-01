@@ -85,6 +85,9 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
 - **Observation (not tested):** the donor/acceptor labels used for the usage columns come from the undirected graph's edge
   iteration order (`:197-205`), which can swap them for some junctions. The filter is symmetric (either share < 0.01), so
   only the reported `five_prime_usage` / `three_prime_usage` columns could be mislabeled, not the ATSEs.
+  **Checked 2026-11-01:** no reported number uses these columns (no code in Leaflet-analysis, LeafletFA or
+  SpliceVI-utils reads them; they appear only in a SpliceVI plotting notebook's saved outputs). Fix after submission:
+  take donor and acceptor from the junction's strand-aware coordinates instead of the edge order.
 
 ### 1.5 Production re-grouping after filtering (Leaflet-analysis `09b_filter_aligned.py`)
 - **Inputs:** after cell QC and the junction filter (junction in ≥ 75 cells; cells with ≥ 500 detected junctions),

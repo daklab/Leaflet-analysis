@@ -79,7 +79,21 @@
 \todo{Data.}
 
 \subsection{ATSEmapper and the ATSE catalog}
-\todo{Junction extraction, ATSE construction, annotation, filters; catalog release.}
+% Draft 2026-11-01 from DEFINITIONS.md (file:line there); shared with the SpliceVI paper (same wording of the definition,
+% each paper's own sentences around it). Numbers via numbers.tex once in the ledger.
+Splice junctions were extracted from each cell's alignments with regtools \cite{regtools} and pooled across cells; junctions
+with introns of 50--500,000 bp, canonical splice motifs (GT-AG, GC-AG, AT-AC) and at least 100 reads in at least 10 cells
+were kept. Each junction was compared with a long-read-supported annotation \cite{Schertzer2025-lw}: an end is annotated
+if it lies within 1 bp of an annotated exon boundary on the same strand, and a junction is assigned the genes of the
+transcripts it matches. Junctions needed at least one annotated end and a single gene; junctions matching more than one
+gene were removed. An alternative transcript structure event (ATSE) is a connected component of the junctions of a gene
+in which two junctions are linked if they share a donor or an acceptor site; a junction was removed from its ATSE if it
+carried less than 1\% of the reads at either of its splice sites, and an ATSE needs at least two junctions. Junctions that
+share no splice site with another junction (singletons) are not alternative within this definition and were dropped,
+including constitutive junctions of highly expressed genes. After cell and junction filtering (Supplementary Methods), ATSEs
+were re-derived on the surviving junctions; this dropped a further 9,065 singletons, including alternative junctions whose
+partners failed the filter of at least 75 cells. Mutually exclusive exons appear as two ATSEs, one for the upstream and one
+for the downstream junction pair (Supplementary Table~\ref{S-tab:eventtypes}).
 
 \subsection{Model}
 % Dirichlet-multinomial likelihood, within-ATSE simplex psi, per-ATSE concentration floored at 2 (a modeling choice; Supplementary Note 1),

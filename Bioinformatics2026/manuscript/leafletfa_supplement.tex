@@ -27,6 +27,29 @@
 \label{suppnote:duplicates}
 \todo{Port from supplementary\_notes.tex; numbers via the ledger.}
 
+\section*{Supplementary Tables}
+\begin{table}[H]
+\centering\small
+\begin{tabular}{lrr}
+\toprule
+Event type (rule on junction coordinates) & ATSEs & Share \\
+\midrule
+Alternative 3$'$ site (2 junctions, shared donor) & 5,810 & 23.7\% \\
+Alternative 5$'$ site (2 junctions, shared acceptor) & 4,867 & 19.9\% \\
+Skipped exon (3 junctions; one spans the other two, sharing its donor and acceptor) & 5,708 & 23.3\% \\
+Complex (other 3-junction ATSEs; all ATSEs with $\geq$ 4 junctions) & 8,090 & 33.1\% \\
+\midrule
+Total & 24,475 & \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Event types of the mouse ATSE catalog.} Labels are geometric. Mutually exclusive exons are never one ATSE:
+their upstream junctions share a donor and their downstream junctions share an acceptor, but the two pairs share no
+splice site, so each appears as an alternative 3$'$ and an alternative 5$'$ ATSE (e.g.\ the \textit{Fgfr2} IIIb/IIIc
+upstream pair). Junctions per ATSE: 2 (10,677), 3 (7,600), 4 (2,381), 5 (1,561), 6 (807), $\geq$ 7 (the rest);
+mean 3.26. Source: \texttt{DEFINITIONS.md}, section 1.6.}
+\label{tab:eventtypes}
+\end{table}
+
 \section*{Supplementary Figures}
 % One figure per item in BIOINFORMATICS_PLAN.md section 2 (S1--S8). Labels fig:S<n> are referenced from the main text as \ref{S-fig:S<n>}.
 \begin{figure}[H]
