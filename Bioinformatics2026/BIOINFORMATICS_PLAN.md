@@ -45,7 +45,8 @@ one-package framing.
     are redrawn). It fits held-out reads better than population, cell-type and one-program nulls in two atlases.
   - The representation is stable across seeds (kNN range \SeedKnnRangeTMS{}). On data simulated from the model at
     full-length depth, one fit recovers the parameters (ψ r \SimPsiR{}, per-cell φ r \SimPhiR{}).
-  - Programs that recur across 15 seeds are the broad lineages. Their top events are confirmed by pseudobulk tests.
+  - Programs that recur across 15 seeds are broad lineage axes. For two of them (brain, epithelial), top events are
+    confirmed by pseudobulk tests. Consensus over seeds plus a pseudobulk check is the recommended route to program-level claims.
 - **Availability:** one Python package (ATSEmapper + LeafletFA) on GitHub/PyPI; catalog and fitted models on Zenodo.
 
 ### Main figures (4). Every panel mapped to an existing figure, table or script
@@ -82,7 +83,7 @@ The ratio-redrawing test is the SpliceVI paper's (Section 3). The validation num
 | b | True vs fitted per-cell φ (r 0.982) | `check4/truth.npz`, `check4/fit_simA/` | plot |
 | c | Depth limit: same at EasySci-like depth (×0.011): ψ r 0.745, 0 of 7 programs | `c4_recovery.tsv` (sim B), `check4/fit_simB/` | plot |
 
-**Figure 4 — Programs that recur across seeds, and imputation at a known event**
+**Figure 4 — Consensus programs are broad lineage axes (and imputation at a known event)**
 
 | Panel | Content | Source | Status |
 |---|---|---|---|
@@ -90,24 +91,39 @@ The ratio-redrawing test is the SpliceVI paper's (Section 3). The validation num
 | b | Pseudobulk confirmation of top ATSEs, CP1 (brain, 9/10) and CP3 (epithelial, 8/10), against random ATSEs (0.20–0.23) | `tsv/c8_pseudobulk_top_atses.tsv`, `c8_pseudobulk_null.tsv` | plot |
 | c | *Fgfr2* IIIb/IIIc: covered vs uncovered cells, raw vs LeafletFA, epithelial and mesenchymal types | `FIGURE2_simulation_imputation/code/build_fgfr2_example.py` panel b (branch `leafletfa-methods-fixes`, 52499bd); `data/fgfr2_IIIb_covered_uncovered.tsv` | built (GB theme); port to paper style |
 
-### Programs section (filled; the consensus reading is in)
-- **Reading (check 8, pre-registered): consensus does not restore interpretable programs.** 3 consensus programs pass,
-  where 8 were needed. So the paper is centered on the per-cell representation and the catalog, and programs come last
-  (Fig. 4a–b).
-- **Programs reported:** the 4 clusters that recur in ≥ 60 % of 15 seeds.
-  - CP1, brain glia and neurons, 15/15.
-  - CP2, endothelial cells and lung smooth muscle, 12/15.
-  - CP3, intestinal and kidney epithelial cells and hepatocytes, 11/15.
-  - CP4, stromal and mesenchymal cells, 10/15.
-- **Junction content is claimed only for CP1–CP3** (top-50 Jaccard ≥ 0.5). CP4 recurs in usage, but its junctions do not
-  (Jaccard 0.42).
-- **Text frame:** the cell types a program describes recur across seeds; the junction composition recurs only for these
-  broad lineages (checks 6 and 8). The keratinocyte/basal program is in 14 of 15 fits but in two compositions: say so in
-  the supplement, not as a reproduced program.
-- **Decision for Karin:** you asked for "the 4 reproduced programs". The one-to-one rule on seeds 0–2 (check 6) gives a
-  different four: glia, endothelial, mesenchymal and keratinocyte/basal.
-  - The 15-seed result demotes keratinocyte/basal and adds the epithelial CP3.
-  - **I recommend the consensus four (CP1–CP4)**, as the larger and pre-registered test.
+### Programs section (Karin, 2026-11-01)
+
+**Paper center**, in order:
+1. The per-cell representation reads junction usage.
+2. Held-out likelihood beats fair nulls.
+3. Simulation recovery at full-length depth.
+4. Consensus programs.
+5. The ATSE catalog and ATSEmapper.
+
+**The paper is not framed around named programs.** Programs appear as broad lineage axes, as the 15-seed consensus found them
+(check 8: 4 clusters recur in ≥ 60 % of fits; 3 keep their top-50 junctions, Jaccard ≥ 0.5; the pre-registered bar of 8
+was not met).
+
+| Consensus program | Lineage axis | Recurrence | How the text uses it |
+|---|---|---|---|
+| CP1 | brain glia and neurons | 15 / 15 | **example confirmed by pseudobulk**: 9 of 10 top ATSEs confirmed (random ATSEs 0.23) |
+| CP3 | intestinal and kidney epithelium, hepatocytes | 11 / 15 | **example confirmed by pseudobulk**: 8 of 10 (random 0.20) |
+| CP2 | endothelial cells, lung smooth muscle | 12 / 15 | lineage axis only, **no junction-level claim** (used by 95 of 96 cell types, so the pseudobulk test has one non-user type) |
+| CP4 | stromal and mesenchymal cells | 10 / 15 | lineage axis only, **no junction-level claim** (top-50 Jaccard 0.42) |
+
+- **Supplement:** the keratinocyte/basal program is the worked example of **usage reproducing while content does not**. It
+  is in 14 of 15 fits, in two compositions (centered cosine 0.77, never both in one fit), with the same top cell types.
+  Show it with check 6's usage-vs-content table (S5–S6).
+- **Recommended user workflow for program-level claims** (Methods and package docs): fit several seeds; build consensus
+  programs over seeds (`c8_consensus.py` becomes a package function); make a program-level claim only for consensus
+  programs; check a program's top ATSEs with a pseudobulk test between the cell types that use it and those that do not.
+  A single fit's programs are not claims.
+- **Figure 4** becomes "Consensus programs are broad lineage axes": a = cell-type usage of CP1–CP4 (recurrence marked);
+  b = pseudobulk confirmation for CP1 and CP3 against random ATSEs. *Fgfr2* (c) stays as the imputation example, or moves
+  to S8 if pages are short.
+- Resolved: the check 6 four (with keratinocyte/basal) is not used.
+- **Figure 3 is pending the DS checks** (amendment 5, below). If differential splicing passes, it may take main Figure 3
+  and the simulation moves into Fig. 2 or the supplement. If it fails, DS stays out of the main text.
 
 ### One package
 - **What:** one GitHub repository and one PyPI package, `leafletfa`.
@@ -263,7 +279,7 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 ---
 
 ## Decisions for Karin
-1. Programs to report: consensus CP1–CP4 (recommended) or check 6's four.
+1. ~~Programs to report~~ — resolved 2026-11-01: consensus lineage axes; CP1 and CP3 as pseudobulk-confirmed examples.
 2. Fit set for *Fgfr2* (Fig. 4c): rebuild on the TMS fits (recommended) or keep the atlas fits and say so.
 3. DS vs LeafCutter and the GB simulation: re-verify for the supplement, or drop.
 4. LeafletFA color: ochre (consistent with SpliceVI, current) or teal (LeafletFA theme).
