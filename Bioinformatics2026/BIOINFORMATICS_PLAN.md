@@ -54,7 +54,7 @@ supplement and portal only.
 
 **Supplement:** simulation recovery (check 4), consensus programs as broad lineage axes (check 8, CP1/CP3 pseudobulk
 confirmed; keratinocyte two-composition example of usage reproducing while content does not), program stability (check 6),
-K and prior (check 2), held-out likelihood verification, DS calibration note (check 9), human brain and bulk catalogs,
+K and prior (check 2), held-out likelihood verification, DS null result (check 9), in Karin's wording: "LeafCutter is anti-conservative on mouse-split nulls; LeafletFA's posterior test made no calls, consistent with its conservative behavior" (not as LeafletFA being calibrated), human brain and bulk catalogs,
 Supplementary Note 1 (duplicate reads), catalog filter chain (`CATALOG_NUMBERS.md`).
 
 ### Application Note (fallback if check 10 fails 10.1 or 10.2 a/b)
@@ -197,7 +197,8 @@ toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge i
     combinatorial-indexing data; here we test it per cell on full-length Smart-seq2 data."
   - **Update after check 9:** LeafletFA's DS is not in the main text, so the LeafletFA sentence becomes a Discussion
     pointer instead: "For differential splicing between groups of cells, see the companion paper (SpliceVI2026); here,
-    LeafletFA's posterior effect-size test was calibrated on a real-data null but its calls did not reproduce across
+    LeafletFA's posterior effect-size test made no calls on mouse-split nulls, consistent with its conservative behavior,
+    and its calls between cell types did not reproduce across
     seeds (Supplementary Note), so we use LeafletFA for per-cell representation and imputation." The SpliceVI sentence
     should then drop the reference to LeafletFA's DS.
 
