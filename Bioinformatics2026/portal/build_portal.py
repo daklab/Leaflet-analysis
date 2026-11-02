@@ -5,7 +5,7 @@
 
 Input: the catalog table of check 10.5, one row per (dataset, event, cell type, junction) with columns
 dataset, event_id, junction_id, gene, annotation_status, cell_type, tissue, lineage, psi, psi_lo, psi_hi, psi_rest,
-reads, cells, cells_covering, tv, specific, source.
+reads, cells, cells_covering, tv, specific, source; optional official_subclass (Allen: the cell group's official subclass).
 Output (all static):
   site/index.html, app.js, style.css             the app (copied from web/)
   site/data/index.json                           datasets, genes, cell types (tissue, lineage, cells), source labels
@@ -51,11 +51,14 @@ def main():
     shutil.copytree(os.path.join(HERE, "web"), a.out)
     index = dict(datasets={}, zenodo=a.zenodo, built=time.strftime("%Y-%m-%d"))
     for ds, D in C.groupby("dataset"):
-        ct = (D.groupby("cell_type").agg(tissue=("tissue", "first"), lineage=("lineage", "first"), cells=("cells", "max"))
-              .reset_index())
+        agg = dict(tissue=("tissue", "first"), lineage=("lineage", "first"), cells=("cells", "max"))
+        if "official_subclass" in D.columns:                       # Allen: official subclass of each cell group (extra column)
+            agg["official_subclass"] = ("official_subclass", "first")
+        ct = D.groupby("cell_type").agg(**agg).reset_index()
         ct["slug"] = ct.cell_type.map(slug)
         index["datasets"][ds] = dict(source=sorted(D.source.unique().tolist()), genes=sorted(D.gene.unique().tolist()),
-                                     cell_types=ct.to_dict("records"))
+                                     cell_types=ct.to_dict("records"),
+                                     type_label="Cell group (cluster name)" if ds.lower().startswith("allen") else "Cell type")
         for g, G in D.groupby("gene"):
             events = []
             for e, Ev in G.groupby("event_id"):

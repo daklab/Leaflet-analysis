@@ -43,11 +43,18 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
     rows; `subtissue` = `region_label` (`00_prepare_metadata.py:60-80`).
   - Linked by SRR through `expected_R1_fastq` → `sra_s3_links.txt` → `SraRunTable.Run`.
   - Matched to expression by `exp_component_name` (`align_splice_ge.py:83-102`).
-- **Allen "subclass" in check 10 and SpliceVI §111:** the cluster label without its number.
+- **Allen "cell groups (cluster names)" in check 10 and SpliceVI §111** (Karin, 2026-11-01: called cell groups, not subclasses):
+  the cluster label without its number.
   - This matches the official `subclass_label` for **78.7 %** of the 73,347 metadata rows: **70 groups vs 42 official
     subclasses** (verified here; `RAW/.../METADATA/metadata.csv` md5 4bba668ad677a8d1905239e04ea46a9f). Examples:
     `204_L5/6 IT CTX` vs `L5 IT CTX`; `59_Vip Igfbp6` vs `Vip`.
-  - `subclass_label` is not carried into the model-ready obs. (Decision for Karin, section 7.)
+  - `subclass_label` is not carried into the model-ready obs.
+  - Each of the 382 cluster labels maps to exactly one official subclass, and only one of the 70 cell groups ("Vip") spans
+    two subclasses, so the mismatch is mostly naming (e.g. cell group `L5/6 IT CTX` is in subclass `L5 IT CTX`), not
+    mixing.
+  - **Decided (Karin, 2026-11-01):** check 10 keeps the 70 cell groups as pre-registered; the official subclass is an extra
+    column in the catalog export and the portal (`LeafletFA scripts/validation/c10_allen_subclass.py`,
+    `tsv/c10_Allen_group_subclass.tsv`).
 - **Dataset label:** by age; age 2 m → `allen_brain` (`align_splice_ge.py:125-127`).
 
 ## 2. Splicing data
@@ -97,7 +104,7 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
 | Cell files listed (frozen 2026-05-11 list) | 106,205 | 63,304 | 169,509 | `01_junctions/frozen_inputs/mouse_smartseq2_junction_files_2026-05-11.txt.gz` (md5 9136f2c521af8fbcb9e5c205b6445cb9) |
 | Readable (6 TMS 3 m files missing) | 106,199 | 63,304 | 169,503 | `P/logs/junc_15876961_*.err`; M |
 | Zero-read cells dropped | — | — | 169,501 | A:6-7 |
-| In both splicing and expression (and metadata) | 106,197 | 59,771 | 165,968 | A:20, 61-63 |
+| In both splicing and expression (and metadata) | 106,197 | 59,771 | 165,968 | A:20, 61-63; Allen loss: 3,533 runs without a metadata row (R2-named links, section 7) |
 | Common genes; zero-read cells dropped | — | — | 165,941 | A:65-72 |
 | Cell QC (≥ 5 junctions; ≤ median + 5 MAD on junctions, junction reads, expression counts) | 96,331 | 54,575 | 150,906 | A:74-92, 120-122 |
 | ≥ 500 detected junctions (after the junction filter and re-grouping) | **78,135** | **54,571** | **132,706** | F:181-190; obs |
@@ -171,29 +178,35 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
 
 ## 7. Gaps and decisions for Karin
 
-1. **Allen subclass labels for check 10 (decision).**
-   - The §111 labels (cluster label without number, 70 groups) match the official Allen `subclass_label` (42) for only
-     78.7 % of cells.
-   - Options: keep §111 labels (as pre-registered, consistent with SpliceVI §111); or switch to the official subclass,
-     joined from `metadata.csv` by cell id, which would be an amendment.
-   - The Allen check 10 run uses the §111 labels.
-2. **AB masked-imputation runs read the TMS masked test file.** The SpliceVI AB runs (`pipeline_20261001_012113_s5-ab-{devp,std}.log`)
-   list `RESAMPLED_90_PERCENT_test_30_70_TMS_ONLY` as their masked test path. Any AB masked-imputation number from them is
-   suspect (SpliceVI side).
+1. ~~Allen labels~~ **Resolved (Karin, 2026-11-01):** keep the 70 cell groups (cluster names) for check 10; official subclass added
+   as an extra column.
+2. ~~AB masked-imputation runs~~ **False alarm (checked 2026-11-01):** the two SpliceVI AB logs
+   (`pipeline_20261001_012113_s5-ab-{devp,std}.log`) list the TMS masked test file only in their config echo; both have
+   `SKIP_STEP4=true` and "STEP 4: SKIPPED (no evaluation)", so no masked-imputation evaluation ran. Confirmed independently
+   by the SpliceVI session (SpliceVI-utils STAGE5 §180, commit 9279810): no Allen masked-imputation number exists.
 3. **Long-read GTF:** the SpliceVI Methods cite it for this build; the build used GENCODE vM19. Was `lr_GRCm38.db`
    (Oct 2025) used by the 2025 build?
 4. **Allen cells vs nuclei:** no field says; the portal README says cells, SpliceVI Methods says nuclei.
 5. **Allen donor ages:** set to 2 m by config, not from data.
 6. **TMS consortium alignment** (aligner, version, settings) is not in our files; cite the consortium.
 7. **Origin of the TMS expression h5ad** (`...facsofficialrawobj.h5ad`): no download command found.
-8. **Code version of the May 2026 ATSEmapper run:** uncommitted. HEAD c072959 lacked the 14-column `smart_seq` parser fix that
-   was committed only on 1 Nov (298f2db).
+8. ~~ATSEmapper code version~~ **Snapshot (2026-11-01):** ATSEmapper branch `run-2026-05-11-snapshot`, commit 3807a85, tag
+   `atsemapper-run-2026-05-11` = c072959 plus the then-uncommitted `junction_parser.py` change. Evidence: the cpython-310
+   cache of `junction_parser.py` was compiled 2026-05-11 00:57 from a 7,509-byte source (the snapshot's file; c072959's is
+   7,450 bytes); `event_detection.py`, `main.py` and `genome_utils.py` were last compiled (cpython-312, 2026-05-06) from
+   sources of exactly c072959's sizes. Not checkable: edits to those three between 2026-05-06 and the run.
 9. **Missing 2026 side files:** `multi_gene_junctions`, `singleton_junctions`, `filtered_low_usage_junctions` were written to
    the job's working directory and were not found; counts come from L.
 10. **Unexplained losses:**
     - 6 unreadable TMS files;
     - 2 + 27 zero-read cells (not attributed to an atlas);
-    - 3,533 Allen cells lost at expression or metadata matching (no reason logged);
+    - ~~3,533 Allen cells~~ **cause found (2026-11-01):** all 3,533 have no row in the combined metadata, so they cannot be
+      linked to expression. The metadata join (`03_gene_expression/00_prepare_metadata.py:60-80`) matches
+      `sra_s3_links.txt` to the GEO metadata by the R1 FASTQ name, but for **3,375** of these runs the links file gives the
+      **R2** name (`…_R2.fastq.gz.1`; 3,859 R2 entries of 73,707 links); **3,362** of them would match after replacing `_R2`
+      with `_R1`, and all 3,362 are in the expression matrix. The other **158** are not in the links file at all (e.g.
+      SRR16390126, GSM5629176); 13 have an R2 name that still does not match. Recoverable in a rebuild; not changed
+      (no new processing).
     - per-atlas cell-QC removals not logged.
 11. **Split code version:** `createtesttrainmudata.py` first entered git on 2026-09-18, after the TMS (08-02) and pooled
     (06-18) splits; the version is attested only by the log CONFIG lines. The splits are not grouped by mouse (say so in

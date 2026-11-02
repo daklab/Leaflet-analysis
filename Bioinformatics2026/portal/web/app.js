@@ -75,13 +75,14 @@ function renderGene() {
     const rows = e.cell_types.filter(keep).sort((a, b) => (b.tv ?? 0) - (a.tv ?? 0));
     if (!rows.length) return "";
     const head = e.junctions.map((j, i) => `<th title="${j.id}">J${i + 1}</th>`).join("");
-    const body = rows.map((c) => `<tr><td class="name">${c.specific ? '<span class="star" title="cell-type-specific">★</span> ' : ""}${c.ct}</td>` +
+    const sub = (ct) => (CTMETA[ct] || {}).official_subclass ? ` <span class="meta">(${CTMETA[ct].official_subclass})</span>` : "";
+    const body = rows.map((c) => `<tr><td class="name">${c.specific ? '<span class="star" title="cell-type-specific">★</span> ' : ""}${c.ct}${sub(c.ct)}</td>` +
       c.psi.map((v, i) => `<td class="psi${v !== null && v > 0.7 ? " light" : ""}" style="background:${mako(v) ?? "transparent"}" ` +
         `title="ψ ${fmt(v)} [${fmt(c.lo[i])}–${fmt(c.hi[i])}]; rest of atlas ${fmt(c.rest[i])}">${fmt(v)}</td>`).join("") +
       `<td>${fmt(c.tv)}</td><td>${c.cells}</td><td>${c.cov}</td><td>${c.reads}</td></tr>`).join("");
     const coords = e.junctions.map((j, i) => `J${i + 1} ${j.chrom}:${j.start}-${j.end} (${j.strand})`).join(" · ");
     return `<div class="event"><h3>${e.event_id}</h3><div class="meta">${e.annotation} · ${coords}</div>${arcs(e.junctions)}` +
-      `<table><thead><tr><th class="name">Cell type</th>${head}<th title="total variation vs the rest of the atlas">TV</th>` +
+      `<table><thead><tr><th class="name">${INDEX.datasets[DS].type_label || "Cell type"}</th>${head}<th title="total variation vs the rest of the atlas">TV</th>` +
       `<th>cells</th><th>covering</th><th>reads</th></tr></thead><tbody>${body}</tbody></table></div>`;
   }).join("");
   $("gene-out").innerHTML = `<h2>${GENE.gene} <span class="meta">${DS}</span></h2>` + (out || `<p class="hint">No cell types pass the filters.</p>`);
@@ -90,7 +91,7 @@ function renderGene() {
 function fillCellTypes() {
   const f = $("ct-filter").value.toLowerCase();
   $("ct-select").innerHTML = INDEX.datasets[DS].cell_types.filter((c) => c.cell_type.toLowerCase().includes(f))
-    .map((c) => `<option value="${c.cell_type}">${c.cell_type} (${c.cells})</option>`).join("");
+    .map((c) => `<option value="${c.cell_type}">${c.cell_type}${c.official_subclass ? " [" + c.official_subclass + "]" : ""} (${c.cells})</option>`).join("");
 }
 
 let CTROWS = [], SORT = { k: "delta", d: -1 };

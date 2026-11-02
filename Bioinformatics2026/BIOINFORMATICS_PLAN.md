@@ -25,7 +25,7 @@ Bioinformatics2026/
 
 **Format: Original Paper (resource + method)** if check 10 (amendment 6) passes 10.1 and 10.2 a/b; **Application Note**
 as fallback. The resource is the **ATSE catalog with cell-type-resolved junction usage**: for every ATSE × cell type
-(TMS tissue–cell types; Allen subclasses), LeafletFA cell-type ψ with an uncertainty interval and a cell-type-specific
+(TMS tissue–cell types; Allen cell groups (cluster names), with the official Allen subclass as an extra column), LeafletFA cell-type ψ with an uncertainty interval and a cell-type-specific
 flag. Programs are no longer the headline; consensus programs move to the supplement. Human brain and bulk catalogs:
 supplement and portal only.
 
@@ -294,6 +294,6 @@ No new GPU training is needed. Everything above is plotting, CPU, or code.
 7. ~~DS~~ — resolved 2026-11-01: out of the paper, no LRT check; one Discussion line.
 8. ~~ATSEmapper tag~~ — resolved 2026-11-01: tag `v0.1.0` on 29 Nov with the Zenodo release.
 6. Author list and order (left as placeholders).
-9. Allen cell types for the catalog: subclass = Allen cluster label without its number (`cell_ontology_class`), as
-   pre-registered; say if you prefer another level.
+9. ~~Allen cell types~~ — resolved 2026-11-01: the 70 cell groups (cluster names, the cluster label without its number), called
+   "cell groups (cluster names)" in all text, not subclasses; official `subclass_label` as an extra column in export and portal.
 10. Atlas-size LeafletFA benchmark fit: ~0.5 GPU-h (b6k) — approve or use the existing dense atlas fit's log.
