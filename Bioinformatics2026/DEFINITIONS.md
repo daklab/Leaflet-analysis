@@ -117,6 +117,26 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
     130,200,982 → IIIb or IIIc; classified "alternative 3′ site") and `ENSMUSG00000030849.18_atse_4` the downstream pair
     (IIIb or IIIc → shared site 130,196,374); no junction links them (checked 2026-11-01 from the catalog var).
   - The geometric rule in the table never labels an ATSE "mutually exclusive": linked MXE ATSEs fall under "complex".
+  - **Counts** (SpliceVI session, STAGE5 §177; SpliceVI-utils `kisaev/experiments` commit 5bcadc7,
+    `stage5_s177_mxe_pairs.py`, output `screen_evals/s177/mxe_summary.tsv`, md5 6321feba517b48991e6148bd9d904bb0,
+    verified here; the catalog var, 79,768 junctions in 24,475 ATSEs). Definition, geometry only: an MXE-style pair is
+    four distinct junctions of one gene and strand, (L, b1), (a1, R), (L, b2), (a2, R), with exon 1 = [b1+1, a1] before
+    exon 2 = [b2+1, a2]; linked = all four in one ATSE; split = two ATSEs (never more: the two junctions at L share a
+    site, as do the two at R); strict = additionally no junction joins exon 1 to exon 2.
+
+    | Subset | Pairs | Linked (one ATSE) | Split (two ATSEs) | ATSEs with ≥ 1 linked pair | ATSE pairs holding a split pair | ATSEs in split pairs |
+    |---|---|---|---|---|---|---|
+    | all | 4,568 | 4,265 (93.4 %) | 303 (6.6 %) | 1,034 (4.2 %) | 143 | 265 |
+    | strict | 1,155 | 852 (73.8 %) | 303 (26.2 %) | 282 (1.2 %) | 143 | 265 |
+
+    - A junction joining exon 1 to exon 2 shares a site with both halves, so a joined pair is always linked (0
+      exceptions); hence the same split count in both rows. Most "all" pairs are joined structures (e.g. tandem exons
+      that can both be included). Pairs are counted per quadruple, so one ATSE can hold several.
+    - *Gria2* flip/flop is joined (the catalog has a flip–flop junction): linked, 2 pairs in `atse_3`, outside the strict
+      subset, so "strict" does not mean "annotated MXE". *Fgfr2* IIIb/IIIc is 1 split pair (`atse_4` genomic-left,
+      `atse_3` genomic-right; minus strand).
+    - Ledger macros for these counts are in the SpliceVI ledger (`MxePairsAll`, `MxePairsLinked`, `MxePairsSplit`,
+      `MxeAtsesLinked`, `MxeStrict*`).
 - These labels are geometric. A 2-junction "alternative 3′ site" ATSE can also be the upstream half of an MXE or an
   alternative last exon.
 
