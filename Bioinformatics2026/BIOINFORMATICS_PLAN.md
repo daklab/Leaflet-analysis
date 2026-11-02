@@ -86,6 +86,7 @@ coverage is reported prominently (main Fig. 3c, abstract if it falls short), and
 from per-draw TV.
 
 ### Methods text shared with SpliceVI
+Mutually exclusive exons (corrected 2026-11-01): "A mutually exclusive exon pair forms one ATSE only if another junction links its two halves; otherwise it appears as two ATSEs, an alternative-3' and an alternative-5' pair." (DEFINITIONS.md 1.6; *Gria2* flip/flop linked, *Fgfr2* IIIb/IIIc unlinked).
 The ratio-redrawing test is described in full in the LeafletFA Methods (self-contained: null construction, embedding,
 kNN protocol, reading), citing the SpliceVI companion paper as where it is applied across methods (Karin, 2026-11-01).
 The ATSE definition paragraph in `manuscript/leafletfa_main.tex` (Methods, "ATSEmapper and the ATSE catalog"; from

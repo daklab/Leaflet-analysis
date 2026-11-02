@@ -108,11 +108,15 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
 | Complex (all other 3-junction ATSEs and every ATSE with ≥ 4 junctions) | 8,090 | 33.1 % |
 
 - **Junctions per ATSE:** 2: 10,677; 3: 7,600; 4: 2,381; 5: 1,561; 6: 807; ≥ 7: the rest. Mean 3.26.
-- **Mutually exclusive exons are never one ATSE under this definition.** The two upstream junctions share a donor and the
-  two downstream junctions share an acceptor, but the pairs share no splice site. An MXE event therefore appears as two
-  ATSEs, an alternative-3′ and an alternative-5′ pair.
-  - Example: *Fgfr2* `ENSMUSG00000030849.18_atse_3` is the **upstream junction pair** of the IIIb/IIIc mutually exclusive
-    exons (shared exon-7 donor → IIIb or IIIc), classified "alternative 3′ site".
+- **Mutually exclusive exons (corrected 2026-11-01, from the SpliceVI session).** A mutually exclusive exon pair forms one
+  ATSE only if another junction links its two halves; otherwise it appears as two ATSEs, an alternative-3′ and an
+  alternative-5′ pair. (The two upstream junctions share a donor and the two downstream junctions share an acceptor; the
+  pairs share no splice site unless a third junction, e.g. one that skips both exons or joins them, connects them.)
+  - **Linked, one ATSE:** *Gria2* flip/flop, `ENSMUSG00000033981.14_atse_3`, 7 junctions.
+  - **Unlinked, two ATSEs:** *Fgfr2* IIIb/IIIc. `ENSMUSG00000030849.18_atse_3` is the upstream pair (shared exon-7 site
+    130,200,982 → IIIb or IIIc; classified "alternative 3′ site") and `ENSMUSG00000030849.18_atse_4` the downstream pair
+    (IIIb or IIIc → shared site 130,196,374); no junction links them (checked 2026-11-01 from the catalog var).
+  - The geometric rule in the table never labels an ATSE "mutually exclusive": linked MXE ATSEs fall under "complex".
 - These labels are geometric. A 2-junction "alternative 3′ site" ATSE can also be the upstream half of an MXE or an
   alternative last exon.
 
