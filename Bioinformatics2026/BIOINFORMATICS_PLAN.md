@@ -39,8 +39,8 @@ supplement and portal only.
 - **Results:** ATSEmapper defines events; LeafletFA, a Dirichlet-multinomial factor model, estimates junction usage per
   cell and per cell type with intervals. Against held-out pseudobulk it is [TBD: as or more accurate, most for small /
   shallow types] (10.1); its cell-type-specific calls [TBD: replicate across mice] (10.2); known switches (*Fgfr2*,
-  *Ptprc*, *Nrxn* SS4) are recovered (10.4). Its per-cell representation reads junction usage, beats fair nulls on
-  held-out reads, and per-cell usage reproduces across 15 seeds (r \PerCellPsiSeedR{}) although programs do not.
+  *Ptprc*, *Nrxn* SS4) are recovered (10.4). Its per-cell representation beats fair nulls on held-out reads and reads junction usage
+  (shown in the companion paper), and per-cell usage reproduces across 15 seeds (r \PerCellPsiSeedR{}) although programs do not.
 - **Availability:** catalog (Zenodo) with a static portal; ATSEmapper and LeafletFA (two repositories, one toolkit).
 
 ### Main figures (Original Paper)
@@ -48,7 +48,7 @@ supplement and portal only.
 | Fig | Content | Panels and sources | Status |
 |---|---|---|---|
 | **1 ATSEmapper and the catalog** | events, catalog size, coverage | a schematic (draw); b catalog per dataset, mouse only (`supplemental/data_quality/output/supp_dataset_coverage_mouse_smartseq2_summary.csv`); c junctions per ATSE, ATSEs per gene (`supp_exons_vs_atses_*.csv`); d coverage per cell; e duplicate reads (drop if not rebuilt by 8 Nov; cite SpliceVI Supp. Fig. S1) | plot / draw |
-| **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); c ratio redrawing, kNN (checks 2–3, `c2_K_prior.tsv`, `c3_*_seed_knn.tsv`); d per-cell ψ across 15 seeds (r 0.998; `c9a_jaccard.tsv`, recompute on all cells) next to program recurrence (check 8); e benchmark: time and memory, LeafletFA vs scQuint and the LeafCutter catalog (10.6) | plot; benchmark to run |
+| **2 Model, scale and representation checks** | what LeafletFA is and that its per-cell representation is sound | a model schematic; b held-out log-likelihood vs fair nulls (check 1, `tsv/c1_*`); **c per-cell ψ stability across 15 seeds, enlarged** (r per seed pair, 0.998; `c9a_jaccard.tsv`, recompute on all cells) beside program recurrence (check 8: 4 of 110 live-program clusters recur in ≥ 60 % of fits), with kNN stability on real data per seed (check 3) as a small inset; d benchmark: time and memory, LeafletFA vs scQuint and the LeafCutter catalog (10.6). **The ratio-redrawing test is not shown** (Karin, 2026-11-01): it is in SpliceVI Fig. 1, where LeafletFA is one of the models; Results cite it, and the all-K numbers are a supplementary table (`paper/supplementary/table_ratio_redrawing_all_programs.tsv`) | plot; benchmark to run |
 | **3 Cell-type ψ accuracy vs pseudobulk** | the resource is more accurate than the obvious alternative | a error vs TEST pseudobulk by type size; b by read depth; c interval coverage (10.3); d example events | check 10.1, 10.3 (to run) |
 | **4 Cell-type-specific splicing** | calls, replication, known biology, portal | a δ and number of specific (event, type) per type; b replication across mice vs permuted null (10.2a/b), across seeds (10.2c); c *Fgfr2* (the upstream junction pair of the IIIb/IIIc mutually exclusive exons), *Ptprc*, *Nrxn1–3* SS4 (10.4; *Fgfr2* rebuilt on TMS fits); d portal screenshot | check 10.2, 10.4 (to run); portal |
 
@@ -59,14 +59,13 @@ Supplementary Note 1 (duplicate reads), catalog filter chain (`CATALOG_NUMBERS.m
 
 ### Application Note (fallback if check 10 fails 10.1 or 10.2 a/b)
 One figure: a ATSEmapper and catalog; b model; c estimation accuracy vs pseudobulk by cell-type size; d specificity
-replication and known-biology examples; e representation checks (ratio redrawing, held-out likelihood, per-cell ψ across
-seeds). Two pages; the portal and catalog as the deliverable; claims limited to what passed.
+replication and known-biology examples; e representation checks (held-out likelihood, per-cell ψ across seeds; ratio redrawing cited from SpliceVI). Two pages; the portal and catalog as the deliverable; claims limited to what passed.
 
 ### Paper center (Original Paper)
 1. The catalog: cell-type ψ with intervals, more accurate than pseudobulk where data are thin (10.1, 10.3).
 2. Cell-type-specific splicing that replicates across mice, with known biology recovered (10.2, 10.4).
-3. The model's per-cell representation is sound: reads junction usage, beats fair nulls, per-cell usage reproduces
-   across seeds although programs do not.
+3. The model's per-cell representation is sound: beats fair nulls on held-out reads, per-cell usage reproduces across seeds
+   although programs do not; that it reads junction usage is shown in the SpliceVI paper (Fig. 1) and cited.
 4. ATSEmapper and the toolkit; the portal.
 
 ### Portal (start now; Karin, 2026-11-01)
@@ -87,8 +86,9 @@ from per-draw TV.
 
 ### Methods text shared with SpliceVI
 Mutually exclusive exons (corrected 2026-11-01): "A mutually exclusive exon pair forms one ATSE only if another junction links its two halves; otherwise it appears as two ATSEs, an alternative-3' and an alternative-5' pair." (DEFINITIONS.md 1.6; *Gria2* flip/flop linked, *Fgfr2* IIIb/IIIc unlinked).
-The ratio-redrawing test is described in full in the LeafletFA Methods (self-contained: null construction, embedding,
-kNN protocol, reading), citing the SpliceVI companion paper as where it is applied across methods (Karin, 2026-11-01).
+The ratio-redrawing test is shown only in the SpliceVI paper (Fig. 1). The LeafletFA Methods describe it in two sentences
+and cite SpliceVI; the LeafletFA Results cite SpliceVI Fig. 1 for the result (Karin, 2026-11-01, superseding the
+self-contained description).
 The ATSE definition paragraph in `manuscript/leafletfa_main.tex` (Methods, "ATSEmapper and the ATSE catalog"; from
 `DEFINITIONS.md`) is the wording both papers use for the definition. The event-type table is Supplementary Table
 (`tab:eventtypes`).
@@ -147,7 +147,9 @@ toolkit** (ATSEmapper defines and counts events; LeafletFA models them). Merge i
 | GB simulation vs NMF and DS calibration (GB Fig. 2 a–h) | **drop** (Karin, 2026-11-01) | not validated (check 5b: "not checked"); different simulation from check 4 |
 | Held-out imputation grid, uncertainty calibration (GB S10, `_imputation_uncertainty`) | **hold** | "not checked" in 5b; re-score on the validated fits if wanted |
 | Catalog (GB S1 data quality), duplicate reads (Supp. Note 1) | **keep, main Fig. 1** | descriptive; reproduced (5b atlas size) |
-| Held-out likelihood, kNN with ratios redrawn, seed stability, simulation recovery | **keep, main Figs 2–3** | checks 1–4 passed |
+| Held-out likelihood, seed stability, per-cell ψ across seeds | **keep, main Fig. 2** | checks 1, 3, 9a |
+| Ratio-redrawing test (kNN with ratios redrawn) | **cited from SpliceVI Fig. 1**; all-K numbers in a supplementary table | shown once, in the SpliceVI paper (Karin, 2026-11-01) |
+| Simulation recovery | supplement | check 4 |
 | Consensus programs, *Fgfr2* covered vs uncovered | **keep, main Fig. 4** | check 8; rebuilt 2026-10-31 |
 
 **Supplement (planned):**

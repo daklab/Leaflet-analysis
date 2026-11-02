@@ -128,8 +128,10 @@ figures:
     title: "The model and what its per-cell representation reads"
     width: double
     # 2a = model schematic, drawn by Karin in Affinity: slot 70 x 55 mm.
-    panels: {2a: {w: 70, h: 55, note: "model schematic\n(Karin, Affinity)"}, 2b: {w: 106, h: 55}, 2c: {w: 58, h: 50}, 2d: {w: 58, h: 50}, 2e: {w: 58, h: 50}}
-    layout: [[2a, 2b], [2c, 2d, 2e]]   # e = per-cell usage reproduces across 15 seeds while programs do not (check 9a + 8)
+    # c = per-cell psi stability across 15 seeds (enlarged; with program recurrence and kNN-per-seed inset); d = benchmark.
+    # The ratio-redrawing test is not shown (SpliceVI Fig. 1; Karin 2026-11-01).
+    panels: {2a: {w: 70, h: 55, note: "model schematic\n(Karin, Affinity)"}, 2b: {w: 106, h: 55}, 2c: {w: 106, h: 55}, 2d: {w: 70, h: 55}}
+    layout: [[2a, 2b], [2c, 2d]]
   "3":
     title: "Recovery on data simulated from the model"
     width: double

@@ -89,22 +89,12 @@ runtime; the definition and filters are in the shared paragraph above and DEFINI
 \todo{Model (from methods\_CURRENT.tex, rewritten to Bioinformatics length).}
 
 \subsection{Ratio-redrawing test}
-% Self-contained (Karin, 2026-11-01); the SpliceVI companion paper applies the same test across methods. Settings from
-% LeafletFA scripts/splicevi_baseline/knn_check.py and the shared test inputs (SpliceVI STAGE5 §170). \unsure = to verify.
-Because a cell detects an event mostly when its gene is expressed, a splicing representation can separate cell types from
-which events are detected rather than from how their junctions are used. To measure what the representation reads, we
-built a null version of the held-out test cells that keeps, for every cell, which events have reads and how many reads
-each has, but removes cell-type information from the junction ratios: the reads of each observed (cell, event) pair were
-redrawn from a multinomial with the cell's own read total and the event's population junction ratios
-\unsure{(estimated on the training cells)}. A second null set the reads to the read total times the population ratios
-exactly, without sampling noise. LeafletFA embedded the real and the null test cells with the same frozen fit (E-step,
-Section~\ref{sec:model}), and each cell was represented by its centered log program weights (all $K$ programs; weights
-clipped at $10^{-6}$; standardized). Cell-type accuracy is that of a $k$-nearest-neighbor classifier ($k = 15$) with labels
-of tissue and broad cell type, in four folds grouped by mouse with a fixed fold assignment, averaged over folds. The drop
-in accuracy from the real cells to the redrawn null measures how much of the representation's cell-type structure depends
-on junction usage rather than on detection; a drop of at least 0.10 was pre-specified as reading junction usage
-\cite{SpliceVI2026}. The companion paper \cite{SpliceVI2026} applies this test to SpliceVI and other splicing models, using
-LeafletFA's programs used by cells (mean training weight $> 0.01$); here we report all $K$ programs.
+% Two sentences plus citation (Karin, 2026-11-01); the test and its result are shown in SpliceVI Fig. 1.
+To test whether the per-cell representation reflects junction usage rather than which events a cell detects, held-out
+cells were embedded after their junction reads were redrawn from the population ratios with each cell's events and read
+totals kept, and the drop in cell-type $k$-nearest-neighbor accuracy was measured \cite{SpliceVI2026}. The test and its
+result across splicing models, including LeafletFA, are reported in the companion paper \cite{SpliceVI2026}; the values
+for all $K$ programs are in Supplementary Table~\ref{S-tab:ratioredraw}.
 
 \subsection{Validation design}
 % Pre-registered checks (LeafletFA_validation/VALIDATION_PREREG.md): held-out likelihood (event split), kNN with ratios redrawn,
@@ -123,10 +113,11 @@ LeafletFA's programs used by cells (mean training weight $> 0.01$); here we repo
 \label{fig:1}
 \end{figure*}
 
-\subsection{LeafletFA's per-cell representation reads junction usage and fits held-out reads}
+\subsection{LeafletFA's per-cell representation fits held-out reads and is stable across seeds}
 % Held-out gain per read over the population null: \HeldoutGainPopulationTMS{} (TMS), \HeldoutGainPopulationAllen{} (Allen).
-% Ratios redrawn: kNN drops by \KnnDropRatiosTMS{}. Seed range \SeedKnnRangeTMS{} / \SeedKnnRangeAllen{}.
-% Per-cell imputed usage (rho = phi . psi) reproduces across 15 seeds: r \PerCellPsiSeedR{} over 105 fit pairs (Fig. 2e),
+% That the representation reads junction usage is shown in SpliceVI Fig. 1 (cite \cite{SpliceVI2026}; all-K values in
+% Supplementary Table S-tab:ratioredraw, e.g. drop \KnnDropRatiosTMS{} for K = 20 seed 0). Seed range \SeedKnnRangeTMS{} / \SeedKnnRangeAllen{}.
+% Per-cell imputed usage (rho = phi . psi) reproduces across 15 seeds: r \PerCellPsiSeedR{} over 105 fit pairs (Fig. 2c),
 % while only 4 of the live-program clusters recur (check 8): programs are not identifiable, per-cell junction usage is.
 \todo{Fig.~\ref{fig:2}.}
 
