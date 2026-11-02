@@ -22,9 +22,9 @@ def _inp(cfg, key):
 
 
 def _fill(cfg, key):
-    """filled for TMS, open for Allen, as in the `data` block"""
-    e = cfg["data"][key]; c = color(cfg, key)
-    return dict(facecolor=c if e["filled"] else "white", edgecolor=c, linewidth=0.6)
+    """the dataset's color (data block: slate = TMS, sage = Allen Brain)"""
+    c = color(cfg, key)
+    return dict(facecolor=c, edgecolor=c, linewidth=0.6)
 
 
 def _log_ticks(ax, lo, hi, axis="y"):
@@ -33,24 +33,48 @@ def _log_ticks(ax, lo, hi, axis="y"):
     (ax.set_yticklabels if axis == "y" else ax.set_xticklabels)([f"$10^{{{x}}}$" for x in k])
 
 
+Q1B = [("cells", "Cells"), ("junctions", "Junctions with reads"), ("atses", "ATSEs with reads"), ("genes", "Genes with reads")]
+
+
 def panel_1b(cfg, fig):
-    """Catalog per dataset: cells, and junctions, ATSEs and genes with reads in that dataset (log scale, values printed).
-    Input: inputs.fig1.catalog."""
+    """Catalog per dataset as small multiples: one row per quantity, each on its own linear scale starting at 0 (values
+    printed; no shared axis). Input: inputs.fig1.catalog."""
+    from style import container_mm
+    w, h = container_mm(fig)
     d = pd.read_csv(_inp(cfg, "catalog"), sep="\t").set_index("dataset")
-    q = [("cells", "Cells"), ("junctions", "Junctions"), ("atses", "ATSEs"), ("genes", "Genes")]
-    ax = axes_in(fig, (17, 8, 12, 2.5))
-    h = 0.36
-    for i, (ds, key) in enumerate(DATASETS):
-        y = np.arange(len(q)) + (i - 0.5) * h
-        v = [d.loc[ds, c] for c, _ in q]
-        ax.barh(y, v, height=h, label=cfg["data"][key]["label"], **_fill(cfg, key))
-        for yy, vv in zip(y, v):
-            ax.text(vv * 1.08, yy, f"{vv:,}", va="center", ha="left", fontsize=cfg["style"]["font"]["small_pt"])
-    ax.set_xscale("log"); ax.set_xlim(5e3, 2.5e5)
-    ax.set_xticks([1e4, 1e5]); ax.set_xticklabels(["$10^{4}$", "$10^{5}$"])
-    ax.set_yticks(np.arange(len(q))); ax.set_yticklabels([l for _, l in q]); ax.invert_yaxis()
-    ax.set_xlabel("Count (log scale)")
-    ax.legend(loc="lower right", frameon=False)
+    fs = cfg["style"]["font"]["small_pt"]
+    top, rowh = 6.0, (h - 6.0 - 2.0) / len(Q1B)
+    for i, (col, lab) in enumerate(Q1B):
+        ax = axes_in(sub_slot(fig, 0, h - top - (i + 1) * rowh, w, rowh), (30, 1.0, 18, 1.0))
+        v = [d.loc[ds, col] for ds, _ in DATASETS]
+        ax.barh([0, 1], v, height=0.75, color=[color(cfg, k) for _, k in DATASETS])
+        for yy, vv in zip([0, 1], v):
+            ax.text(vv + max(v) * 0.02, yy, f"{vv:,}", va="center", ha="left", fontsize=fs)
+        ax.set_xlim(0, max(v) * 1.18); ax.set_ylim(1.6, -0.6)
+        ax.set_yticks([0.5]); ax.set_yticklabels([lab]); ax.tick_params(axis="y", length=0)
+        ax.set_xticks([]); ax.spines["bottom"].set_visible(False)
+    import matplotlib.patches as mpatches
+    hs = [mpatches.Patch(color=color(cfg, k), label=cfg["data"][k]["label"]) for _, k in DATASETS]
+    lax = axes_in(sub_slot(fig, 0, h - top, w, top), (30, 0, 2, 0)); lax.axis("off")
+    lax.legend(handles=hs, loc="center left", ncol=2, frameon=False)
+
+
+def panel_1b_table(cfg, fig):
+    """Alternative to 1b: the catalog per dataset as a compact table (no bars). Input: inputs.fig1.catalog."""
+    d = pd.read_csv(_inp(cfg, "catalog"), sep="\t").set_index("dataset")
+    ax = axes_in(fig, (1, 1, 1, 1)); ax.axis("off")
+    fs = cfg["style"]["font"]["size_pt"]
+    cols = [cfg["data"][k]["label"] for _, k in DATASETS]
+    ys = np.linspace(0.78, 0.08, len(Q1B))
+    for j, (ds, k) in enumerate(DATASETS):
+        x = 0.62 + 0.22 * j
+        ax.text(x, 0.95, cols[j], ha="right", va="center", fontsize=fs, fontweight="bold", color=color(cfg, k))
+        for y, (col, _) in zip(ys, Q1B):
+            ax.text(x, y, f"{d.loc[ds, col]:,}", ha="right", va="center", fontsize=fs)
+    for y, (_, lab) in zip(ys, Q1B):
+        ax.text(0.02, y, lab, ha="left", va="center", fontsize=fs)
+    ax.plot([0.02, 0.86], [0.87, 0.87], color=cfg["palette"]["ink"], linewidth=0.5)
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
 
 
 def panel_1c(cfg, fig):
@@ -62,11 +86,10 @@ def panel_1c(cfg, fig):
     ax = axes_in(sub_slot(fig, 0, 0, w * 0.55, h), (19, 8, 6, 2.5))
     ax.barh(np.arange(len(E)), E.atses, color=cfg["palette"]["dark_gray"], height=0.6)
     for i, r in E.iterrows():
-        ax.text(r.atses * 1.02, i, f"{100 * r.share:.0f}%", va="center", fontsize=cfg["style"]["font"]["small_pt"])
+        ax.text(r.atses * 1.03, i, f"{r.atses:,}\n({100 * r.share:.0f}%)", va="center", fontsize=cfg["style"]["font"]["small_pt"], linespacing=0.95)
     ax.set_yticks(np.arange(len(E))); ax.set_yticklabels([t.replace("alt", "Alt.").replace("skipped", "Skipped").replace("complex", "Complex")
                                                           for t in E.event_type]); ax.invert_yaxis()
-    ax.set_xlabel("ATSEs"); ax.set_xlim(0, E.atses.max() * 1.3); ax.xaxis.set_major_formatter(COMMA)
-    ax.set_xticks([0, 4000, 8000])
+    ax.set_xlim(0, E.atses.max() * 1.6); ax.set_xticks([]); ax.spines["bottom"].set_visible(False)
     M = pd.read_csv(_inp(cfg, "junctions_per_atse"), sep="\t")
     m7 = M[M.junctions_per_atse >= 7].atses.sum()
     M = pd.concat([M[M.junctions_per_atse < 7], pd.DataFrame([dict(junctions_per_atse=7, atses=m7)])])
@@ -84,35 +107,35 @@ def panel_1d(cfg, fig):
     C = pd.read_csv(_inp(cfg, "per_cell"), sep="\t")
     fs = cfg["style"]["font"]["small_pt"]
     for j, (col, lab) in enumerate((("junctions_with_reads", "Junctions with reads\nper cell"), ("atses_with_reads", "ATSEs with reads\nper cell"))):
-        ax = axes_in(sub_slot(fig, j * w * 0.3, 0, w * 0.3, h), (10, 8, 1.5, 2.5))
+        ax = axes_in(sub_slot(fig, j * w * 0.31, 0, w * 0.31, h), (10, 8, 1.0, 2.5))
         vals = [np.log10(np.maximum(C[C.dataset == ds][col].values, 1)) for ds, _ in DATASETS]
         vp = ax.violinplot(vals, positions=[0, 1], showextrema=False, widths=0.8)
         for b, (ds, key) in zip(vp["bodies"], DATASETS):
-            b.set_facecolor(color(cfg, key) if cfg["data"][key]["filled"] else "white"); b.set_edgecolor(color(cfg, key))
-            b.set_alpha(0.35 if cfg["data"][key]["filled"] else 1); b.set_linewidth(0.6)
+            b.set_facecolor(color(cfg, key)); b.set_edgecolor(color(cfg, key)); b.set_alpha(0.55); b.set_linewidth(0.6)
         ax.boxplot(vals, positions=[0, 1], widths=0.18, showfliers=False, medianprops=dict(color=cfg["palette"]["ink"], linewidth=1),
                    boxprops=dict(linewidth=0.6), whiskerprops=dict(linewidth=0.6), capprops=dict(linewidth=0))
         for i, v in enumerate(vals):
             ax.text(i, np.quantile(v, 0.999) + 0.05, f"{10 ** np.median(v):,.0f}", ha="center", va="bottom", fontsize=fs)
-        ax.set_xticks([0, 1]); ax.set_xticklabels([cfg["data"][k]["label"] for _, k in DATASETS])
+        ax.set_xticks([0, 1]); ax.set_xticklabels([cfg["data"][k]["label"].replace(" ", "\n") for _, k in DATASETS])
         lo, hi = min(map(np.min, vals)), max(map(np.max, vals))
         _log_ticks(ax, lo, hi); ax.set_ylabel(lab)
     R = pd.read_csv(_inp(cfg, "reads_per_event"), sep="\t")
-    ax = axes_in(sub_slot(fig, 0.6 * w, 0, 0.4 * w, h), (11.5, 8, 2.5, 2.5))
+    ax = axes_in(sub_slot(fig, 0.62 * w, 0, 0.38 * w, h), (10, 11, 1.5, 2.5))
     for ds, key in DATASETS:
         r = R[R.dataset == ds]; f = r.observed_events / r.observed_events.sum()
         ax.plot(np.log2(r.reads_from), f, color=color(cfg, key), linestyle=cfg["data"][key]["linestyle"],
-                marker=cfg["data"][key]["marker"], ms=2.5, mfc=color(cfg, key) if cfg["data"][key]["filled"] else "white",
+                marker=cfg["data"][key]["marker"], ms=2.2, mfc=color(cfg, key),
                 label=cfg["data"][key]["label"])
     ax.set_xticks([0, 2, 4, 6, 8]); ax.set_xticklabels(["1", "4", "16", "64", "256"])
     ax.set_xlabel("Reads per observed\n(cell, ATSE)"); ax.set_ylabel("Fraction of observed\n(cell, ATSE)")
-    ax.set_xlim(-0.5, 9); ax.set_ylim(0, None)
-    ax.legend(loc="upper right", frameon=False)
+    ax.set_xlim(-0.5, 9); ax.set_ylim(0, 0.4); ax.set_yticks([0, 0.1, 0.2, 0.3])
+    ax.legend(loc="upper right", frameon=False, handlelength=1.6, borderaxespad=0.1)
 
 
-PANELS = {"1b": panel_1b, "1c": panel_1c, "1d": panel_1d}
+PANELS = {"1b": panel_1b, "1b_table": panel_1b_table, "1c": panel_1c, "1d": panel_1d}
 SOURCE_DATA = {
     "1b": lambda cfg: {"fig1b_catalog": pd.read_csv(_inp(cfg, "catalog"), sep="\t")},
+    "1b_table": lambda cfg: {},
     "1c": lambda cfg: {"fig1c_event_types": pd.read_csv(_inp(cfg, "event_types"), sep="\t"),
                        "fig1c_junctions_per_atse": pd.read_csv(_inp(cfg, "junctions_per_atse"), sep="\t")},
     "1d": lambda cfg: {"fig1d_quantiles": pd.read_csv(_inp(cfg, "quantiles"), sep="\t"),

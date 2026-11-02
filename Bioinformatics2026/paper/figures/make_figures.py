@@ -87,6 +87,13 @@ def build_assembled(cfg, fig_id, gap_mm=2.0):
     layout, plus panel letters; slots without code are gray placeholders (schematics drawn in Affinity). A layout row is a
     list of cells; a cell is a panel id or a list of panel ids stacked top to bottom (e.g. [1a, [1c, 1b]])."""
     fc, st = cfg["figures"][fig_id], cfg["style"]
+    lay = os.environ.get("FIG_LAYOUT", "layout")                                    # alternative layouts named in the config
+    if lay != "layout":
+        fc = dict(fc, layout=fc[lay]); fc["panels"] = {k: dict(v) for k, v in fc["panels"].items()}
+        for k in list(fc["panels"]):
+            if os.environ.get(f"FIG_W_{k}"):
+                fc["panels"][k]["w"] = float(os.environ[f"FIG_W_{k}"])
+        cfg = dict(cfg, figures=dict(cfg["figures"], **{fig_id: fc}))
     page_w = st["width_mm"][fc["width"]]
     flat = lambda row: [p for c in row for p in (c if isinstance(c, list) else [c])]   # noqa: E731
     rows = [(row, max(_cell_size(cfg, fig_id, c, flat(row), gap_mm)[1] for c in row)) for row in fc["layout"]]
@@ -117,7 +124,8 @@ def build_assembled(cfg, fig_id, gap_mm=2.0):
                 yc -= h + gap_mm
             x += cw + gap_mm
         y -= rh + gap_mm
-    path = save(cfg, page, os.path.join(cfg["output_dir"], f"fig{fig_id}", f"fig{fig_id}"))
+    suffix = "" if lay == "layout" else "_" + lay
+    path = save(cfg, page, os.path.join(cfg["output_dir"], f"fig{fig_id}", f"fig{fig_id}{suffix}"))
     print(f"[FIG] assembled {path} ({page_w} x {page_h:.0f} mm)")
 
 

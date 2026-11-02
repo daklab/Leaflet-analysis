@@ -27,9 +27,11 @@ style:
     marker_pt: 3.5
   panel_label: {case: lower, bold: true}   # "a", "b", ... (keep one case throughout)
 
+# slate / sage = the two DATASET colors (TMS / Allen Brain; added 2026-11-01, shared with the SpliceVI paper): muted, L* 40 / 71,
+# dE 46 between them (43-44 under deuteranopia / protanopia), >= 17 from every other token; never used for a method.
 # Theme palette (CIELAB lightness ladder; color-blind and grayscale safe). Hard limit: five series colors per panel;
 # gray = non-focal context only, never a compared series; rose = null / shuffled / negative control only.
-palette: {teal: "#006865", indigo: "#657BB5", ochre: "#B79B51", rose: "#ECB0CA", olive: "#3A4621", gray: "#6E7478", ink: "#222222", dark_gray: "#262A2E", light_gray: "#B8BEC3", yellow: "#F2BE2E"}   # yellow = SpliceVI splicing only (close to the original logo yellow #FFD454, a bit deeper so thin lines and dots show on white; L* 80, like rose); dark_gray = the standard reference method (LeafCutter); L* 17, >= 8 from every series color
+palette: {slate: "#5E5A7A", sage: "#A8B39A", teal: "#006865", indigo: "#657BB5", ochre: "#B79B51", rose: "#ECB0CA", olive: "#3A4621", gray: "#6E7478", ink: "#222222", dark_gray: "#262A2E", light_gray: "#B8BEC3", yellow: "#F2BE2E"}   # yellow = SpliceVI splicing only (close to the original logo yellow #FFD454, a bit deeper so thin lines and dots show on white; L* 80, like rose); dark_gray = the standard reference method (LeafCutter); L* 17, >= 8 from every series color
 
 # How every plotted thing looks (same rules as SpliceVI: each key defined once; colors are palette tokens; panel code reads
 # them with style.color / style.method_style). LeafletFA keeps the SpliceVI papers' ochre so a reader of both papers sees
@@ -46,8 +48,8 @@ methods:
   baseline:         {label: "Depth-matched baseline",            color: light_gray, marker: o,  linestyle: "--", filled: false}
 
 data:
-  tms_data:         {label: "TMS",                               color: ink,       marker: s,   linestyle: "-",  filled: true}
-  allen_data:       {label: "Allen Brain",                       color: ink,       marker: o,   linestyle: "--", filled: false}
+  tms_data:         {label: "TMS",                               color: slate,     marker: s,   linestyle: "-",  filled: true}
+  allen_data:       {label: "Allen Brain",                       color: sage,      marker: o,   linestyle: "--", filled: true}
   truth:            {label: "Simulated truth",                   color: gray,      marker: o,   linestyle: "--", filled: true}
   raw_reads:        {label: "Raw reads",                         color: gray,      marker: o,   linestyle: "-",  filled: false}
 
@@ -115,9 +117,13 @@ figures:
     formats: [pdf, svg, png]
     # 1a = ATSEmapper schematic, drawn by Karin in Affinity: slot 70 x 50 mm. 1e = duplicate reads: placeholder until
     # 8 Nov (rebuilt or dropped, then SpliceVI Supp. Fig. S1 is cited).
-    panels: {1a: {w: 70, h: 50, note: "ATSEmapper schematic\n(Karin, Affinity)"}, 1b: {w: 106, h: 50}, 1c: {w: 88, h: 48}, 1d: {w: 88, h: 48},
-             1e: {w: 58, h: 40, note: "duplicate reads\n(rebuild or drop by 8 Nov)"}}
-    layout: [[1a, 1b], [1c, 1d], [1e]]
+    panels: {1a: {w: 70, h: 50, note: "ATSEmapper schematic\n(Karin, Affinity)"}, 1b: {w: 106, h: 50}, 1b_table: {w: 106, h: 40},
+             1c: {w: 58, h: 50}, 1d: {w: 78, h: 50}, 1e: {w: 38, h: 50, note: "duplicate reads\n(by 8 Nov)"}}
+    # Layout with 1e (until the 8 Nov decision): 1a 70 + 1b 106 / 1c 58 + 1d 78 + 1e 38 (mm, 2 mm gaps) = 178 x 102 mm.
+    # Layout without 1e (if dropped): 1a 70 + 1b 106 / 1c 88 + 1d 88, i.e. set 1c and 1d to w: 88 and use
+    # layout_without_1e (FIG_LAYOUT=layout_without_1e FIG_W_1c=88 FIG_W_1d=88 for the preview). 1b_table is the alternative to 1b (compact table), built as its own panel, not in the layout.
+    layout: [[1a, 1b], [1c, 1d, 1e]]
+    layout_without_1e: [[1a, 1b], [1c, 1d]]
   "2":
     title: "The model and what its per-cell representation reads"
     width: double
