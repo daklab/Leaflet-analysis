@@ -33,5 +33,6 @@ stored in a different folder layout, were missed when the input files were liste
 
 \paragraph{Training and test cells.}
 Each atlas was split at random into 70\% training and 30\% test cells, stratified by broad cell type and age (random seed
-42); the split is per cell, so the same mice contribute to both sets. Tabula Muris Senis has \SplitTrainTMS{} training and
+42); the split is per cell, not by mouse, so all 18 Tabula Muris Senis mice contribute to both sets (in Allen, 482 of
+the 489 donors with test cells also have training cells). Tabula Muris Senis has \SplitTrainTMS{} training and
 \SplitTestTMS{} test cells, and Allen \SplitTrainAllen{} and \SplitTestAllen{}.
