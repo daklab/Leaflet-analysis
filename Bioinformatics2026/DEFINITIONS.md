@@ -47,9 +47,10 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
 
 - **Which statuses are kept:** `both` → `both` only; `either` → `both`/`five_prime`/`three_prime`; `unanno_also` → all
   (`:393-399`). **Production: `unanno_also`** (`config/mouse_smartseq2.yaml:41`).
-- **Consequence:** an unannotated junction has no gene (no transcript matched either end), and junctions without a gene
-  are excluded when the graph is built (`event_detection.py:30-32`). So the production catalog effectively contains only
-  junctions with at least one annotated end.
+- **Consequence:** junctions without a gene are excluded when the graph is built (`event_detection.py:30-32`). Gene
+  assignment uses end matches within the tolerance (`genome_utils.py:288-297`), while the annotation status uses exact
+  matches (`:376-389`), so a few "unannotated" junctions still carry a gene: 724 in the run log, 106 in the final catalog
+  (CATALOG_PROVENANCE.md section 5; corrected 2026-11-01). Nearly all catalog junctions have at least one annotated end.
 - **Multi-gene junctions** (> 1 gene id) are **removed** and written to `multi_gene_junctions_<time>.csv`
   (`genome_utils.py:366-370`, `:408-411`). Graph building takes `gene_ids[0]` (`event_detection.py:32`), which is then
   the only gene.
@@ -90,11 +91,13 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
   take donor and acceptor from the junction's strand-aware coordinates instead of the edge order.
 
 ### 1.5 Production re-grouping after filtering (Leaflet-analysis `09b_filter_aligned.py`)
-- **Inputs:** after cell QC and the junction filter (junction in ≥ 75 cells; cells with ≥ 500 detected junctions),
-  ATSEs are re-derived on the surviving junctions with ATSEmapper's `ATSEAnalyzer` (`09b_filter_aligned.py:191-290`).
+- **Order (corrected 2026-11-01):** after cell QC, junctions in fewer than 75 of the 150,906 QC cells are removed, ATSEs are
+  re-derived on the surviving junctions with ATSEmapper's `ATSEAnalyzer` (`09b_filter_aligned.py:191-290`), and only then
+  are cells with fewer than 500 detected junctions removed (`:301-341`).
 - **Settings:** `build_splice_graph`, then `find_atse_groups(min_splice_site_usage=0.0)`, so no usage filter the second
   time (`:239-249`); junction scores are the summed reads, at least 1 (`:221-237`).
-- **Singletons are dropped:** 9,065 junctions (`CATALOG_NUMBERS.md`).
+- **Singletons are dropped:** 9,065 junctions, every one of which lost at least one original ATSE partner to the ≥ 75-cell
+  filter (5,240 lost all partners; 3,825 were disconnected when a bridging junction failed; CATALOG_PROVENANCE.md).
 - **ATSE totals:** recomputed from the surviving junctions only (`recompute_cluster_matrix`, `:123-185`).
 - **Result:** 79,768 junctions in 24,475 ATSEs.
 

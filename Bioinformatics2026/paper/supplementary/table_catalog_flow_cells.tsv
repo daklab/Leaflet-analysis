@@ -1,0 +1,6 @@
+step	TMS	Allen	total
+Cell files listed	106205	63304	169509
+Readable	106199	63304	169503
+Matched to expression and metadata	106197	59771	165968
+After cell QC	96331	54575	150906
+Final (>= 500 junctions)	78135	54571	132706

@@ -1,0 +1,37 @@
+% shared_data_catalog.tex -- the "Data and event catalog" Methods text, written once for both papers (LeafletFA and SpliceVI).
+% Every number is a ledger macro (paper/ledger/results_ledger.tsv; SpliceVI copies: paper/ledger/for_splicevi_catalog_rows.tsv).
+% Sources: CATALOG_PROVENANCE.md, DEFINITIONS.md. No contractions, no em dashes, American spelling. Draft 2026-11-01.
+
+\paragraph{Data.}
+We used two full-length single-cell atlases of the mouse: Tabula Muris Senis (TMS), FACS-sorted single cells from 23
+tissues of 18 mice aged 3, 18 and 24 months profiled with Smart-seq2 \cite{Tabula_Muris_Consortium2020-ga}, and the Allen
+Brain atlas of the mouse isocortex and hippocampus profiled with Smart-seq v4 (GEO GSE185862) \cite{mouse-allen-brain-ssv4}.
+For TMS we used the consortium's alignments to GRCm38 with the GENCODE vM19 annotation; Allen reads were aligned to the
+same genome and annotation with STAR 2.7.10b in two-pass mode. Cell annotations were the consortium's tissue and cell
+ontology class for TMS and the cluster labels of the GEO metadata for Allen. Gene expression was taken from each atlas's
+published count matrix (exonic counts for Allen), restricted to protein-coding and long noncoding RNA genes with more than
+one exon that are shared by both atlases and carry catalog junctions (\CatalogGenesMouse{} genes), and normalized for mean
+transcript length.
+
+\paragraph{Event catalog.}
+Splice junction reads were extracted from each cell's alignments with regtools \cite{regtools} (anchor of at least 6 nt,
+introns of 50 to 500{,}000 bp, strand from the XS tag) and pooled over all \FlowCellsReadable{} cells of both atlases.
+Junctions with at least 100 reads in at least 10 cells and a canonical splice motif (GT-AG, GC-AG or AT-AC) were kept,
+and each was assigned the gene of the transcripts whose exon boundaries it matches within 1 bp at either end; junctions
+without a gene, or with more than one, were removed. An alternative transcript structure event (ATSE) is a connected
+component of a gene's junctions in which two junctions are linked if they share a donor or an acceptor site; a junction
+was removed from its event if it carried less than 1\% of the reads at either of its splice sites, and an event needs at
+least two junctions, so junctions that share no splice site with another junction (singletons) are not part of the
+catalog. A mutually exclusive exon pair forms one ATSE only if another junction links its two halves; otherwise it
+appears as two ATSEs, an alternative-3$'$ and an alternative-5$'$ pair. After matching cells to expression and quality
+control (\FlowCellsQC{} cells), junctions observed in fewer than 75 cells were removed, ATSEs were re-derived on the
+remaining junctions (which left \FlowSingletonsRegroup{} junctions without a partner), and cells with fewer than 500
+detected junctions were removed. The catalog contains \CatalogJunctionsMouse{} junctions in \CatalogATSEsMouse{} ATSEs
+across \CatalogGenesMouse{} genes, measured in \CatalogCellsMouse{} cells (\CatalogCellsTMS{} from TMS and
+\CatalogCellsAllen{} from Allen; Supplementary Table~\ref{S-tab:catalogflow}). A further \FlowAllenOmitted{} Allen cells,
+stored in a different folder layout, were missed when the input files were listed and are not in the catalog.
+
+\paragraph{Training and test cells.}
+Each atlas was split at random into 70\% training and 30\% test cells, stratified by broad cell type and age (random seed
+42); the split is per cell, so the same mice contribute to both sets. Tabula Muris Senis has \SplitTrainTMS{} training and
+\SplitTestTMS{} test cells, and Allen \SplitTrainAllen{} and \SplitTestAllen{}.

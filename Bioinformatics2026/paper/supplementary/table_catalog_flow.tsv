@@ -1,0 +1,13 @@
+step	name	rule	cells	junctions	ATSEs	genes
+1	Parse	Intron 50 to 500,000 bp; standard chromosomes	169,503	23,673,431		
+2	Pooled junction QC	>= 10 cells and >= 100 reads, both atlases summed	169,503	828,510		
+3	Canonical motif	GT-AG, GC-AG, AT-AC	169,503	762,806		
+4	Multi-gene junctions removed	Junctions annotated to more than one gene	169,503	749,497		
+5	Gene assignment	Junctions with no matching transcript end excluded	169,503	469,294		23,711
+6	Splice-site usage	Junction removed if < 1% of reads at either splice site	169,503	279,986		
+7	Event construction	Connected components; singletons dropped	169,503	142,896	39,729	17,598
+8	Matched to expression	Cells and genes present in both modalities	165,941	111,903	31,993	13,119
+9	Cell QC	>= 5 junctions; <= median + 5 MAD on junctions, junction reads, expression counts	150,906	111,903	31,993	13,119
+10	Junction filter	Junction observed in >= 75 cells	150,906	88,833		
+11	Event re-derivation	Connected components on surviving junctions; 9,065 singletons dropped	150,906	79,768	24,475	11,236
+12	Cell filter	>= 500 detected junctions per cell	132,706	79,768	24,475	11,233

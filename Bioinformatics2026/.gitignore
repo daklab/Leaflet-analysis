@@ -10,3 +10,4 @@ manuscript/*.fls
 manuscript/*.fdb_latexmk
 manuscript/*.out
 manuscript/*.synctex.gz
+!paper/supplementary/*.tsv

@@ -44,5 +44,33 @@
 \newcommand{\EventShareAltFive}{20\%}  % share of the 24,475 ATSEs classified alt 5' site (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
 \newcommand{\EventShareSkippedExon}{23\%}  % share of the 24,475 ATSEs classified skipped exon (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
 \newcommand{\EventShareComplex}{33\%}  % share of the 24,475 ATSEs classified complex (DEFINITIONS.md 1.6) | fig1c_event_types.tsv | job 22597637 | paper/scripts/fig1_catalog_summaries.py (Fig. 1b-d)
+\newcommand{\FlowCellsListed}{169,509}  % cell files in the frozen 2026-05-11 input list (TMS 106,205; Allen 63,304) | mouse_smartseq2_junction_files_2026-05-11.txt.gz | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsListedTMS}{106,205}  % TMS cell files listed | mouse_smartseq2_junction_files_2026-05-11.txt.gz | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsListedAllen}{63,304}  % Allen cell files listed | mouse_smartseq2_junction_files_2026-05-11.txt.gz | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsReadable}{169,503}  % cell files read into the joint junction pool (6 TMS files missing) | junc_merge_15915229.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsParsed}{23,673,431}  % unique junctions after intron-length and chromosome filters | junc_merge_15915229.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsPooledQC}{828,510}  % junctions in >= 10 cells with >= 100 reads, both atlases pooled | junc_merge_15915229.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsCanonical}{762,806}  % junctions with canonical motifs | atsemap_15915608.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsSingleGene}{749,497}  % junctions after removing multi-gene junctions | atsemap_15915608.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsWithGene}{469,294}  % junctions assigned a gene (enter the splice graph) | atsemap_15915608.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsATSEmapper}{142,896}  % junctions in ATSEs after the usage filter and singleton removal (ATSEmapper run) | atsemap_15915608.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowATSEsATSEmapper}{39,729}  % ATSEs from the joint ATSEmapper run | atsemap_15915608.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsMatched}{165,968}  % cells in both splicing and expression (TMS 106,197; Allen 59,771) | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsMatchedTMS}{106,197}  % TMS cells matched to expression and metadata | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsMatchedAllen}{59,771}  % Allen cells matched to expression and metadata | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsMatched}{111,903}  % junctions after matching genes to expression | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowATSEsMatched}{31,993}  % ATSEs after matching genes to expression | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowGenesMatched}{13,119}  % genes common to splicing and expression | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsQC}{150,906}  % cells after QC (TMS 96,331; Allen 54,575) | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsQCTMS}{96,331}  % TMS cells after QC | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsQCAllen}{54,575}  % Allen cells after QC | align_16554847.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowJunctionsSeventyFive}{88,833}  % junctions observed in >= 75 of the 150,906 QC cells | filter_aligned_rerun_17388363.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowSingletonsRegroup}{9,065}  % singleton junctions dropped when ATSEs were re-derived after the 75-cell filter | filter_aligned_rerun_17388363.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowCellsFinal}{132,706}  % cells with >= 500 detected junctions (final catalog) | filter_aligned_rerun_17388363.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\FlowAllenOmitted}{9,400}  % Allen cells never listed (per-cell folders missed by the input glob) | omitted_cells_list.tsv | job  | CATALOG_PROVENANCE.md
+\newcommand{\SplitTrainTMS}{54,694}  % TMS training cells (70/30, seed 42, stratified by broad type x age, not by mouse) | step1_19457949.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\SplitTestTMS}{23,441}  % TMS test cells | step1_19457949.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\SplitTrainAllen}{38,199}  % Allen training cells | step1_21438648.out | job  | CATALOG_PROVENANCE.md
+\newcommand{\SplitTestAllen}{16,372}  % Allen test cells | step1_21438648.out | job  | CATALOG_PROVENANCE.md
 % not final (Overleaf fallback stays): DuplicateAllOnOne
 % not final (Overleaf fallback stays): DuplicateMolecules
