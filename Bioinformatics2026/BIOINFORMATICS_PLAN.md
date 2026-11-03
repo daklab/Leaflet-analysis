@@ -23,6 +23,10 @@ Bioinformatics2026/
 
 ## 1. Format, title, abstract, figures (Karin, 2026-11-01)
 
+**Decision (Karin, 2026-11-02): Application Note, 4 pages, about 2,600 words.** Check 10: 10.1 passed; 10.2 and 10.7 failed their
+pre-registered rule, so the Application Note reading applies. The outline is `~/LeafletFA_overleaf/main.tex`. Sections below written
+for the Original Paper are kept as source material. The "Two pages" and "specificity replication" of the Application Note block below are superseded.
+
 **Format: Original Paper (resource + method)** if check 10 (amendment 6) passes 10.1 and 10.2 a/b; **Application Note**
 as fallback. The resource is the **ATSE catalog with cell-type-resolved junction usage**: for every ATSE × cell type
 (TMS tissue–cell types; Allen cell groups (cluster names), with the official Allen subclass as an extra column), LeafletFA cell-type ψ with an uncertainty interval and a cell-type-specific

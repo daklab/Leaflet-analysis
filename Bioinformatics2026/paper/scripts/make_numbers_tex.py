@@ -59,7 +59,8 @@ def main():
         if os.path.exists(r["source_file"]) and md5(r["source_file"]) != r["source_md5"]:
             stale.append(r["macro"])
             continue
-        out.append(f"\\newcommand{{\\{r['macro']}}}{{{r['display']}}}  % {r['description']} | {os.path.basename(r['source_file'])} | "
+        display = re.sub(r"(?<!\\)%", r"\\%", r["display"])      # a bare % would comment out the closing brace
+        out.append(f"\\newcommand{{\\{r['macro']}}}{{{display}}}  % {r['description']} | {os.path.basename(r['source_file'])} | "
                    f"job {r['job_id']} | {r['record']}")
     if stale:
         sys.exit(f"source md5 changed for: {', '.join(stale)} (re-derive these numbers before writing numbers.tex)")
