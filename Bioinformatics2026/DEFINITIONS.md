@@ -50,7 +50,8 @@ the re-grouping in `pipelines/04_align/09b_filter_aligned.py` after the cell and
 - **Consequence:** junctions without a gene are excluded when the graph is built (`event_detection.py:30-32`). Gene
   assignment uses end matches within the tolerance (`genome_utils.py:288-297`), while the annotation status uses exact
   matches (`:376-389`), so a few "unannotated" junctions still carry a gene: 724 in the run log, 106 in the final catalog
-  (CATALOG_PROVENANCE.md section 5; corrected 2026-11-01). Nearly all catalog junctions have at least one annotated end.
+  (CATALOG_PROVENANCE.md section 5; corrected 2026-11-01).
+- **The rule is "assigned to a gene", not "at least one annotated end"** (corrected 2026-11-04). Final catalog of 79,768 junctions by annotation status: both ends 60,603; 5′ only 9,645; 3′ only 9,414; unannotated 106 (`annotation_status` in the ATSE file).
 - **Multi-gene junctions** (> 1 gene id) are **removed** and written to `multi_gene_junctions_<time>.csv`
   (`genome_utils.py:366-370`, `:408-411`). Graph building takes `gene_ids[0]` (`event_detection.py:32`), which is then
   the only gene.

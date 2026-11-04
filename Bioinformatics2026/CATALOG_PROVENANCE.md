@@ -95,7 +95,7 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
 - **Matching expression to splicing cells:** by cell id (TMS) and `exp_component_name` through the metadata (Allen)
   (`align_splice_ge.py:83-103`).
   - 169,501 splice cells → **165,968** in both (106,197 TMS / 59,771 Allen; A:20,61-63).
-  - TMS loses 8; Allen loses 3,533, with no per-cell reason logged (Gap).
+  - TMS loses 8; Allen loses 3,533, all runs with no row in the combined metadata (cause in section 7; the align log gives no per-cell reason).
 
 ## 4. Cells
 
@@ -154,7 +154,7 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
 - **Per-atlas, final catalog:**
   - Junctions with ≥ 1 read: TMS 77,562; Allen 77,204; both 74,998.
   - ≥ 75 cells within one atlas: TMS 56,696; Allen 65,998; 2,314 junctions pass only when the atlases are pooled.
-- **Final catalog by annotation status:** both ends 60,603; 5′ only 9,645; 3′ only 9,414; unannotated 106.
+- **Final catalog by annotation status:** both ends 60,603; 5′ only 9,645; 3′ only 9,414; unannotated 106. The filter is "assigned to a gene", not "at least one annotated end" (corrected 2026-11-04).
 - **Final catalog by motif:** GT-AG 78,827; GC-AG 926; AT-AC 15.
 
 ## 6. The two builds, and which analyses use which
