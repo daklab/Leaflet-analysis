@@ -3,47 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Splicing Atlas</title>
+<title>Splicing Browser</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <h1>Cell-type-resolved splicing atlas</h1>
-  <p class="sub">Junction usage (ψ) per alternative transcript structure event (ATSE) and cell type, estimated with LeafletFA.</p>
-  <div id="banner" class="banner" hidden></div>
+  <a class="brand" href="#/">Cell-type splicing browser</a>
+  <div class="search"><input id="q" type="search" placeholder="Gene or ATSE id, e.g. Gria2" autocomplete="off" aria-label="Search by gene or ATSE id"><div id="q-results" class="results" hidden></div></div>
   <nav>
-    <label>Dataset <select id="dataset"></select></label>
-    <button class="tab active" data-view="gene">Gene view</button>
-    <button class="tab" data-view="celltype">Cell-type view</button>
-    <span id="downloads"></span>
+    <a href="#/compare" data-nav="compare">Compare two</a>
+    <a href="#/one" data-nav="one">One vs. all others</a>
   </nav>
 </header>
-<main>
-  <section id="view-gene">
-    <div class="controls">
-      <label>Gene <input id="gene" list="genelist" placeholder="e.g. Fgfr2" autocomplete="off"></label>
-      <datalist id="genelist"></datalist>
-      <label>Tissue <select id="f-tissue"><option value="">all</option></select></label>
-      <label>Lineage <select id="f-lineage"><option value="">all</option></select></label>
-      <label>Cell type contains <input id="f-name" size="12"></label>
-      <label>Min cells <input id="f-cells" type="number" min="0" value="10" size="4"></label>
-      <label>Min reads <input id="f-reads" type="number" min="0" value="0" size="4"></label>
-      <label><input id="f-specific" type="checkbox"> specific only</label>
-    </div>
-    <div id="gene-out"><p class="hint">Type a gene name to see its events.</p></div>
-  </section>
-  <section id="view-celltype" hidden>
-    <div class="controls">
-      <label>Find cell type <input id="ct-filter" size="18"></label>
-      <select id="ct-select" multiple size="8"></select>
-      <button id="ct-show">Show specific events</button>
-    </div>
-    <div id="ct-out"><p class="hint">Pick one or more cell types (Ctrl/Cmd-click for several).</p></div>
-  </section>
-</main>
-<footer>
-  <span class="legend">ψ <span class="ramp"></span> 0 → 1 &nbsp; ★ = flagged cell-type-specific &nbsp; hover a cell for its 95 % interval and the rest-of-atlas ψ.</span>
-</footer>
+<main id="main"><p class="hint">Loading…</p></main>
+<footer id="footer"></footer>
+<div id="tip" class="tip" hidden></div>
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

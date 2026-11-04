@@ -1,23 +1,66 @@
-# Splicing atlas portal (static)
+# Cell-type splicing browser (static, local preview)
 
-Generated from the catalog export (check 10.5); no server code, all filtering client-side. Not published: local preview only.
+Static files, no server code, all computation client-side. Not published; do not deploy from here.
 
 ```bash
-python make_preview_catalog.py                       # PREVIEW data (raw TMS pseudobulk, ~100 genes) until check 10 exists
-python build_portal.py preview_catalog.tsv.gz        # -> site/  (prints build time, total size, largest file, Parquet size)
-python -m http.server -d site 8000                   # open http://localhost:8000  (fetch() needs http, not file://)
+V=/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation
+python -m http.server -d $V/portal_browser/site 8000     # open http://localhost:8000
 ```
+`fetch()` needs http; opening `index.html` from `file://` does not work. Over ssh: `ssh -L 8000:localhost:8000 <host>`.
 
-- `web/`: the app (index.html, app.js, style.css), copied into `site/`.
-- `site/data/index.json`: datasets, genes, cell types; `site/data/genes/<dataset>/<gene>.json`: one file per gene;
-  `site/data/celltypes/<dataset>/<cell type>.json`: events flagged specific in that type.
-- Gene view: gene search; per ATSE the junction arcs and a cell type × junction ψ heatmap (hover: 95 % interval and
-  rest-of-atlas ψ; ★ = specific); filters by tissue, lineage, name, minimum cells and reads, specific only.
-- Cell-type view: one or several cell types; every specific event, sortable, linking to the gene view.
-- Preview data carry `source = "PREVIEW raw pseudobulk"` and the site shows a banner.
+## Rebuild
+```bash
+sbatch -J pb_cat -c 2 --mem 1G -t 0:30:00 run_precompute.sbatch precompute.py catalog
+sbatch -J pb_TMS -c 4 --mem 8G -t 0:30:00 run_precompute.sbatch precompute.py counts TMS
+sbatch -J pb_Allen -c 4 --mem 18G -t 0:30:00 run_precompute.sbatch precompute.py counts Allen
+sbatch -J pb_build -c 2 --mem 2G -t 0:15:00 run_precompute.sbatch build_portal.py all     # data shards + web files
+python build_portal.py web                                                                  # web/ edits only
+python make_screenshots.py                                                                  # browser checks + screenshots
+```
+Measured peak memory: catalog 0.58 GiB, counts TMS 6.05 GiB, counts Allen 13.8 GiB, build 1.24 GiB; the requests above are peak + 30 %.
+All generated data live under `$V/portal_browser/` (`precomputed/`, `site/`, `screenshots/`), not in git. `SOURCE.json` here
+(copy in `site/data/`) holds input md5s, fit commits, counts and sizes.
 
-**Build report (2026-11-01, preview: 99 genes, 246 events, 132 TMS cell types, 57,867 rows):** 27.9 s; 233 files;
-3.86 MB total; largest file `data/genes/TMS/Picalm.json`, 114.7 kB; the same rows as Parquet 1.84 MB.
-Extrapolated to the full TMS catalog (24,475 events, ~100× the preview): ~400 MB of per-gene JSON, largest gene files
-a few MB; Parquet ~180 MB per dataset. A single Parquet queried with DuckDB-WASM is feasible at that size (range
-requests), but not built.
+## Fixed wording and rules
+`web/config.js` is the single place for the interval label, the compare-view note, the grey rule and the default read filters.
+
+- Differences are LeafletFA point estimates with intervals, ranked for exploration. The site makes no pairwise calls. The
+  check 10 arrays `specific`, `tv`, `p_tv` are neither read nor shipped.
+- Grey estimates: `CONFIG.GREY_RULE`. Default `"eligible"`: saved check 10 flag false (fewer than 2 mice, or no TRAIN cells in
+  one of the two frozen mouse halves). `"n_mice_lt2"`: fewer than 2 mice only (no type at present, see `SOURCE.json`).
+
+## Views
+- **Search**: gene name or ATSE id; gene page lists its ATSEs.
+- **Event** (`#/event/<dataset>/<event_id>`): structure diagram and a ψ dot plot per junction, grouped by tissue / cell type (TMS)
+  or class / official subclass (Allen). LeafletFA estimate with interval; raw TRAIN pseudobulk as an open marker sized by junction reads.
+- **Compare two** (`#/compare/<dataset>/<A>/<B>`): ATSEs ranked by max |Δψ| across junctions. Default filter 20 reads and 3 cells per type.
+- **One vs. all others** (`#/one/<dataset>/<A>`): ATSEs ranked by max |ψ − rest ψ| (rest: saved check 10 mean over the other types' cells),
+  with the range across other eligible types.
+- **Downloads**: each table as TSV, with version, fit md5 and fit commit in `#` comment lines.
+
+## Data sources and definitions
+- Estimates: `$V/c10/{TMS,Allen}_s0_estimates.npz`. Raw pseudobulk, reads, cells and mice with reads: TRAIN counts (`precompute.py counts`,
+  which asserts reads, cells and mice per type against the saved arrays).
+- Event class (`precompute.classify`, `mxe_pairs`): the coordinate rules of `../DEFINITIONS.md` 1.6. Linked MXE (STAGE5 s177 definition, at
+  least one linked pair) is taken out of "complex". Labels are geometric.
+- Junction annotation status: ATSE file `MOUSE_SMARTSEQ2_ATSE_FILE_unanno_also_2026-05-12_03-43-52.txt.gz`.
+- Exons: GENCODE vM19 `genes.gtf`. Junction id `chrom_start_end_strand`: start = last base of the left exon, end = first base of the right exon - 1.
+  The diagram draws, per junction end, the touching exon with most transcripts, plus up to 15 non-overlapping annotated exons inside the
+  span that no catalog junction touches (dashed).
+- Allen: "cell groups (cluster names)". Class by majority `class_label` of a group's TRAIN cells: Glutamatergic = excitatory,
+  GABAergic = inhibitory, any other = non-neuronal.
+
+## File layout (`site/data/`)
+- `index.json`: version, shard layout, types per dataset, featured examples (each verified in `build_portal.featured`, or the build fails).
+- `catalog/events.json`, `catalog/junctions.bin` (u32 start × J, u32 end × J, u8 status × J), `catalog/struct/<bucket>.json`. Site junction order: by event, then genomic.
+- `<dataset>/types/<i>.bin`: one per type; columns in `index.json` `type_layout`; a compare loads two of these.
+- `<dataset>/events/<bucket>.bin`: 64 ATSEs per bucket (types × junctions); an event page loads one.
+- ψ-like values: u16 = value × 10,000; 65535 = missing. All little-endian.
+
+## Filling the "SpliceVI DS call" column
+The column ships empty. To fill it, no rebuild:
+```bash
+python add_splicevi_ds.py CALLS.tsv --source "SpliceVI cell-type DS runs, <run id>"
+```
+`CALLS.tsv` columns: `dataset, cell_type_a, cell_type_b, event_id, call`. Type names as in `index.json` `name`; order does not matter;
+`cell_type_b = rest` fills the one-vs-all view. `call` is shown verbatim, in the table and the TSV, and the column subtitle becomes `source: ...`.

@@ -1,0 +1,223 @@
+{
+ "version": "preview-2026-11-04",
+ "built": "2026-11-04 14:55",
+ "site_note": "LeafletFA estimates are seed 0, K = 20; raw pseudobulk, reads, cells and mice are TRAIN cells only.",
+ "classes": {
+  "annotation_status": {
+   "both": 60603,
+   "five_prime": 9645,
+   "three_prime": 9414,
+   "unannotated": 106
+  },
+  "geometric_classes": {
+   "complex": 8090,
+   "alt3": 5810,
+   "skipped_exon": 5708,
+   "alt5": 4867
+  },
+  "final_classes": {
+   "complex": 7056,
+   "alt3": 5810,
+   "skipped_exon": 5708,
+   "alt5": 4867,
+   "mxe_linked": 1034
+  },
+  "mxe_pairs_linked": 4265,
+  "mxe_pairs_split": 303,
+  "atses_linked": 1034,
+  "atses_in_split_pairs": 265,
+  "sites": 102221,
+  "sites_touching_exon": 83796,
+  "md5": {
+   "gtf": {
+    "path": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/TabulaSenis/genome_files/gencode.vM19/genes/genes.gtf",
+    "bytes": 728379568,
+    "md5": "e5eba8699d1e92885c9f3d5c8153fe8a"
+   },
+   "atse_file": {
+    "path": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/ATSE_mapper/ATSE_files/MOUSE_SMARTSEQ2_ATSE_FILE_unanno_also_2026-05-12_03-43-52.txt.gz",
+    "bytes": 7694490,
+    "md5": "dbdc000f7626ecb46b2c8edc8514a06e"
+   },
+   "allen_metadata": {
+    "path": "/gpfs/commons/projects/knowles_singlecell_splicing/allen-brain/mouse_isocortex_hippocampal_2021/METADATA/metadata.csv",
+    "bytes": 29481556,
+    "md5": "4bba668ad677a8d1905239e04ea46a9f"
+   },
+   "allen_group_subclass": {
+    "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/tsv/c10_Allen_group_subclass.tsv",
+    "bytes": 2891,
+    "md5": "bd38db07db642b38c16f343943777b91"
+   }
+  }
+ },
+ "datasets": {
+  "TMS": {
+   "types": 132,
+   "train_cells": 54694,
+   "labels_not_in_estimates": {
+    "Mammary_Gland_ENDOTHELIAL CELL": 9,
+    "Aorta_DENDRITIC CELL": 8,
+    "Thymus_ENDOTHELIAL CELL": 8,
+    "Skin_MACROPHAGE": 7,
+    "Aorta_MACROPHAGE": 7,
+    "Liver_GRANULOCYTE": 7,
+    "Lung_MACROPHAGE": 7,
+    "Skin_FIBROBLAST": 5,
+    "Kidney_FIBROBLAST": 4,
+    "Spleen_GRANULOCYTE": 4,
+    "Trachea_KERATINOCYTE": 3,
+    "Aorta_EPITHELIAL CELL": 2
+   },
+   "fit_record": {
+    "leafletfa_git": {
+     "commit": "0f304d907e1a347b9ee040e1160de04291fbce57",
+     "branch": "leafletfa-splicevi-baseline",
+     "dirty": true
+    },
+    "slurm_job": "22400620",
+    "started": "2026-10-24 20:19:18",
+    "finished": "2026-10-24 20:29:53",
+    "K": 20,
+    "seed": 0,
+    "resumed_from_step": 16200,
+    "steps_run": 16200,
+    "train_md5_matches_run_record": true
+   },
+   "inputs_md5": {
+    "train": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/20260526/train_70_30_TMS_ONLY_model_ready_combined_ge_splicing_aligned_filtered_minCells75_minJuncs500_2026-06-17.h5mu",
+     "bytes": 45777319017,
+     "md5": "d2ceebe490b7bfe1f1487fe2aaad7424"
+    },
+    "estimates": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/c10/TMS_s0_estimates.npz",
+     "bytes": 386527542,
+     "md5": "738f74ce8dff156fe3d9232aa8599a19"
+    },
+    "export": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/c10/export/catalog_TMS_s0.tsv.gz",
+     "bytes": 166031590,
+     "md5": "309ef0c50c03fc1b490611a45c867468"
+    },
+    "fit": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_splicevi_baseline/TMS/full_K20_s0_f64/fit/fit.npz",
+     "bytes": 10978712,
+     "md5": "140c17e6af58dd9466607e864a0fb983"
+    },
+    "run_record": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_splicevi_baseline/TMS/full_K20_s0_f64/run_record.json",
+     "bytes": 11784,
+     "md5": "4d24c5283cbe93d046027e518ecdf30c"
+    }
+   },
+   "fewer_than_2_mice": [],
+   "frozen_ineligible": [
+    {
+     "type": "Brain_Non-Myeloid_NEUROEPITHELIAL CELL",
+     "n_mice": 3
+    },
+    {
+     "type": "MAT_EPITHELIAL CELL",
+     "n_mice": 2
+    },
+    {
+     "type": "Mammary_Gland_BASAL CELL",
+     "n_mice": 4
+    },
+    {
+     "type": "Mammary_Gland_EPITHELIAL CELL",
+     "n_mice": 4
+    },
+    {
+     "type": "Mammary_Gland_STROMAL CELL",
+     "n_mice": 4
+    }
+   ],
+   "export_rows": 6478290,
+   "export_vs_estimates_max_abs_diff": {
+    "point": 4.999999999999449e-05,
+    "lo": 4.9999952316304164e-05,
+    "hi": 4.999999999999449e-05
+   },
+   "export_reads_max_abs_diff": 0.0
+  },
+  "Allen": {
+   "types": 68,
+   "train_cells": 38199,
+   "labels_not_in_estimates": {
+    "L2/3 IT AI": 6,
+    "Mossy": 3
+   },
+   "fit_record": {
+    "leafletfa_git": {
+     "commit": "74462107a518e6cad757238162d7d6037ed5ae82",
+     "branch": "leafletfa-splicevi-baseline",
+     "dirty": false
+    },
+    "slurm_job": "22400623",
+    "started": "2026-10-24 20:45:15",
+    "finished": "2026-10-24 21:16:50",
+    "K": 20,
+    "seed": 0,
+    "resumed_from_step": 16200,
+    "steps_run": 16200,
+    "train_md5_matches_run_record": true
+   },
+   "inputs_md5": {
+    "train": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/Leaflet-analysis-WD/MOUSE_SPLICING_FOUNDATION/MODEL_INPUT/20260526/train_70_30_AB_ONLY_model_ready_combined_ge_splicing_aligned_filtered_minCells75_minJuncs500_2026-06-17.h5mu",
+     "bytes": 50586874701,
+     "md5": "3f4918928c75ae4758620108d65a424f"
+    },
+    "estimates": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/c10/Allen_s0_estimates.npz",
+     "bytes": 198598083,
+     "md5": "a1d787502bf1d53793b24ddc5f0f3e15"
+    },
+    "export": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/c10/export/catalog_Allen_s0.tsv.gz",
+     "bytes": 112432226,
+     "md5": "76ddbeec1471bb77ebf21a33330b93c8"
+    },
+    "fit": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_splicevi_baseline/Allen/full_K20_s0_f64/fit/fit.npz",
+     "bytes": 9714311,
+     "md5": "974153b331677c443933f67de77a9f9f"
+    },
+    "run_record": {
+     "path": "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_splicevi_baseline/Allen/full_K20_s0_f64/run_record.json",
+     "bytes": 11791,
+     "md5": "d5f9372ba3fc534088cc1383683fe267"
+    }
+   },
+   "fewer_than_2_mice": [],
+   "frozen_ineligible": [
+    {
+     "type": "L2 IT ENTm",
+     "n_mice": 2
+    }
+   ],
+   "export_rows": 4420578,
+   "export_vs_estimates_max_abs_diff": {
+    "point": 4.999999999999449e-05,
+    "lo": 4.999999999999449e-05,
+    "hi": 4.999999999999449e-05
+   },
+   "export_reads_max_abs_diff": 0.0
+  }
+ },
+ "size": {
+  "files": 1352,
+  "total_bytes": 561998451,
+  "largest": "data/TMS/types/1.bin",
+  "largest_bytes": 1631624,
+  "by_dir": {
+   "catalog": 5034705,
+   "TMS/types": 215374368,
+   "TMS/events": 152198112,
+   "Allen/types": 110950432,
+   "Allen/events": 78405088
+  }
+ }
+}
