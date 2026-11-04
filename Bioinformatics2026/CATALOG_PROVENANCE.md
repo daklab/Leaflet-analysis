@@ -112,6 +112,7 @@ items are in **Gaps** (section 7). Flow table as TSV: `paper/supplementary/table
 - **TMS per tissue** (listed / after QC / final): a 23-row table, in the TSV
   (`paper/supplementary/table_catalog_flow_tms_tissues.tsv`). Brain_Myeloid 12,943 / 12,372 / 11,203; Marrow 14,009 /
   13,104 / 10,202; Heart 9,438 / 8,547 / 6,986; …
+- **The 21-month TMS cells:** 728 FACS cells (all Mammary_Gland, 3 mice) removed by `exclude_ages: ["21m"]` (`mouse_smartseq2.yaml:61`) before any listed step. **Reason:** too few cells for statistical analysis (Karin's decision; `GenomeBiology_Submission2026/config/mouse_smartseq2.yaml:60`, `GenomeBiology_Submission2026/WORKFLOW.md:254`).
 - **The 9,400 omitted Allen cells:**
   - **Cause:** a non-recursive glob (`01_split.sh:64-66` with `junction_pattern: "*_junctions_with_barcodes.bed"`,
     `mouse_smartseq2.yaml:16-17`) matched the 63,304 flat files and missed the cells stored only as per-cell folders

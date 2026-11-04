@@ -57,7 +57,7 @@ Code: `GenomeBiology_Submission2026/pipelines/04_align/align_splice_ge.py`, then
 **Superseded run, not to be cited:** `filter_aligned_17183325.out`, files ending `_2026-06-13`. ATSEs were not
 re-derived, giving 83,593 junctions / 25,750 ATSEs / 132,875 cells.
 
-**21-month TMS cells (traced 2026-11-04):** the 728 FACS cells (all Mammary_Gland, mice 21_48_F, 21_54_F, 21_55_F) are removed on purpose at metadata preparation: `exclude_ages: ["21m"]` (`GenomeBiology_Submission2026/config/mouse_smartseq2.yaml:61`, applied at `03_gene_expression/00_prepare_metadata.py:114-119`). The junction folders hold only 3, 18 and 24 months, and the frozen input list has no 21-month file. The reason for the exclusion is not recorded.
+**21-month TMS cells (traced 2026-11-04):** the 728 FACS cells (all Mammary_Gland, mice 21_48_F, 21_54_F, 21_55_F) are removed on purpose at metadata preparation: `exclude_ages: ["21m"]` (`GenomeBiology_Submission2026/config/mouse_smartseq2.yaml:61`, applied at `03_gene_expression/00_prepare_metadata.py:114-119`). The junction folders hold only 3, 18 and 24 months, and the frozen input list has no 21-month file. **Reason:** too few cells for statistical analysis (Karin's decision; `GenomeBiology_Submission2026/config/mouse_smartseq2.yaml:60`, `GenomeBiology_Submission2026/WORKFLOW.md:254`).
 
 **2025 build, partly traceable:**
 - **Starting point:** 165,950 aligned cells × 113,995 junctions (`B/102025/dataset_summary_20251003_004515.txt`).
