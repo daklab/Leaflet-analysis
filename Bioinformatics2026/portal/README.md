@@ -26,8 +26,14 @@ All generated data live under `$V/portal_browser/` (`precomputed/`, `site/`, `sc
 
 - Differences are LeafletFA point estimates with intervals, ranked for exploration. The site makes no pairwise calls. The
   check 10 arrays `specific`, `tv`, `p_tv` are neither read nor shipped.
-- Grey estimates: `CONFIG.GREY_RULE`. Default `"eligible"`: saved check 10 flag false (fewer than 2 mice, or no TRAIN cells in
-  one of the two frozen mouse halves). `"n_mice_lt2"`: fewer than 2 mice only (no type at present, see `SOURCE.json`).
+- Grey estimates: `CONFIG.GREY_RULE`. Default `"n_mice_lt2"` (Karin's spec, 2026-11-06): cell types with fewer than 2 mice. Under
+  this rule **no type is grey at present** in TMS or Allen (every type has at least 2 mice; `SOURCE.json`). Alternative `"eligible"`:
+  the saved check 10 flag is false (fewer than 2 mice, or no TRAIN cells in one of the two frozen mouse halves), which greys 5 TMS
+  types and 1 Allen group.
+- Junction colors: `CONFIG.JUNCTION_COLORS` (light) and `JUNCTION_COLORS_DARK`, the same eight hues stepped per surface, chosen by
+  the page's color scheme. Validated with the dataviz `validate_palette.js` (2026-11-06):
+  - dark on `#15191B` and `#1E2427`: all checks pass (lightness band, chroma, CVD worst adjacent ΔE 8.4, normal-vision 19.3, contrast ≥ 3:1);
+  - light on `#ffffff` and `#F4F5F3`: all checks pass; contrast WARN below 3:1 for 3–4 colors, relieved by the J labels and the junction table.
 
 ## Views
 - **Search**: gene name or ATSE id; gene page lists its ATSEs.

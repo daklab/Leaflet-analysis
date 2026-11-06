@@ -26,7 +26,9 @@ function greyReason(t) {
 const typeLabel = (ds) => (ds === "Allen" ? "cell group" : "cell type");
 const typesLabel = (ds) => (ds === "Allen" ? "cell groups (cluster names)" : "cell types");
 function typeByName(ds, name) { return INDEX.datasets[ds].types.find((t) => t.name === name); }
-function jcolor(i) { return i < CONFIG.JUNCTION_COLORS.length ? CONFIG.JUNCTION_COLORS[i] : CONFIG.JUNCTION_OVERFLOW_COLOR; }
+const DARK_MQ = window.matchMedia("(prefers-color-scheme: dark)");
+const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === "dark" : DARK_MQ.matches; };
+function jcolor(i) { const c = isDark() ? CONFIG.JUNCTION_COLORS_DARK : CONFIG.JUNCTION_COLORS; return i < c.length ? c[i] : CONFIG.JUNCTION_OVERFLOW_COLOR; }
 const eventIdx = (id) => CAT.byId.get(id);
 function eventInfo(e) {
   const jo = CAT.jo[e], jn = CAT.jo[e + 1] - jo, g = CAT.gene_idx[e];
@@ -488,6 +490,7 @@ async function init() {
   $("footer").innerHTML = `Version ${esc(INDEX.version)}. Local preview; not published. Seed-0 TMS and Allen K = 20 fits, TRAIN cells only. Provenance: <a href="data/SOURCE.json">SOURCE.json</a>. Interval: ${esc(CONFIG.INTERVAL_LABEL)}.`;
   initSearch();
   window.addEventListener("hashchange", route);
+  DARK_MQ.addEventListener("change", route);   // re-render so junction colors follow the color scheme
   route();
 }
 init().catch((e) => { $("main").innerHTML = `<p>Could not load data/index.json (${esc(e.message)}). This site needs http, not file://: run <code>python -m http.server -d SITE 8000</code>.</p>`; });

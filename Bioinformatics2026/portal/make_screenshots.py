@@ -83,7 +83,8 @@ with sync_playwright() as p:
     pg.set_viewport_size(dict(width=1440, height=950))
     # grey type
     go("#/event/TMS/ENSMUSG00000030849.18_atse_3", "table.dots")
-    check("grey rows on event page", pg.locator("tr.grey").count() >= 1, str(pg.locator("tr.grey").count()))
+    rule = pg.evaluate("CONFIG.GREY_RULE"); ng = pg.locator("tr.grey").count()
+    check(f"grey rows on event page follow GREY_RULE={rule}", ng == 0 if rule == "n_mice_lt2" else ng >= 1, str(ng))
     # compare Allen excitatory vs inhibitory
     A, B = "L2/3 IT CTX", "Pvalb"
     go(f"#/compare/Allen/{enc(A, safe='')}/{enc(B, safe='')}", "#cmp-table table"); shot("05_compare_allen_excitatory_vs_inhibitory", full=False)
@@ -103,7 +104,8 @@ with sync_playwright() as p:
     go("#/compare/TMS", "#sel-a"); check("compare note on empty TMS", NOTE in text())
     pg.select_option("#sel-a", "Brain_Non-Myeloid_NEURON"); pg.wait_for_timeout(200)
     pg.select_option("#sel-b", "Mammary_Gland_BASAL CELL"); pg.wait_for_selector("#cmp-table table", timeout=60000); shot("07_compare_tms_grey_type", full=False)
-    check("grey banner", "Grey:" in text())
+    check(f"grey banner follows GREY_RULE={rule}", ("Grey:" in text()) == (rule != "n_mice_lt2"))
+    check("no '(grey)' in the type dropdowns" if rule == "n_mice_lt2" else "dropdown marks grey types", ("(grey)" in pg.inner_html("#sel-b")) == (rule != "n_mice_lt2"))
     # one vs all
     go(f"#/one/Allen/{enc(B, safe='')}", "#one-table table"); shot("08_one_vs_all_allen_pvalb", full=False)
     check("one-vs-all note", NOTE in text()); check("one-vs-all SpliceVI column", "SpliceVI DS call" in text())
@@ -121,6 +123,14 @@ with sync_playwright() as p:
         go(h, sel); low = text().lower().replace("cell-type specificity calls", "")
         check(f"no forbidden wording {h}", not any(w in low for w in ("specific", "significant", "differentially spliced", "★")))
     check("no JS errors", not errs, "; ".join(errs[:5])); check("no failed requests", not bad, "; ".join(bad[:5]))
+    # dark mode: junction colors switch to the dark set
+    pg.emulate_media(color_scheme="dark")
+    go(f"#/event/Allen/{GRIA2}", "table.dots"); shot("11_event_gria2_Allen_dark")
+    used = pg.evaluate("Array.from(document.querySelectorAll('svg.structure path, svg.structure line')).map(e => e.getAttribute('stroke')).filter(Boolean)")
+    dark = pg.evaluate("CONFIG.JUNCTION_COLORS_DARK"); light = pg.evaluate("CONFIG.JUNCTION_COLORS")
+    check("dark mode uses the dark junction colors", any(c in dark for c in used) and not any(c in light and c not in dark for c in used), ",".join(sorted(set(used))[:8]))
+    go(f"#/compare/Allen/{enc(A, safe='')}/{enc(B, safe='')}", "#cmp-table table"); shot("12_compare_allen_dark", full=False)
+    pg.emulate_media(color_scheme="light")
     b.close()
 srv.shutdown()
 print("FAILURES:", fails); sys.exit(1 if fails else 0)
