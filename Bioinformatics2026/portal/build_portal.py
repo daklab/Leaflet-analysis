@@ -13,7 +13,7 @@ import numpy as np, pandas as pd
 V = "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation"
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRE = os.path.join(V, "portal_browser", "precomputed")
-VERSION = "preview-2026-11-04"
+VERSION = "preview-2026-11-06"
 BUCKET = 64                     # ATSEs per event shard
 RANGE_READS, RANGE_CELLS = 20, 3  # support required to enter the "range in other types" columns (fixed at build)
 NA = 65535

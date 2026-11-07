@@ -20,7 +20,7 @@ box(122, 6, 57, 52, "b", "Accuracy vs raw pseudobulk (10.1)",
     "error vs TEST pseudobulk,\nLeafletFA and raw, by TRAIN reads\n(1-19, 20-99, ...) and type size;\nTMS and Allen; 95% CI\n\nsource: tsv/c10_*_s0_accuracy.tsv\n(+ accuracy_units for bins)\n\nn per bin in-plot")
 ex = [("c", "Gria2 flip/flop (Allen)", "linked MXE, ATSE atse_3, 7 junctions\npsi of the flip and flop junctions\nper cell group, grouped by class\n(glutamatergic, GABAergic)"),
       ("d", "Fgfr2 IIIb/IIIc (TMS)", "upstream pair, atse_3; IIIb usage\nper type, epithelial vs mesenchymal;\ncovered (raw vs LeafletFA) and\nuncovered cells shown apart"),
-      ("e", "Nrxn SS4 (Allen)", "candidate: Nrxn1 atse_2 (or Nrxn2 atse_1);\nSS4 junctions per cell group,\nexcitatory vs inhibitory\n(Nrxn3 limited: downstream only)"),
+      ("e", "Nrxn1 SS4 (Allen)", "Nrxn1 atse_2 (SS4; SLM2 target,\nas in SpliceVI Fig. 2 switches);\nSS4 junctions per cell group,\nexcitatory vs inhibitory"),
       ("f", "Ptprc (TMS)", "atse_2 (MXE linked, 10 junctions);\nlead junction psi in B and T cells\nvs other immune types;\nTEST direction from 10.4")]
 for i, (lab, t, b) in enumerate(ex):
     x = 4 + (i % 2) * 90; y = 66 + (i // 2) * 49

@@ -369,6 +369,8 @@ async function viewCompare(ds, an, bn) {
     { h: "Max |Δψ|", sort: "delta", f: (r) => `<b>${f2(r.delta)}</b>` },
     { h: "ψ A", sub: "[interval]", sort: "pa", cls: () => (greyA ? "grey" : ""), f: (r) => ivText(r.a) },
     { h: "ψ B", sub: "[interval]", sort: "pb", cls: () => (greyB ? "grey" : ""), f: (r) => ivText(r.b) },
+    { h: "Raw ψ A", sub: "lead junction", sort: "rawa", title: "raw TRAIN pseudobulk ψ of A at the lead junction", f: (r) => f2(r.rawa) },
+    { h: "Raw ψ B", sub: "lead junction", sort: "rawb", title: "raw TRAIN pseudobulk ψ of B at the lead junction", f: (r) => f2(r.rawb) },
     { h: "Raw Δψ", sub: "lead junction", sort: "rawd", title: "raw TRAIN pseudobulk at the lead junction", f: (r) => f2(r.rawd) },
     { h: "Intervals", sub: "A, B on 0 to 1", l: 1, f: (r) => intervalGlyph(r.a, r.b) },
     { h: "Overlap", sort: "ovl", title: `at the lead junction; ${CONFIG.INTERVAL_LABEL}`, f: (r) => (r.ovl ? "yes" : "no") },
@@ -384,12 +386,12 @@ async function viewCompare(ds, an, bn) {
       const jo = CAT.jo[e], jn = CAT.jo[e + 1] - jo; let best = -1, lead = 0;
       for (let k = 0; k < jn; k++) { const d = Math.abs(X.psi[jo + k] - Y.psi[jo + k]); if (d > best) { best = d; lead = k; } }
       const j = jo + lead, a = { p: dec(X.psi[j]), lo: dec(X.lo[j]), hi: dec(X.hi[j]) }, b = { p: dec(Y.psi[j]), lo: dec(Y.lo[j]), hi: dec(Y.hi[j]) };
-      rows.push({ e, id: CAT.ids[e], gene: CAT.genes[CAT.gene_idx[e]], cls: CAT.classes[CAT.cls[e]], jn, lead, j, delta: best / SCALE, a, b, pa: a.p, pb: b.p, sd: a.p - b.p, rawd: dec(X.raw[j]) - dec(Y.raw[j]), ovl: overlap(a, b),
+      rows.push({ e, id: CAT.ids[e], gene: CAT.genes[CAT.gene_idx[e]], cls: CAT.classes[CAT.cls[e]], jn, lead, j, delta: best / SCALE, a, b, pa: a.p, pb: b.p, sd: a.p - b.p, rawa: dec(X.raw[j]), rawb: dec(Y.raw[j]), rawd: dec(X.raw[j]) - dec(Y.raw[j]), ovl: overlap(a, b),
         ra: X.reads[e], ca: X.cov[e], ma: X.mice[e], rb: Y.reads[e], cb: Y.cov[e], mb: Y.mice[e] });
     }
     st.download = (sorted) => downloadTSV(`compare_${ds}_${slug(A.name)}_vs_${slug(B.name)}.tsv`, ds, [`A = ${A.label}`, `B = ${B.label}`, filterLine(st), CONFIG.COMPARE_NOTE],
-      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi_A", "lo_A", "hi_A", "psi_B", "lo_B", "hi_B", "signed_delta_psi", "raw_delta_psi", "intervals_overlap", "reads_A", "cells_A", "mice_A", "reads_B", "cells_B", "mice_B", "A_grey", "B_grey", "splicevi_ds_call"],
-      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.b.lo), f4(r.b.hi), f4(r.sd), f4(r.rawd), r.ovl ? "yes" : "no", r.ra, r.ca, r.ma, r.rb, r.cb, r.mb, greyA, greyB, sv.map[r.id] ?? ""]));
+      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi_A", "lo_A", "hi_A", "psi_B", "lo_B", "hi_B", "signed_delta_psi", "raw_psi_A", "raw_psi_B", "raw_delta_psi", "intervals_overlap", "reads_A", "cells_A", "mice_A", "reads_B", "cells_B", "mice_B", "A_grey", "B_grey", "splicevi_ds_call"],
+      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.b.lo), f4(r.b.hi), f4(r.sd), f4(r.rawa), f4(r.rawb), f4(r.rawd), r.ovl ? "yes" : "no", r.ra, r.ca, r.ma, r.rb, r.cb, r.mb, greyA, greyB, sv.map[r.id] ?? ""]));
     renderTable(st, cols, rows, $("cmp-table"));
   };
   bindFilters(st, () => { st.page = 0; run(); });
