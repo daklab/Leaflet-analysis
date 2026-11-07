@@ -38,7 +38,7 @@ All generated data live under `$V/portal_browser/` (`precomputed/`, `site/`, `sc
 ## Views
 - **Search**: gene name or ATSE id; gene page lists its ATSEs.
 - **Event** (`#/event/<dataset>/<event_id>`): structure diagram and a ψ dot plot per junction, grouped by tissue / cell type (TMS)
-  or class / official subclass (Allen). LeafletFA estimate with interval; raw TRAIN pseudobulk as an open marker sized by junction reads.
+  or class / official subclass (Allen). LeafletFA estimate with interval (where validated); raw TRAIN pseudobulk as an open marker sized by junction reads.
 - **Compare two** (`#/compare/<dataset>/<A>/<B>`): ATSEs ranked by max |Δψ| across junctions. Default filter 20 reads and 3 cells per type.
 - **One vs. all others** (`#/one/<dataset>/<A>`): ATSEs ranked by max |ψ − rest ψ| (rest: saved check 10 mean over the other types' cells),
   with the range across other eligible types.
@@ -60,7 +60,11 @@ All generated data live under `$V/portal_browser/` (`precomputed/`, `site/`, `sc
 - `index.json`: version, shard layout, types per dataset, featured examples (each verified in `build_portal.featured`, or the build fails).
 - `catalog/events.json`, `catalog/junctions.bin` (u32 start × J, u32 end × J, u8 status × J), `catalog/struct/<bucket>.json`. Site junction order: by event, then genomic.
 - `<dataset>/types/<i>.bin`: one per type; columns in `index.json` `type_layout`; a compare loads two of these.
-- `<dataset>/events/<bucket>.bin`: 64 ATSEs per bucket (types × junctions); an event page loads one.
+- `<dataset>/events/<bucket>.bin`: 64 ATSEs per bucket; an event page loads one. Arrays in order: junction reads (u32, types × junctions),
+  ATSE reads (u32, types × ATSEs), TEST reads (u32), ψ, lo, hi, raw ψ (u16, types × junctions), cells with reads, mice, TEST cells with reads (u16, types × ATSEs).
+- Intervals (`lo`, `hi`): check 12 (a)+(b), from `LeafletFA/scripts/validation/c12_export.py` (`$V/c12/export/<ds>_intervals.npz`). A 95 % predictive
+  interval for the pseudobulk ψ of the type's held-out TEST cells at their read depth; missing (65535) where TEST has fewer than 100 reads or fewer
+  than 10 cells with reads at the ATSE. The rest-ψ interval has no validated version and is always missing.
 - ψ-like values: u16 = value × 10,000; 65535 = missing. All little-endian.
 
 ## Filling the "SpliceVI DS call" column

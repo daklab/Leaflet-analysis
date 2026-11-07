@@ -1,6 +1,6 @@
 {
- "version": "preview-2026-11-04",
- "built": "2026-11-06 13:55",
+ "version": "preview-2026-11-07",
+ "built": "2026-11-07 15:40",
  "site_note": "LeafletFA estimates are seed 0, K = 20; raw pseudobulk, reads, cells and mice are TRAIN cells only.",
  "classes": {
   "annotation_status": {
@@ -209,15 +209,15 @@
  },
  "size": {
   "files": 1352,
-  "total_bytes": 561998451,
+  "total_bytes": 620738685,
   "largest": "data/TMS/types/1.bin",
-  "largest_bytes": 1631624,
+  "largest_bytes": 1778474,
   "by_dir": {
    "catalog": 5034705,
-   "TMS/types": 215374368,
-   "TMS/events": 152198112,
-   "Allen/types": 110950432,
-   "Allen/events": 78405088
+   "TMS/types": 234758568,
+   "TMS/events": 171582312,
+   "Allen/types": 120936232,
+   "Allen/events": 88390888
   }
  }
 }

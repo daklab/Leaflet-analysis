@@ -5,7 +5,7 @@
     python build_portal.py web       # only re-copy web/ into the site (seconds, no data read)
     python -m http.server -d $V/portal_browser/site 8000
 
-The check 10 `specific`, `tv` and `p_tv` arrays are never read or written. See README.md for the file layout.
+The check 10 `specific`, `tv` and `p_tv` arrays are never read or written. Intervals: check 12 (a)+(b), from c12_export.py. See README.md for the file layout.
 """
 import argparse, glob, hashlib, json, os, shutil, sys, time
 import numpy as np, pandas as pd
@@ -13,14 +13,14 @@ import numpy as np, pandas as pd
 V = "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation"
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRE = os.path.join(V, "portal_browser", "precomputed")
-VERSION = "preview-2026-11-06"
+VERSION = "preview-2026-11-07"
 BUCKET = 64                     # ATSEs per event shard
 RANGE_READS, RANGE_CELLS = 20, 3  # support required to enter the "range in other types" columns (fixed at build)
 NA = 65535
 CLASSES = ["alt3", "alt5", "skipped_exon", "mxe_linked", "complex"]
 ANN = ["both", "five_prime", "three_prime", "unannotated"]
-TYPE_LAYOUT = [["reads", "u32", "E"], ["cov", "u16", "E"], ["mice", "u16", "E"], ["psi", "u16", "J"], ["lo", "u16", "J"], ["hi", "u16", "J"], ["raw", "u16", "J"],
-               ["rest", "u16", "J"], ["rest_lo", "u16", "J"], ["rest_hi", "u16", "J"], ["oth_min", "u16", "J"], ["oth_max", "u16", "J"]]
+TYPE_LAYOUT = [["reads", "u32", "E"], ["treads", "u32", "E"], ["cov", "u16", "E"], ["mice", "u16", "E"], ["psi", "u16", "J"], ["lo", "u16", "J"], ["hi", "u16", "J"], ["raw", "u16", "J"],
+               ["rest", "u16", "J"], ["rest_lo", "u16", "J"], ["rest_hi", "u16", "J"], ["oth_min", "u16", "J"], ["oth_max", "u16", "J"], ["tcells", "u16", "E"]]
 ALLEN_CLASS = {"Glutamatergic": "excitatory", "GABAergic": "inhibitory"}          # anything else: non-neuronal
 SS4 = {"Nrxn1": ("ENSMUSG00000024109.18_atse_2", 90992115, 90992144), "Nrxn2": ("ENSMUSG00000033768.16_atse_1", 6448255, 6448284),
        "Nrxn3": ("ENSMUSG00000066392.11_atse_2", 88850279, 88850308)}             # c10_known_biology_fix.py
@@ -131,7 +131,12 @@ def build_data(site):
         rec = json.load(open(os.path.join(PRE, f"{ds}_record.json")))
         types = E["types"].astype(str); assert np.array_equal(types, C["types"].astype(str))
         T = len(types)
-        psi = E["point"][:, perm]; lo = E["lo"][:, perm]; hi = E["hi"][:, perm]; rest = E["rest"][:, perm]; rlo = E["lo_rest"][:, perm]; rhi = E["hi_rest"][:, perm]
+        # interval: check 12 (a)+(b), predictive for the type's held-out TEST cells; NA outside the check 12 units (Karin 2026-11-07).
+        # The rest interval has no validated version and is not shown.
+        IV = np.load(os.path.join(V, "c12", "export", f"{ds}_intervals.npz")); assert np.array_equal(IV["types"].astype(str), types)
+        psi = E["point"][:, perm]; lo = IV["lo"][:, perm]; hi = IV["hi"][:, perm]; rest = E["rest"][:, perm]
+        rlo = np.full_like(rest, np.nan); rhi = np.full_like(rest, np.nan)
+        tr = IV["test_reads"].astype(np.uint32); tc = IV["test_cells"].astype(np.uint16)
         jr = C["jreads"][:, perm]; er = C["ereads"]; cov = C["cov"]; mice = C["mice"]
         tot = er[:, inv_s].astype(np.float64)
         with np.errstate(invalid="ignore", divide="ignore"):
@@ -142,10 +147,10 @@ def build_data(site):
         ep, el, eh, er_, er2, er3, emn, emx, eraw = enc(psi), enc(lo), enc(hi), enc(rest), enc(rlo), enc(rhi), enc(mn), enc(mx), enc(raw)
         dsdir = os.path.join(site, "data", ds)
         for k in range(T):
-            wb(os.path.join(dsdir, "types", f"{k}.bin"), [er[k], cov[k], mice[k], ep[k], el[k], eh[k], eraw[k], er_[k], er2[k], er3[k], emn[k], emx[k]])
+            wb(os.path.join(dsdir, "types", f"{k}.bin"), [er[k], tr[k], cov[k], mice[k], ep[k], el[k], eh[k], eraw[k], er_[k], er2[k], er3[k], emn[k], emx[k], tc[k]])
         for b in range(0, n_e, BUCKET):
             e1 = min(n_e, b + BUCKET); j0, j1 = jo[b], jo[e1]
-            wb(os.path.join(dsdir, "events", f"{b // BUCKET}.bin"), [jr[:, j0:j1], er[:, b:e1], ep[:, j0:j1], el[:, j0:j1], eh[:, j0:j1], eraw[:, j0:j1], cov[:, b:e1], mice[:, b:e1]])
+            wb(os.path.join(dsdir, "events", f"{b // BUCKET}.bin"), [jr[:, j0:j1], er[:, b:e1], tr[:, b:e1], ep[:, j0:j1], el[:, j0:j1], eh[:, j0:j1], eraw[:, j0:j1], cov[:, b:e1], mice[:, b:e1], tc[:, b:e1]])
         meta = rec["types_meta"]; tlist = []
         for k, m in enumerate(meta):
             assert m["type"] == types[k]
@@ -157,7 +162,9 @@ def build_data(site):
                 d.update(label=m["type"], group1=cl, group2=m["subclass"], allen_class_label=m["allen_class"], allen_class_fraction=m["allen_class_fraction"])
             tlist.append(d)
         fr = rec["fit_record"]; md = rec["md5"]
-        src = dict(seed=fr["seed"], K=fr["K"], fit_md5=md["fit"]["md5"], fit_commit=fr["leafletfa_git"]["commit"], fit_dirty=fr["leafletfa_git"]["dirty"], estimates_md5=md["estimates"]["md5"])
+        ivp = os.path.join(V, "c12", "export", f"{ds}_intervals.npz")
+        src = dict(seed=fr["seed"], K=fr["K"], fit_md5=md["fit"]["md5"], fit_commit=fr["leafletfa_git"]["commit"], fit_dirty=fr["leafletfa_git"]["dirty"], estimates_md5=md["estimates"]["md5"],
+                   intervals_md5=hashlib.md5(open(ivp, "rb").read()).hexdigest(), tau2=json.loads(str(IV["tau2"])))
         index["datasets"][ds] = dict(types=tlist, train_cells=rec["train_cells"], source=src, splicevi_ds=None)
         lt2 = [t["name"] for t in tlist if t["n_mice"] < 2]; inel = [t["name"] for t in tlist if not t["eligible"]]
         manifest["datasets"][ds] = dict(types=T, train_cells=rec["train_cells"], labels_not_in_estimates=rec["labels_not_in_estimates"], fit_record=fr, inputs_md5=md,

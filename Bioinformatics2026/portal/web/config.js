@@ -1,6 +1,9 @@
 // Every wording and rule the browser must state in one place. Edit here; nothing else repeats these values.
 const CONFIG = {
-  INTERVAL_LABEL: "posterior interval (not calibrated; see Supplementary)",
+  INTERVAL_LABEL: "95 % predictive interval for the pseudobulk ψ of this type's held-out cells at their read depth (check 12; shown where held-out cells have ≥ 100 reads and ≥ 10 cells with reads at the ATSE)",
+  IV_MIN_TEST_READS: 100,   // check 12 units; must equal c12_export.MIN_READS / MIN_CELLS
+  IV_MIN_TEST_CELLS: 10,
+  REST_INTERVAL_NOTE: "rest ψ has no validated interval",
   COMPARE_NOTE: "Ranking for exploration; LeafletFA's cell-type specificity calls did not pass validation (see paper).",
   // Which cell types show estimates in grey.
   //   "n_mice_lt2": fewer than 2 mice (Karin's spec, 2026-11-06; default). No type has fewer than 2 mice at present, so nothing is grey.

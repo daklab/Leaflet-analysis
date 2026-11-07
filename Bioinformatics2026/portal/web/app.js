@@ -118,15 +118,16 @@ async function loadEvent(ds, e) {
   const [buf, st] = await Promise.all([getBuf(`data/${ds}/events/${b}.bin`), getJSON(`data/catalog/struct/${b}.json`)]);
   let off = 0;
   const take = (Arr, n) => { const a = new Arr(buf, off, n); off += n * Arr.BYTES_PER_ELEMENT; return a; };
-  const jreads = take(Uint32Array, T * nj), ereads = take(Uint32Array, T * ne);
+  const jreads = take(Uint32Array, T * nj), ereads = take(Uint32Array, T * ne), treads = take(Uint32Array, T * ne);
   const psi = take(Uint16Array, T * nj), lo = take(Uint16Array, T * nj), hi = take(Uint16Array, T * nj), raw = take(Uint16Array, T * nj);
-  const cov = take(Uint16Array, T * ne), mice = take(Uint16Array, T * ne);
+  const cov = take(Uint16Array, T * ne), mice = take(Uint16Array, T * ne), tcells = take(Uint16Array, T * ne);
   if (off !== buf.byteLength) throw new Error(`bucket ${b}: expected ${off} bytes, got ${buf.byteLength}`);
   const v = eventInfo(e), jl = v.jo - j0, el = e - e0;
   return {
     v, D, exons: st[CAT.ids[e]],
     psi: (t, k) => dec(psi[t * nj + jl + k]), lo: (t, k) => dec(lo[t * nj + jl + k]), hi: (t, k) => dec(hi[t * nj + jl + k]), raw: (t, k) => dec(raw[t * nj + jl + k]),
     jreads: (t, k) => jreads[t * nj + jl + k], reads: (t) => ereads[t * ne + el], cov: (t) => cov[t * ne + el], mice: (t) => mice[t * ne + el],
+    treads: (t) => treads[t * ne + el], tcells: (t) => tcells[t * ne + el],
   };
 }
 
@@ -245,7 +246,7 @@ function dotTable(ds, E, st, hlSet) {
       body += `<tr class="${grey ? "grey" : ""}${hlSet.has(t.name) ? " hl" : ""}"><th class="label" title="${esc(t.label)}${grey ? `; grey: ${esc(greyReason(t))}` : ""}">${esc(st.group === "group1" && ds === "TMS" ? t.group2 : t.name)}</th><td class="n">${num(E.reads(i))}</td><td class="n">${num(E.cov(i))}</td><td class="n">${num(E.mice(i))}</td>`;
       for (let k = 0; k < v.jn; k++) {
         const p = E.psi(i, k), lo = E.lo(i, k), hi = E.hi(i, k), raw = E.raw(i, k), rr = E.jreads(i, k);
-        let m = ref + `<line x1="${X(lo)}" x2="${X(hi)}" y1="7.5" y2="7.5" stroke="${col}" stroke-width="1.6"/><circle cx="${X(p)}" cy="7.5" r="2.8" fill="${col}"/>`;
+        let m = ref + (hasIv(lo, hi) ? `<line x1="${X(lo)}" x2="${X(hi)}" y1="7.5" y2="7.5" stroke="${col}" stroke-width="1.6"/>` : "") + `<circle cx="${X(p)}" cy="7.5" r="2.8" fill="${col}"/>`;
         if (!Number.isNaN(raw)) m += `<circle cx="${X(raw)}" cy="7.5" r="${Math.max(1.5, rawR(rr))}" fill="none" stroke="${rawc}" stroke-width="0.9"/>`;
         body += `<td data-t="${i}" data-k="${k}"><svg width="${PW}" height="${RH}">${m}</svg></td>`;
       }
@@ -261,7 +262,8 @@ function attachDotTip(ds, E) {
     const td = ev.target.closest("td[data-t]");
     if (!td) { tip.hidden = true; return; }
     const i = +td.dataset.t, k = +td.dataset.k, t = E.D.types[i];
-    tip.innerHTML = `<b>${esc(t.label)}</b>, J${k + 1}<br>LeafletFA ψ ${f2(E.psi(i, k))} [${f2(E.lo(i, k))}, ${f2(E.hi(i, k))}]<br><span class="meta">${esc(CONFIG.INTERVAL_LABEL)}</span><br>raw pseudobulk ψ ${f2(E.raw(i, k))}; ${num(E.jreads(i, k))} of ${num(E.reads(i))} reads<br>${num(E.cov(i))} cells and ${num(E.mice(i))} mice with reads at this ATSE${isGrey(t) ? `<br><span class="meta">grey: ${esc(greyReason(t))}</span>` : ""}`;
+    const ivs = ivStatus(E.treads(i), E.tcells(i));
+    tip.innerHTML = `<b>${esc(t.label)}</b>, J${k + 1}<br>LeafletFA ψ ${ivText({ p: E.psi(i, k), lo: E.lo(i, k), hi: E.hi(i, k) })}<br><span class="meta">${ivs ? esc(ivs) : esc(CONFIG.INTERVAL_LABEL)}</span><br>held-out (TEST): ${num(E.treads(i))} reads, ${num(E.tcells(i))} cells with reads at this ATSE<br>raw pseudobulk ψ ${f2(E.raw(i, k))}; ${num(E.jreads(i, k))} of ${num(E.reads(i))} reads<br>${num(E.cov(i))} cells and ${num(E.mice(i))} mice with reads at this ATSE${isGrey(t) ? `<br><span class="meta">grey: ${esc(greyReason(t))}</span>` : ""}`;
     tip.hidden = false;
     tip.style.left = Math.min(innerWidth - 370, ev.clientX + 14) + "px"; tip.style.top = Math.min(innerHeight - 130, ev.clientY + 12) + "px";
   };
@@ -313,11 +315,16 @@ const passesMeta = (st, e) => (!st.cls || CAT.classes[CAT.cls[e]] === st.cls) &&
 
 function intervalGlyph(a, b) {
   const W = 104, X = (p) => 3 + p * (W - 6);
-  const seg = (x, y, col) => `<line x1="${X(x.lo)}" x2="${X(x.hi)}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="2"/><circle cx="${X(x.p)}" cy="${y}" r="2.4" fill="${col}"/>`;
+  const seg = (x, y, col) => (hasIv(x.lo, x.hi) ? `<line x1="${X(x.lo)}" x2="${X(x.hi)}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="2"/>` : "") + `<circle cx="${X(x.p)}" cy="${y}" r="2.4" fill="${col}"/>`;
   return `<svg width="${W}" height="15" aria-hidden="true"><line x1="${X(0)}" x2="${X(1)}" y1="14" y2="14" stroke="var(--line)"/>${seg(a, 4, "var(--ochre)")}${seg(b, 10, "var(--raw)")}</svg>`;
 }
-const overlap = (a, b) => a.lo <= b.hi && b.lo <= a.hi;
-const ivText = (x) => `${f2(x.p)} [${f2(x.lo)}, ${f2(x.hi)}]`;
+const hasIv = (lo, hi) => !Number.isNaN(lo) && !Number.isNaN(hi);
+// 1 = overlap, 0 = no overlap, -1 = an interval is missing (shown and downloaded as NA)
+const overlap = (a, b) => (hasIv(a.lo, a.hi) && hasIv(b.lo, b.hi) ? (a.lo <= b.hi && b.lo <= a.hi ? 1 : 0) : -1);
+const ovlText = (o) => (o < 0 ? "NA" : o ? "yes" : "no");
+const ivText = (x) => (hasIv(x.lo, x.hi) ? `${f2(x.p)} [${f2(x.lo)}, ${f2(x.hi)}]` : `${f2(x.p)} <span class="meta">[no interval]</span>`);
+const ivStatus = (tr, tc) => (tr < CONFIG.IV_MIN_TEST_READS ? `no interval: fewer than ${CONFIG.IV_MIN_TEST_READS} held-out (TEST) reads`
+  : tc < CONFIG.IV_MIN_TEST_CELLS ? `no interval: fewer than ${CONFIG.IV_MIN_TEST_CELLS} held-out (TEST) cells with reads` : "");
 
 function renderTable(st, cols, rows, host) {
   const key = st.sort, dir = st.dir;
@@ -373,7 +380,7 @@ async function viewCompare(ds, an, bn) {
     { h: "Raw ψ B", sub: "lead junction", sort: "rawb", title: "raw TRAIN pseudobulk ψ of B at the lead junction", f: (r) => f2(r.rawb) },
     { h: "Raw Δψ", sub: "lead junction", sort: "rawd", title: "raw TRAIN pseudobulk at the lead junction", f: (r) => f2(r.rawd) },
     { h: "Intervals", sub: "A, B on 0 to 1", l: 1, f: (r) => intervalGlyph(r.a, r.b) },
-    { h: "Overlap", sort: "ovl", title: `at the lead junction; ${CONFIG.INTERVAL_LABEL}`, f: (r) => (r.ovl ? "yes" : "no") },
+    { h: "Overlap", sort: "ovl", title: `at the lead junction; ${CONFIG.INTERVAL_LABEL}; NA if either interval is missing`, f: (r) => ovlText(r.ovl) },
     { h: "Reads A", sort: "ra", f: (r) => num(r.ra) }, { h: "Cells A", sort: "ca", f: (r) => num(r.ca) },
     { h: "Reads B", sort: "rb", f: (r) => num(r.rb) }, { h: "Cells B", sort: "cb", f: (r) => num(r.cb) },
     spliceviCol(sv),
@@ -390,8 +397,8 @@ async function viewCompare(ds, an, bn) {
         ra: X.reads[e], ca: X.cov[e], ma: X.mice[e], rb: Y.reads[e], cb: Y.cov[e], mb: Y.mice[e] });
     }
     st.download = (sorted) => downloadTSV(`compare_${ds}_${slug(A.name)}_vs_${slug(B.name)}.tsv`, ds, [`A = ${A.label}`, `B = ${B.label}`, filterLine(st), CONFIG.COMPARE_NOTE],
-      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi_A", "lo_A", "hi_A", "psi_B", "lo_B", "hi_B", "signed_delta_psi", "raw_psi_A", "raw_psi_B", "raw_delta_psi", "intervals_overlap", "reads_A", "cells_A", "mice_A", "reads_B", "cells_B", "mice_B", "A_grey", "B_grey", "splicevi_ds_call"],
-      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.b.lo), f4(r.b.hi), f4(r.sd), f4(r.rawa), f4(r.rawb), f4(r.rawd), r.ovl ? "yes" : "no", r.ra, r.ca, r.ma, r.rb, r.cb, r.mb, greyA, greyB, sv.map[r.id] ?? ""]));
+      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi_A", "lo_A", "hi_A", "psi_B", "lo_B", "hi_B", "signed_delta_psi", "raw_psi_A", "raw_psi_B", "raw_delta_psi", "intervals_overlap", "reads_A", "cells_A", "mice_A", "test_reads_A", "test_cells_A", "reads_B", "cells_B", "mice_B", "test_reads_B", "test_cells_B", "A_grey", "B_grey", "splicevi_ds_call"],
+      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.b.lo), f4(r.b.hi), f4(r.sd), f4(r.rawa), f4(r.rawb), f4(r.rawd), ovlText(r.ovl), r.ra, r.ca, r.ma, X.treads[r.e], X.tcells[r.e], r.rb, r.cb, r.mb, Y.treads[r.e], Y.tcells[r.e], greyA, greyB, sv.map[r.id] ?? ""]));
     renderTable(st, cols, rows, $("cmp-table"));
   };
   bindFilters(st, () => { st.page = 0; run(); });
@@ -411,7 +418,7 @@ async function viewOne(ds, an) {
   const [X, sv] = await Promise.all([loadType(ds, A.i), loadSpliceVI(ds, `${A.i}__rest`)]);
   const st = { ...newFilters(), sort: "delta", dir: -1 }, grey = isGrey(A);
   $("one-body").innerHTML = `${greyBanner([A])}<div class="controls">${filterControls(st)}</div>
-  <p class="meta">Filters apply to this ${typeLabel(ds)}. Rest ψ = mean over all TRAIN cells of the other ${typesLabel(ds)} (saved in check 10). Range = lowest to highest LeafletFA ψ among other eligible ${typesLabel(ds)} with at least ${INDEX.range_min_reads} reads and ${INDEX.range_min_cells} cells at the ATSE (fixed; does not follow the filters). Beyond range = distance from this ψ to that range, 0 if inside. Lead = junction with the largest |ψ − rest ψ|. Interval: ${esc(CONFIG.INTERVAL_LABEL)}.</p><div id="one-table"></div>`;
+  <p class="meta">Filters apply to this ${typeLabel(ds)}. Rest ψ = mean over all TRAIN cells of the other ${typesLabel(ds)} (saved in check 10). Range = lowest to highest LeafletFA ψ among other eligible ${typesLabel(ds)} with at least ${INDEX.range_min_reads} reads and ${INDEX.range_min_cells} cells at the ATSE (fixed; does not follow the filters). Beyond range = distance from this ψ to that range, 0 if inside. Lead = junction with the largest |ψ − rest ψ|. Interval: ${esc(CONFIG.INTERVAL_LABEL)}; ${esc(CONFIG.REST_INTERVAL_NOTE)}.</p><div id="one-table"></div>`;
   const cols = [
     { h: "#", f: (r, i) => i + 1 },
     { h: "Gene", l: 1, sort: "gene", f: geneCell },
@@ -420,11 +427,10 @@ async function viewOne(ds, an) {
     { h: "Lead", l: 1, f: (r) => `J${r.lead + 1}<span class="meta"> of ${r.jn}</span>` },
     { h: "Max |ψ − rest|", sort: "delta", f: (r) => `<b>${f2(r.delta)}</b>` },
     { h: "ψ", sub: "[interval]", sort: "pa", cls: () => (grey ? "grey" : ""), f: (r) => ivText(r.a) },
-    { h: "Rest ψ", sub: "[interval]", sort: "pb", f: (r) => ivText(r.b) },
+    { h: "Rest ψ", sort: "pb", title: CONFIG.REST_INTERVAL_NOTE, f: (r) => f2(r.b.p) },
     { h: "Range in others", f: (r) => `${f2(r.mn)} to ${f2(r.mx)}` },
     { h: "Beyond range", sort: "gap", f: (r) => f2(r.gap) },
-    { h: "Intervals", sub: "this, rest on 0 to 1", l: 1, f: (r) => intervalGlyph(r.a, r.b) },
-    { h: "Overlap", sort: "ovl", title: `at the lead junction; ${CONFIG.INTERVAL_LABEL}`, f: (r) => (r.ovl ? "yes" : "no") },
+    { h: "Intervals", sub: "this (interval), rest (point) on 0 to 1", l: 1, f: (r) => intervalGlyph(r.a, r.b) },
     { h: "Raw ψ", sub: "lead junction", sort: "raw", f: (r) => f2(r.raw) },
     { h: "Reads", sort: "ra", f: (r) => num(r.ra) }, { h: "Cells", sort: "ca", f: (r) => num(r.ca) },
     spliceviCol(sv),
@@ -442,8 +448,8 @@ async function viewOne(ds, an) {
       rows.push({ e, id: CAT.ids[e], gene: CAT.genes[CAT.gene_idx[e]], cls: CAT.classes[CAT.cls[e]], jn, lead, j, delta: best / SCALE, a, b, pa: a.p, pb: b.p, mn, mx, gap, raw: dec(X.raw[j]), ovl: overlap(a, b), ra: X.reads[e], ca: X.cov[e], ma: X.mice[e] });
     }
     st.download = (sorted) => downloadTSV(`one_vs_rest_${ds}_${slug(A.name)}.tsv`, ds, [`type = ${A.label}`, filterLine(st), CONFIG.COMPARE_NOTE],
-      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi", "lo", "hi", "psi_rest", "lo_rest", "hi_rest", "others_min", "others_max", "beyond_range", "raw_psi", "intervals_overlap", "reads", "cells", "mice", "grey", "splicevi_ds_call"],
-      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.b.lo), f4(r.b.hi), f4(r.mn), f4(r.mx), r.gap < 0 ? "NA" : f4(r.gap), f4(r.raw), r.ovl ? "yes" : "no", r.ra, r.ca, r.ma, grey, sv.map[r.id] ?? ""]));
+      ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi", "lo", "hi", "psi_rest", "others_min", "others_max", "beyond_range", "raw_psi", "reads", "cells", "mice", "test_reads", "test_cells", "grey", "splicevi_ds_call"],
+      sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.mn), f4(r.mx), r.gap < 0 ? "NA" : f4(r.gap), f4(r.raw), r.ra, r.ca, r.ma, X.treads[r.e], X.tcells[r.e], grey, sv.map[r.id] ?? ""]));
     renderTable(st, cols, rows, $("one-table"));
   };
   bindFilters(st, () => { st.page = 0; run(); });
@@ -456,15 +462,15 @@ const filterLine = (st) => `filters: min reads ${st.minReads}, min cells with re
 function downloadTSV(name, ds, notes, header, rows) {
   const S = INDEX.datasets[ds].source;
   const head = [`LeafletFA cell-type splicing browser, version ${INDEX.version}`, `dataset ${ds}; seed ${S.seed}, K = ${S.K}`, `fit.npz md5 ${S.fit_md5}`, `fit commit ${S.fit_commit}${S.fit_dirty ? " (recorded dirty)" : ""}`,
-    `estimates md5 ${S.estimates_md5}`, `interval: ${CONFIG.INTERVAL_LABEL}`, ...notes].map((l) => `# ${l}`);
+    `estimates md5 ${S.estimates_md5}`, `intervals md5 ${S.intervals_md5}; tau^2 by TEST read bin ${JSON.stringify(S.tau2)}`, `interval: ${CONFIG.INTERVAL_LABEL}`, ...notes].map((l) => `# ${l}`);
   const txt = [...head, header.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n") + "\n";
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/tab-separated-values" })); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
 }
 function downloadEvent(ds, E) {
   const v = E.v, rows = [];
-  E.D.types.forEach((t, i) => { for (let k = 0; k < v.jn; k++) rows.push([t.label, t.group1 ?? "", isGrey(t), v.id, v.gene, jId(v.jo + k, v), f4(E.psi(i, k)), f4(E.lo(i, k)), f4(E.hi(i, k)), f4(E.raw(i, k)), E.jreads(i, k), E.reads(i), E.cov(i), E.mice(i)]); });
-  downloadTSV(`event_${ds}_${slug(v.id)}.tsv`, ds, [`event class ${v.cls}`], [typeLabel(ds).replace(" ", "_"), ds === "Allen" ? "class" : "tissue", "grey", "event_id", "gene", "junction_id", "psi", "lo", "hi", "raw_psi", "junction_reads", "atse_reads", "cells_with_reads", "mice_with_reads"], rows);
+  E.D.types.forEach((t, i) => { for (let k = 0; k < v.jn; k++) rows.push([t.label, t.group1 ?? "", isGrey(t), v.id, v.gene, jId(v.jo + k, v), f4(E.psi(i, k)), f4(E.lo(i, k)), f4(E.hi(i, k)), ivStatus(E.treads(i), E.tcells(i)) || "check 12 (a)+(b)", f4(E.raw(i, k)), E.jreads(i, k), E.reads(i), E.cov(i), E.mice(i), E.treads(i), E.tcells(i)]); });
+  downloadTSV(`event_${ds}_${slug(v.id)}.tsv`, ds, [`event class ${v.cls}`], [typeLabel(ds).replace(" ", "_"), ds === "Allen" ? "class" : "tissue", "grey", "event_id", "gene", "junction_id", "psi", "lo", "hi", "interval_status", "raw_psi", "junction_reads", "atse_reads", "cells_with_reads", "mice_with_reads", "test_reads", "test_cells_with_reads"], rows);
 }
 
 /* ---------- routing ---------- */

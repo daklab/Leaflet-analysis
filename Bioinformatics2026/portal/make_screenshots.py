@@ -23,7 +23,7 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{srv.server_address[1]}/"
 enc = urllib.parse.quote
 NOTE = "Ranking for exploration; LeafletFA's cell-type specificity calls did not pass validation (see paper)."
-IV = "posterior interval (not calibrated; see Supplementary)"
+IV = "95 % predictive interval for the pseudobulk ψ of this type's held-out cells"   # check 12 (a)+(b); full label in web/config.js
 GRIA2 = "ENSMUSG00000033981.14_atse_3"
 fails = []
 
@@ -76,10 +76,17 @@ with sync_playwright() as p:
     with pg.expect_download() as d:
         pg.click("#ev-dl")
     t = open(d.value.path()).read().splitlines()
-    print("\n".join(t[:9])); check("event TSV header", t[0].startswith("# LeafletFA") and any("fit.npz md5" in x for x in t[:8]) and any(IV in x for x in t[:8]))
+    print("\n".join(t[:10])); check("event TSV header", t[0].startswith("# LeafletFA") and any("fit.npz md5" in x for x in t[:9]) and any(IV in x for x in t[:9]) and any("intervals md5" in x for x in t[:9]))
+    hd = [x for x in t if not x.startswith("#")]; cols = hd[0].split("\t"); body = [x.split("\t") for x in hd[1:]]
+    check("event TSV has interval_status, test_reads, test_cells_with_reads", all(c in cols for c in ("interval_status", "test_reads", "test_cells_with_reads")))
+    si, li, tri, tci = cols.index("interval_status"), cols.index("lo"), cols.index("test_reads"), cols.index("test_cells_with_reads")
+    ok_rows = [r for r in body if r[si] == "check 12 (a)+(b)"]; na_rows = [r for r in body if r[si] != "check 12 (a)+(b)"]
+    check("event TSV: interval present exactly where TEST >= 100 reads and >= 10 cells",
+          all(r[li] != "NA" and int(r[tri]) >= 100 and int(r[tci]) >= 10 for r in ok_rows) and all(r[li] == "NA" and (int(r[tri]) < 100 or int(r[tci]) < 10) for r in na_rows),
+          f"{len(ok_rows)} with, {len(na_rows)} without")
     # hover
     go(f"#/event/Allen/{GRIA2}", "table.dots"); pg.hover("td[data-t='5'][data-k='2']"); pg.wait_for_timeout(100)
-    check("dot tooltip", "LeafletFA" in pg.inner_text("#tip")); pg.screenshot(path=os.path.join(a.out, "04b_event_tooltip.png"))
+    check("dot tooltip", "LeafletFA" in pg.inner_text("#tip") and "held-out (TEST)" in pg.inner_text("#tip")); pg.screenshot(path=os.path.join(a.out, "04b_event_tooltip.png"))
     pg.set_viewport_size(dict(width=1440, height=950))
     # grey type
     go("#/event/TMS/ENSMUSG00000030849.18_atse_3", "table.dots")
@@ -109,6 +116,7 @@ with sync_playwright() as p:
     # one vs all
     go(f"#/one/Allen/{enc(B, safe='')}", "#one-table table"); shot("08_one_vs_all_allen_pvalb", full=False)
     check("one-vs-all note", NOTE in text()); check("one-vs-all SpliceVI column", "SpliceVI DS call" in text())
+    check("one-vs-all: no Overlap column (rest has no validated interval)", pg.locator("#one-table th", has_text="Overlap").count() == 0)
     pg.fill("#f-gene", "gria2"); pg.wait_for_timeout(500); shot("09_one_vs_all_filtered_gria2", full=False)
     check("one-vs-all gene filter", "Gria2" in pg.inner_text("#one-table"))
     with pg.expect_download() as d:
