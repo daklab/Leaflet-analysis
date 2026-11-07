@@ -16,7 +16,7 @@ Layout mock-up (no data): `paper/figures/layout/fig1_appnote_layout.png` (`fig1_
 Each of c to f: exon structure on top (the browser's structure diagram, GENCODE vM19), ψ per cell type below (LeafletFA point with interval labeled not calibrated, raw TRAIN pseudobulk sized by reads). The browser gap diagnosis (TMS ranking vs raw) must finish before d and f are drawn, since both are TMS.
 
 ## Supplement gallery (10 to 20 ATSEs)
-Selection rule to fix before choosing (proposal): event classes spread (alt 3', alt 5', skipped exon, MXE linked, complex), both atlases, at least 20 reads and 3 cells in the shown types, and LeafletFA and raw Δψ of the same sign; known-biology events first (literature list to be agreed), not the top of a ranking.
+Selection rule, approved by Karin as proposed (2026-11-06); event list draft in GALLERY_KNOWN_BIOLOGY_DRAFT.md: event classes spread (alt 3', alt 5', skipped exon, MXE linked, complex), both atlases, at least 20 reads and 3 cells in the shown types, and LeafletFA and raw Δψ of the same sign; known-biology events first (literature list to be agreed), not the top of a ranking.
 
 ## Moves out of the main figure
 Interval coverage and width (10.3), duplicate reads, sparsity per cell, representation checks, program stability, benchmarks, DS null, Allen donor composition: Supplement. Everything else: browser.
