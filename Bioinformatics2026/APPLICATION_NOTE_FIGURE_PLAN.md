@@ -13,7 +13,7 @@ Layout mock-up (no data): `paper/figures/layout/fig1_appnote_layout.png` (`fig1_
 | e | *Nrxn1* SS4 (atse_2), excitatory vs inhibitory (Allen); chosen by Karin 2026-11-06 (best-known SLM2 target; matches SpliceVI Fig. 2 switches) | `tsv/c10_Allen_s0_nrxn_pairs_note4.tsv` | chosen, to draw |
 | f | *Ptprc* in lymphoid cells (TMS atse_2), B and T vs other immune types | `tsv/c10_TMS_s0_ptprc_direction.tsv` | to draw |
 
-Each of c to f: exon structure on top (the browser's structure diagram, GENCODE vM19), ψ per cell type below (LeafletFA point with interval labeled not calibrated, raw TRAIN pseudobulk sized by reads). The browser gap diagnosis (TMS ranking vs raw) must finish before d and f are drawn, since both are TMS.
+Each of c to f: exon structure on top (the browser's structure diagram, GENCODE vM19), ψ per cell type below (LeafletFA point with the check 12 interval: 95 % predictive interval for the type's held-out pseudobulk ψ at its read depth, shown only where held-out cells have ≥ 100 reads and ≥ 10 cells with reads, point only elsewhere; raw TRAIN pseudobulk sized by reads). The browser gap diagnosis (TMS ranking vs raw) must finish before d and f are drawn, since both are TMS.
 
 ## Supplement gallery (10 to 20 ATSEs)
 Selection rule, approved by Karin as proposed (2026-11-06); event list draft in GALLERY_KNOWN_BIOLOGY_DRAFT.md: event classes spread (alt 3', alt 5', skipped exon, MXE linked, complex), both atlases, at least 20 reads and 3 cells in the shown types, and LeafletFA and raw Δψ of the same sign; known-biology events first (literature list to be agreed), not the top of a ranking.

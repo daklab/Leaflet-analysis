@@ -27,7 +27,7 @@ for i, (lab, t, b) in enumerate(ex):
     box(x, y, 85, 43, lab, t, "")
     strip(x, y + 6, 85, "exon structure (portal structure diagram; GENCODE vM19)")
     ax.add_patch(Rectangle((x + 2, y + 17), 50, 24, fc="white", ec="#657BB5", lw=0.5, ls=(0, (3, 2))))
-    ax.text(x + 4, y + 19, "psi per cell type: dot = LeafletFA\n(interval, not calibrated), ring = raw\nTRAIN pseudobulk sized by reads", fontsize=4.8, va="top", color="#6E7478")
+    ax.text(x + 4, y + 19, "psi per cell type: dot = LeafletFA\n(95% predictive interval for held-out\npseudobulk where >= 100 reads, >= 10 cells),\nring = raw TRAIN pseudobulk sized by reads", fontsize=4.8, va="top", color="#6E7478")
     import textwrap; ax.text(x + 54, y + 18, "\n".join(textwrap.fill(l, 30) for l in b.split("\n")), fontsize=5, va="top", color="#222222", linespacing=1.3)
 ax.text(4, 163, "Layout only, no data. 183 x 165 mm. Gallery of 10-20 further ATSEs in the Supplement; every event in the browser. Colors: LeafletFA teal, raw grey, lineages from the cell-type maps.",
         fontsize=5, color="#6E7478")
