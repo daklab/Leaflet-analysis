@@ -1,7 +1,8 @@
-# Supplement gallery: known-biology event list (DRAFT for Karin's approval; 2026-11-06)
+# Supplement gallery: known-biology event list (approved by Karin with changes, 2026-11-09)
 
-Status: draft. Nothing is ranked or looked up against this list until Karin approves it. The gallery rule was approved
-as proposed (2026-11-06; APPLICATION_NOTE_FIGURE_PLAN.md).
+Status: approved with changes (Karin 2026-11-09). No LeafletFA or raw value has been looked up against this list. The gallery rule was
+approved as proposed (2026-11-06; APPLICATION_NOTE_FIGURE_PLAN.md). Every citation's volume and pages must be verified against PubMed or the
+journal before use (section "Citation check" below).
 
 - Directions come from the cited papers, written before any LeafletFA or raw value was looked at.
 - Citations were written from memory, without a literature search. Each needs a check (volume, pages, and that the paper
@@ -13,20 +14,31 @@ as proposed (2026-11-06; APPLICATION_NOTE_FIGURE_PLAN.md).
 | # | Gene | Event | Atlas | Expected direction | Citation |
 |---|---|---|---|---|---|
 | 1 | *Fgfr2* | IIIb vs IIIc exon (MXE), atse_3 | TMS | IIIb higher in epithelial types, IIIc in mesenchymal (ESRP1/2) | Warzecha et al. 2009, Mol Cell 33:591 (VERIFY) |
-| 2 | *Ptprc* | Variable exons 4–6 (CD45RA/RB/RC), atse_2 | TMS | Inclusion higher in B cells than T cells | Oberdoerffer et al. 2008, Science 321:686, hnRNPLL (VERIFY) |
-| 3 | *Nrxn1* | SS4 exon, atse_2 | Allen | Different SS4 usage between neuron groups; SLM2 represses SS4 where it is expressed (direction by cell group to confirm from the paper) | Traunmüller et al. 2016, Science 352:982 (VERIFY) |
+| 2 | *Ptprc* | Variable exons 4–6 (CD45RA/RB/RC), atse_2 | TMS | Inclusion higher in B cells than T cells | Hermiston, Xu and Weiss 2003, Annu Rev Immunol (CD45 review; VERIFY) |
+| 3 | *Nrxn1* | SS4 exon, atse_2 | Allen | Differs between neuron groups (a direction only if Traunmüller 2016 is read and states it) | Traunmüller et al. 2016, Science 352:982 (VERIFY); Nguyen et al. 2016, eLife (SLM2 drives principal-cell neurexin isoforms; most PV interneurons lack SLM2; VERIFY) |
 | 4 | *Gria2* | Flip vs flop (MXE), atse_3 | Allen | Flip/flop ratio differs between neuron types; no single direction stated for excitatory vs inhibitory, so descriptive only | Sommer et al. 1990, Science 249:1580 (VERIFY) |
 | 5 | *Cd44* | Variable exons v2–v10 | TMS | Inclusion higher in epithelial than mesenchymal types (ESRP) | Warzecha et al. 2010, EMBO J 29:3286 (VERIFY) |
 | 6 | *Enah* | Exon 11a | TMS | Included in epithelial, skipped in mesenchymal types (ESRP) | Warzecha et al. 2010 (as row 5; VERIFY) |
 | 7 | *Ctnnd1* | Epithelial exon (p120 isoform) | TMS | Epithelial isoform higher in epithelial types (ESRP) | Warzecha et al. 2010 (as row 5; VERIFY) |
 | 8 | *Ptbp2* | Exon 10 | TMS (brain) or Allen vs non-neuronal | Included in neurons, skipped in non-neuronal cells (PTBP1-driven NMD) | Boutz et al. 2007, Genes Dev 21:1636 (VERIFY) |
 | 9 | *Dlg4* (PSD-95) | Exon 18 | TMS brain neurons vs non-neuronal | Included in neurons, skipped in non-neuronal cells (PTBP1/2) | Zheng et al. 2012, Nat Neurosci 15:381 (VERIFY) |
-| 10 | *Pkm* | Exon 9 (PKM1) vs exon 10 (PKM2), MXE | TMS | PKM1 higher in muscle, heart and brain; PKM2 higher in proliferating and immune cells | David et al. 2010, Nature 463:364 (VERIFY) |
-| 11 | neuronal microexons (one gene, chosen by annotation, e.g. a SRRM4 target) | 3–27 nt microexon | TMS brain | Included in neurons, skipped elsewhere | Irimia et al. 2014, Cell 159:1511 (VERIFY; the gene must be fixed before looking) |
+| 10 | *Pkm* | Exon 9 (PKM1) vs exon 10 (PKM2), MXE | TMS | PKM1 higher in muscle, heart and brain; PKM2 higher in proliferating and immune cells | Noguchi et al. 1986, J Biol Chem (M1/M2 from one gene by alternative splicing; VERIFY) |
+| 11 | *Src* | N1 microexon (18 nt; chr2:157,458,843–157,458,860, +; GENCODE vM19), `ENSMUSG00000027646.15_atse_3` (class complex) | TMS brain | Included in neurons, skipped elsewhere | Irimia et al. 2014, Cell 159:1511 (VERIFY) |
 
-Open points for Karin:
-- Row 3: the direction by cell group needs checking in the paper (SLM2 expression pattern); until then it is "differs".
-- Row 4 and row 11 have no single pre-stated direction or gene; drop them, or keep them as descriptive.
-- 11 rows (≥ 10 needed). The rule allows up to 20; adding more needs more citations.
-- Event-class spread is uneven: mostly MXE and skipped exon, with no alt 3′ or alt 5′ example yet. Do you have a
-  known alt 3′ or alt 5′ event to add?
+Decisions (Karin 2026-11-09):
+- Row 2: TMS has one broad "T CELL" type per tissue and no naive vs activated/memory split (type names checked, no values), so
+  the B vs T direction is kept with the CD45 review (Hermiston, Xu and Weiss 2003) instead of Oberdoerffer 2008.
+- Row 3: direction stays "differs between neuron groups"; Nguyen et al. 2016 added.
+- Row 4: kept, descriptive.
+- Row 10: Noguchi et al. 1986 replaces David 2010.
+- Row 11: fixed as *Src* N1 by annotation only (no usage read; `LeafletFA_validation/gallery_annotation/src_n1.py`, job 23121076).
+  - GENCODE vM19 *Src* has one 18-nt exon, chr2:157,458,843–157,458,860 (+). It is taken as N1 by length (six codons); the exon number
+    was not checked against Irimia 2014.
+  - The catalog has both inclusion junctions (157,458,633→N1 start; N1 end→157,462,709) and the skipping junction
+    (157,458,633→157,462,709), all in `ENSMUSG00000027646.15_atse_3`, which has 5 junctions and the catalog classes as complex
+    (not skipped exon: two more junctions, N1 end→157,461,942 and 157,461,975→157,462,709,
+    use a second exon between N1 and the downstream exon). Row kept.
+- No alt 3′ or alt 5′ event: the gallery caption must state this gap.
+
+Gallery caption note (to carry into the Supplement): the list has no alternative 3′ or alternative 5′ splice-site event, because no
+known-biology example with a stated direction was available for those classes.
