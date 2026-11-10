@@ -244,4 +244,4 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - Row 11 (*Src* N1): dropped (Karin 2026-11-10; the catalog exon is 18 nt, Irimia 2014 defines microexons as 3–15 nt).
 - No alt 3′ or alt 5′ event; the caption must say so.
 - No values read.
-- Citation volume and pages verified against PubMed (all match). Direction-in-mouse check of each remaining row: in progress (10 Nov).
+- Citation volume and pages verified against PubMed (all match). Direction-in-mouse check (10 Nov): only row 3 (Nguyen 2016) is stated in mouse cell types; rows 1, 5–7 are human cell lines; 8–9 mouse developmental; 4 rat; 2 and 10 paywalled. Proposals in `GALLERY_KNOWN_BIOLOGY_DRAFT.md`.
