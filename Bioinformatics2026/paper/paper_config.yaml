@@ -9,7 +9,7 @@ style:
   # Theme = Karin's LeafletFA figure theme (Leaflet-analysis GenomeBiology_Submission2026/figures/FIGURE_THEME.md, _common/leaflet_theme.py
   # md5 f00ee406), so SpliceVI and LeafletFA figures look the same: palette, fonts, sizes, line weights, no gridlines, despined.
   journal: target journal (page widths, resolution and fonts below)
-  width_mm: {single: 86, double: 178}      # column widths; panels are sized to fit these
+  width_mm: {single: 86, double: 178, appnote: 183}      # column widths; panels are sized to fit these. appnote = 183 mm (Karin, 2026-11-10, Application Note figure)
   max_height_mm: 225                        # usable page height
   dpi: {color: 350, line: 1200, review: 150}
   font:
@@ -37,8 +37,10 @@ palette: {slate: "#5E5A7A", sage: "#A8B39A", teal: "#006865", indigo: "#657BB5",
 # them with style.color / style.method_style). LeafletFA keeps the SpliceVI papers' ochre so a reader of both papers sees
 # one color per method (decision for Karin: the LeafletFA theme makes the paper's own model teal; see BIOINFORMATICS_PLAN.md).
 methods:
-  leafletfa:        {label: "LeafletFA",                         color: ochre,     marker: "^", linestyle: "-",  filled: true}
-  leafletfa_seed:   {label: "LeafletFA, other seeds",            color: ochre,     marker: "^", linestyle: "--", filled: false}
+  # 2026-11-10 (Karin, Application Note figure): LeafletFA is teal, the theme's color for the paper's own method. SpliceVI is also
+  # teal in this config; the two never share a panel here (SpliceVI's own paper keeps its colors).
+  leafletfa:        {label: "LeafletFA",                         color: teal,      marker: "^", linestyle: "-",  filled: true}
+  leafletfa_seed:   {label: "LeafletFA, other seeds",            color: teal,      marker: "^", linestyle: "--", filled: false}
   consensus:        {label: "Consensus programs (15 seeds)",     color: olive,     marker: D,   linestyle: "-",  filled: true}
   null_population:  {label: "Population ψ (null)",               color: rose,      marker: x,   linestyle: ":",  filled: true}
   null_celltype:    {label: "Cell-type ψ (supervised)",          color: indigo,    marker: s,   linestyle: "--", filled: false}
@@ -142,3 +144,11 @@ figures:
     width: double
     panels: {4a: {w: 106, h: 70}, 4b: {w: 70, h: 70}, 4c: {w: 178, h: 60}}
     layout: [[4a, 4b], [4c]]
+  "AN":
+    title: "Application Note figure: catalog, accuracy and four known events"
+    width: appnote
+    formats: [pdf, png]
+    # Layout approved 2026-11-06 (APPLICATION_NOTE_FIGURE_PLAN.md): a catalog + model (schematic placeholder), b check 10.1,
+    # c Gria2 (Allen), d Fgfr2 (TMS), e Nrxn1 SS4 (Allen), f Ptprc (TMS). 183 mm wide, 164 mm tall (limit 165).
+    panels: {AN_a: {w: 96, h: 50}, AN_b: {w: 85, h: 50}, AN_c: {w: 90.5, h: 55}, AN_d: {w: 90.5, h: 55}, AN_e: {w: 90.5, h: 55}, AN_f: {w: 90.5, h: 55}}
+    layout: [[AN_a, AN_b], [AN_c, AN_d], [AN_e, AN_f]]

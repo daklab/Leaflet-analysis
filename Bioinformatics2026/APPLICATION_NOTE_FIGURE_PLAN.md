@@ -23,3 +23,12 @@ Interval coverage and width (10.3), duplicate reads, sparsity per cell, represen
 
 ## Word budget at 2,000
 Unchanged from 2026-11-05; current counts in the Overleaf comments.
+
+## Build status (2026-11-10)
+- **Built from data:** `paper/figures/panels/fig_appnote.py` (`make_figures.py --figure AN`, sbatch). Output: `LeafletFA_bioinformatics/paper_figures/figAN/` (`figAN.pdf`, PNG preview, per-panel PDFs, `source_data/`). 183 × 164 mm.
+- **Caption facts:** `paper/captions/FIG_APPNOTE_CAPTION_FACTS.md`. The fixed cell-type, lineage and junction rules are in the module docstring.
+- **Open:**
+  - Panel a model schematic is a placeholder.
+  - *Gria2* flip vs flop exon identity is UNVERIFIED (exons labeled by coordinate).
+  - Panel e shows one SS4 junction, not SS4 inclusion. Decision needed to read the Nguyen 2016 direction.
+  - Lineage groupings are defined in the module, not in `cell_type_maps/`.
