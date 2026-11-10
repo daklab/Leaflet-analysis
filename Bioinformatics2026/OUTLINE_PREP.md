@@ -241,7 +241,7 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - *Nrxn1*: "differs", with Nguyen 2016 added.
   - *Gria2*: descriptive.
   - *Pkm*: Noguchi 1986.
-  - Row 11: *Src* N1 by annotation (`ENSMUSG00000027646.15_atse_3`).
+  - Row 11 (*Src* N1): dropped (Karin 2026-11-10; the catalog exon is 18 nt, Irimia 2014 defines microexons as 3–15 nt).
 - No alt 3′ or alt 5′ event; the caption must say so.
 - No values read.
-- Citation volume and pages verified against PubMed (all 10 match). Flag: Irimia 2014 defines microexons as 3–15 nt; the *Src* exon is 18 nt (row 11 decision).
+- Citation volume and pages verified against PubMed (all match). Direction-in-mouse check of each remaining row: in progress (10 Nov).
