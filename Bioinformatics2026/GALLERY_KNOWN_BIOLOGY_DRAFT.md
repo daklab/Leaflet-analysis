@@ -1,4 +1,4 @@
-# Supplement gallery: known-biology event list (approved by Karin with changes, 2026-11-09)
+# Supplement gallery: known-biology event list (FINAL, Karin 2026-11-10; no values looked up until Karin approves)
 
 Status: approved with changes (Karin 2026-11-09). No LeafletFA or raw value has been looked up against this list. The gallery rule was
 approved as proposed (2026-11-06; APPLICATION_NOTE_FIGURE_PLAN.md). Every citation's volume and pages must be verified against PubMed or the
@@ -11,18 +11,18 @@ journal before use (section "Citation check" below).
   (exon coordinates, GENCODE vM19) after approval, before usage is read.
 - The first four are the main figure (c to f); the gallery adds the others.
 
-| # | Gene | Event | Atlas | Expected direction | Citation |
-|---|---|---|---|---|---|
-| 1 | *Fgfr2* | IIIb vs IIIc exon (MXE), atse_3 | TMS | IIIb higher in epithelial types, IIIc in mesenchymal (ESRP1/2) | Warzecha et al. 2009, Mol Cell 33:591–601 (PMID 19285943) |
-| 2 | *Ptprc* | Variable exons 4–6 (CD45RA/RB/RC), atse_2 | TMS | Inclusion higher in B cells than T cells | Hermiston, Xu and Weiss 2003, Annu Rev Immunol 21:107–137 (CD45 review; PMID 12414720) |
-| 3 | *Nrxn1* | SS4 exon, atse_2 | Allen | Differs between neuron groups (a direction only if Traunmüller 2016 is read and states it) | Traunmüller et al. 2016, Science 352:982–986 (PMID 27174676); Nguyen et al. 2016, eLife 5:e22757 (SLM2 drives principal-cell neurexin isoforms; most PV interneurons lack SLM2; PMID 27960072) |
-| 4 | *Gria2* | Flip vs flop (MXE), atse_3 | Allen | Flip/flop ratio differs between neuron types; no single direction stated for excitatory vs inhibitory, so descriptive only | Sommer et al. 1990, Science 249:1580–1585 (PMID 1699275) |
-| 5 | *Cd44* | Variable exons v2–v10 | TMS | Inclusion higher in epithelial than mesenchymal types (ESRP) | Warzecha et al. 2010, EMBO J 29:3286–3300 (PMID 20711167) |
-| 6 | *Enah* | Exon 11a | TMS | Included in epithelial, skipped in mesenchymal types (ESRP) | Warzecha et al. 2010 (as row 5) |
-| 7 | *Ctnnd1* | Epithelial exon (p120 isoform) | TMS | Epithelial isoform higher in epithelial types (ESRP) | Warzecha et al. 2010 (as row 5) |
-| 8 | *Ptbp2* | Exon 10 | TMS (brain) or Allen vs non-neuronal | Included in neurons, skipped in non-neuronal cells (PTBP1-driven NMD) | Boutz et al. 2007, Genes Dev 21:1636–1652 (PMID 17606642) |
-| 9 | *Dlg4* (PSD-95) | Exon 18 | TMS brain neurons vs non-neuronal | Included in neurons, skipped in non-neuronal cells (PTBP1/2) | Zheng et al. 2012, Nat Neurosci 15:381–388 (PMID 22246437) |
-| 10 | *Pkm* | Exon 9 (PKM1) vs exon 10 (PKM2), MXE | TMS | PKM1 higher in muscle, heart and brain; PKM2 higher in proliferating and immune cells | Noguchi, Inoue and Tanaka 1986, J Biol Chem 261:13807–13812 (rat; M1/M2 from one gene by alternative splicing; PMID 3020052) |
+| # | Gene | Event | Atlas | Expected direction | Evidence type | Citation |
+|---|---|---|---|---|---|---|
+| 1 | *Fgfr2* | IIIb vs IIIc exon (MXE), atse_3 | TMS | IIIb higher in epithelial types, IIIc in mesenchymal (ESRP1/2) | mouse in vivo (Esrp1/2 knockout epidermis, E18.5: full IIIb to IIIc switch) + cell lines (human) | Warzecha et al. 2009, Mol Cell 33:591–601 (PMID 19285943); Bebee et al. 2015, eLife 4:e08954 (PMID 26371508) |
+| 2 | *Ptprc* | Variable exons 4–6 (CD45RA/RB/RC), atse_2 | TMS | **Descriptive:** differs between immune types (the B vs T direction is not verified; Hermiston 2003 paywalled) | not verified | Hermiston, Xu and Weiss 2003, Annu Rev Immunol 21:107–137 (PMID 12414720) |
+| 3 | *Nrxn1* | SS4 exon, atse_2 | Allen | **SS4 skipped in excitatory (pyramidal) neurons, included in PV and SST interneurons** | mouse cell types (hippocampus and neocortex, ribosome-tagged CamK2, PV, SST neurons) | Nguyen et al. 2016, eLife 5:e22757 (PMID 27960072); Traunmüller et al. 2016, Science 352:982–986 (PMID 27174676; paywalled, abstract only) |
+| 4 | *Gria2* | Flip vs flop (MXE), atse_3 | Allen | **Descriptive:** flip/flop ratio differs between neuron types | rat brain regions (CA1 vs CA3; abstract only) | Sommer et al. 1990, Science 249:1580–1585 (PMID 1699275) |
+| 5 | *Cd44* | Variable exons **v8–v10** | TMS | Inclusion higher in epithelial than mesenchymal types (ESRP) | cell lines (human; v8–v10) + mouse in vivo (Esrp1/2 knockout epidermis converts Cd44v to Cd44s; all 10 variable exons as one block) | Warzecha et al. 2009 (as row 1); Bebee et al. 2015 (as row 1) |
+| 6 | *Enah* | Exon 11a | TMS | Included in epithelial, skipped in mesenchymal types (ESRP) | cell lines (human) + mouse in vivo (an "Esrp enhanced" Enah event in epidermis; the exon is not named in the text) | Warzecha et al. 2009 (as row 1); Bebee et al. 2015 (as row 1) |
+| 7 | *Ctnnd1* | **Exons 2 and 3** (mesenchymal p120 isoform) | TMS | **Exons 2–3 included more in mesenchymal than in epithelial types** (ESRP silences them) | cell lines (human); Bebee 2015 does not mention *Ctnnd1* | Warzecha et al. 2009 (as row 1) |
+| 8 | *Ptbp2* | Exon 10 | TMS (brain) or Allen vs non-neuronal | Included in neurons, skipped (with NMD) in neural progenitors and non-neuronal cells (PTBP1) | development (mouse cell lines, embryonic neural progenitors) | Boutz et al. 2007, Genes Dev 21:1636–1652 (PMID 17606642) |
+| 9 | *Dlg4* (PSD-95) | Exon 18 | TMS brain neurons vs non-neuronal | Repressed by PTBP1/2 early, included late in neuronal maturation | development (mouse embryonic cortex, cultured neurons, N2a) | Zheng et al. 2012, Nat Neurosci 15:381–388 (PMID 22246437) |
+| 10 | *Pkm* | Exon 9 (PKM1) vs exon 10 (PKM2), MXE | TMS | **Descriptive:** M1/M2 exon usage differs between cell types (no tissue direction in the abstract; paper paywalled) | not verified (rat; abstract only) | Noguchi, Inoue and Tanaka 1986, J Biol Chem 261:13807–13812 (PMID 3020052) |
 
 Decisions (Karin 2026-11-09):
 - Row 2: TMS has one broad "T CELL" type per tissue and no naive vs activated/memory split (type names checked, no values), so
@@ -97,3 +97,22 @@ known-biology example with a stated direction was available for those classes.
 4. **Rows 8, 9:** mouse, but developmental and cell-line evidence. Keep them, labeled "neurons vs non-neuronal and progenitor cells (development)".
 5. **Row 4:** stays descriptive. Sommer is rat (abstract only), and Furlanis covers Gria1, not *Gria2*.
 6. **Rows 2, 10:** unverifiable until the PDFs are in `refs/`. Noguchi is rat.
+
+## Decisions applied (Karin 2026-11-10); list final
+- Row 3: direction from Nguyen 2016 (SS4 skipped in excitatory/pyramidal neurons, included in PV and SST interneurons). This is main-figure panel e.
+- Rows 5–7 cite Warzecha 2009, not Warzecha 2010. Row 5 is narrowed to v8–v10. Row 7 is re-signed (exons 2–3 higher in mesenchymal types).
+- Rows 1, 5, 6: Bebee et al. 2015 (eLife 4:e08954, PMID 26371508, DOI 10.7554/eLife.08954) checked before labeling them "cell lines".
+  It gives mouse in vivo evidence (E18.5 epidermis, wild type vs Esrp1/2 knockout), quotes verified against the full text (PMC4566030):
+  - Fgfr2: "in DKO epidermis Fgfr2 underwent a full switch from Fgfr2-IIIb (epithelial) to Fgfr2-IIIc (mesenchymal), indicating that the
+    production of the Fgfr2-IIIb isoform is fully dependent upon the Esrps in epidermis (Figure 3B)."
+  - Cd44: "inclusion of 10 exons in the mouse variable region of the Cd44 transcript is associated with the epithelial isoforms (Cd44v),
+    and the exclusion of these exons generates the mesenchymal Cd44s isoform"; "KO of Esrp1 and Esrp2 results in full conversion of Cd44v
+    to the mesenchymally expressed Cd44s (short) isoform" (Fig. 4—figure supplement 1B).
+  - Enah: "We evaluated an Esrp enhanced splicing event in Enah" (Fig. 3C); the exon is not named in the text.
+  - Ctnnd1: not mentioned (0 hits; supplementary rMATS tables and figure images not searched).
+  - Limit: Bebee compares wild type with Esrp knockout **within epidermis**. No mesenchymal tissue was measured, so the
+    epithelial vs mesenchymal direction itself rests on the cited earlier work (Orr-Urtreger 1993 for Fgfr2; Brown 2011 for Cd44).
+- Rows 8–9: labeled developmental evidence.
+- Rows 2, 4, 10: descriptive. Rows 2 and 10 change only if PDFs Karin adds to `refs/` state a direction.
+- Optional PDFs for `refs/` (none blocks anything): Traunmüller 2016, Sommer 1990, Hermiston 2003, Noguchi 1986.
+- **Still no values looked up against this list until Karin approves it.**
