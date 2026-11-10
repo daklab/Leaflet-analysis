@@ -73,6 +73,12 @@ with sync_playwright() as p:
         check(f"event {ds}: 7 panels", pg.locator("th.panel").count() == 7, str(pg.locator("th.panel").count()))
         check(f"event {ds}: structure", pg.locator("svg.structure path").count() == 7 and pg.locator("svg.structure rect").count() >= 4)
     pg.select_option("#ev-group", "group2"); pg.wait_for_timeout(200); check("event group switch", pg.locator("tr.group").count() > 3)
+    pg.select_option("#ev-group", "lineage"); pg.wait_for_timeout(200)
+    labs = [x.split(" (")[0] for x in pg.locator("tr.group th").all_inner_texts()]
+    check("TMS event group by lineage (cell_type_maps/mouse_lineage_map.json)", "Epithelial" in labs and "Neuron" in labs, ",".join(labs))
+    go(f"#/event/Allen/{GRIA2}", "table.dots"); pg.select_option("#ev-group", "lineage"); pg.wait_for_timeout(200)
+    labs = [x.split(" (")[0] for x in pg.locator("tr.group th").all_inner_texts()]
+    check("Allen event group by lineage", labs[:2] == ["Excitatory", "PV"] and "Non-neuronal" in labs, ",".join(labs))
     with pg.expect_download() as d:
         pg.click("#ev-dl")
     t = open(d.value.path()).read().splitlines()

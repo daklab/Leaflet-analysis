@@ -13,7 +13,8 @@ import numpy as np, pandas as pd
 V = "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation"
 HERE = os.path.dirname(os.path.abspath(__file__))
 PRE = os.path.join(V, "portal_browser", "precomputed")
-VERSION = "preview-2026-11-07"
+VERSION = "preview-2026-11-10"
+LINEAGE_MAP = os.path.join(HERE, "..", "..", "GenomeBiology_Submission2026", "cell_type_maps", "mouse_lineage_map.json")   # shared with the figures
 BUCKET = 64                     # ATSEs per event shard
 RANGE_READS, RANGE_CELLS = 20, 3  # support required to enter the "range in other types" columns (fixed at build)
 NA = 65535
@@ -120,7 +121,9 @@ def build_data(site):
     wb(os.path.join(site, "data", "catalog", "junctions.bin"), [vs.a.values.astype(np.uint32), vs.b.values.astype(np.uint32), st.astype(np.uint8)])
     for b in range(0, n_e, BUCKET):
         wj(os.path.join(site, "data", "catalog", "struct", f"{b // BUCKET}.json"), {e: cat["structure"][e] for e in ids[b:b + BUCKET]})
-    index = dict(version=VERSION, built=time.strftime("%Y-%m-%d %H:%M"), bucket_size=BUCKET, type_layout=TYPE_LAYOUT, range_min_reads=RANGE_READS,
+    _lm = json.load(open(LINEAGE_MAP))
+    index = dict(version=VERSION, built=time.strftime("%Y-%m-%d %H:%M"), lineage_order=dict(TMS=_lm["tms_lineage_order"], Allen=_lm["allen_lineage_order"]),
+                 lineage_source="cell_type_maps/mouse_lineage_map.json " + _lm["version"], bucket_size=BUCKET, type_layout=TYPE_LAYOUT, range_min_reads=RANGE_READS,
                  range_min_cells=RANGE_CELLS, datasets={}, featured=featured(vs, cat), example_compare=dict(a="L2/3 IT CTX", b="Pvalb"))
     manifest = dict(version=VERSION, built=index["built"], site_note="LeafletFA estimates are seed 0, K = 20; raw pseudobulk, reads, cells and mice are TRAIN cells only.",
                     classes=crec, datasets={})
@@ -152,9 +155,17 @@ def build_data(site):
             e1 = min(n_e, b + BUCKET); j0, j1 = jo[b], jo[e1]
             wb(os.path.join(dsdir, "events", f"{b // BUCKET}.bin"), [jr[:, j0:j1], er[:, b:e1], tr[:, b:e1], ep[:, j0:j1], el[:, j0:j1], eh[:, j0:j1], eraw[:, j0:j1], cov[:, b:e1], mice[:, b:e1], tc[:, b:e1]])
         meta = rec["types_meta"]; tlist = []
+        LM = json.load(open(LINEAGE_MAP))
         for k, m in enumerate(meta):
             assert m["type"] == types[k]
             d = dict(i=k, name=m["type"], cells=m["cells"], n_mice=m["n_mice"], eligible=m["eligible"])
+            if ds == "TMS":
+                d["lineage"] = LM["tms_broad_to_lineage"][m["cell_type"]]
+            else:
+                lin = LM["allen_class_to_lineage"].get(m["allen_class"], LM["allen_class_to_lineage"]["_other"])
+                if lin == "Inhibitory":
+                    lin = next((lab for pre, lab in LM["allen_inhibitory_prefix"] if m["type"].split(" ")[0] == pre), LM["allen_inhibitory_other"])
+                d["lineage"] = lin
             if ds == "TMS":
                 d.update(label=f"{m['tissue']} | {m['cell_type']}", group1=m["tissue"], group2=m["cell_type"])
             else:

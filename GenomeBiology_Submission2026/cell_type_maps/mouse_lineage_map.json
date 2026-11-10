@@ -1,0 +1,37 @@
+{
+  "description": "Lineage of each mouse cell type, for the LeafletFA browser and figures (Karin 2026-11-10: one definition, used by both). TMS: by broad cell type (the part of the TMS label after the tissue). Allen: by the majority class of a cell group's TRAIN cells, with inhibitory groups split by cluster-name prefix. Epithelial and Mesenchymal reproduce the check 10 keyword lists (LeafletFA scripts/validation/c10_catalog.py EPI / MES), so NEUROEPITHELIAL CELL is Epithelial and LUNG CELL and PANCREATIC ACINAR CELL are Other. Colors are palette tokens of paper_config.yaml.",
+  "version": "2026-11-10",
+  "tms_broad_to_lineage": {
+    "BASAL CELL": "Epithelial", "EPITHELIAL CELL": "Epithelial", "HEPATOCYTE": "Epithelial", "INTESTINAL CELL": "Epithelial",
+    "KERATINOCYTE": "Epithelial", "KIDNEY CELL": "Epithelial", "NEUROEPITHELIAL CELL": "Epithelial",
+    "PANCREATIC DUCTAL CELL": "Epithelial", "PANCREATIC ISLET CELL": "Epithelial",
+    "CARDIAC MUSCLE CELL": "Mesenchymal", "FIBROBLAST": "Mesenchymal", "MESENCHYMAL STEM CELL": "Mesenchymal", "PERICYTE": "Mesenchymal",
+    "SKELETAL MUSCLE CELL": "Mesenchymal", "SMOOTH MUSCLE CELL": "Mesenchymal", "STROMAL CELL": "Mesenchymal",
+    "B CELL": "B cell", "T CELL": "T cell",
+    "DENDRITIC CELL": "Other immune", "GENERAL IMMUNE CELL": "Other immune", "GRANULOCYTE": "Other immune",
+    "HEMATOPOIETIC PROGENITOR": "Other immune", "MACROPHAGE": "Other immune", "MICROGLIA": "Other immune", "MONOCYTE": "Other immune",
+    "MYELOID IMMUNE CELL": "Other immune", "NK CELL": "Other immune",
+    "ENDOTHELIAL CELL": "Endothelial",
+    "NEURON": "Neuron", "INHIBITORY NEURON": "Neuron",
+    "ASTROCYTE": "Glia", "GLIAL CELL": "Glia", "OLIGODENDROCYTE": "Glia",
+    "LUNG CELL": "Other", "PANCREATIC ACINAR CELL": "Other", "STEM CELL": "Other"
+  },
+  "tms_lineage_order": ["Epithelial", "Mesenchymal", "Endothelial", "B cell", "T cell", "Other immune", "Neuron", "Glia", "Other"],
+  "allen_class_to_lineage": {"Glutamatergic": "Excitatory", "GABAergic": "Inhibitory", "_other": "Non-neuronal"},
+  "allen_inhibitory_prefix": [["Pvalb", "PV"], ["Sst", "SST"], ["Vip", "VIP"], ["Lamp5", "Lamp5"]],
+  "allen_inhibitory_other": "Other inhibitory",
+  "allen_lineage_order": ["Excitatory", "PV", "SST", "VIP", "Lamp5", "Other inhibitory", "Non-neuronal"],
+  "schemes": {
+    "allen": {"map": {"Excitatory": "Excitatory", "PV": "Inhibitory", "SST": "Inhibitory", "VIP": "Inhibitory", "Lamp5": "Inhibitory", "Other inhibitory": "Inhibitory", "Non-neuronal": "Non-neuronal"},
+              "order": ["Excitatory", "Inhibitory", "Non-neuronal"], "colors": {"Excitatory": "indigo", "Inhibitory": "ochre", "Non-neuronal": "light_gray"}},
+    "allen_inhibitory_split": {"map": {"Excitatory": "Excitatory", "PV": "PV", "SST": "SST", "VIP": "VIP", "Lamp5": "Lamp5", "Other inhibitory": "Other inhibitory", "Non-neuronal": "Non-neuronal"},
+              "order": ["Excitatory", "PV", "SST", "VIP", "Lamp5", "Other inhibitory", "Non-neuronal"],
+              "colors": {"Excitatory": "indigo", "PV": "ochre", "SST": "olive", "VIP": "slate", "Lamp5": "sage", "Other inhibitory": "light_gray", "Non-neuronal": "light_gray"}},
+    "tms_epithelial": {"map": {"Epithelial": "Epithelial", "Mesenchymal": "Mesenchymal", "_other": "Other"},
+              "order": ["Epithelial", "Mesenchymal", "Other"], "colors": {"Epithelial": "indigo", "Mesenchymal": "ochre", "Other": "light_gray"}},
+    "tms_immune": {"map": {"B cell": "B cell", "T cell": "T cell", "Other immune": "Other immune", "_other": "Non-immune"},
+              "order": ["B cell", "T cell", "Other immune", "Non-immune"], "colors": {"B cell": "indigo", "T cell": "ochre", "Other immune": "olive", "Non-immune": "light_gray"}},
+    "tms_neural": {"map": {"Neuron": "Neuron", "Glia": "Glia", "_other": "Non-neural"},
+              "order": ["Neuron", "Glia", "Non-neural"], "colors": {"Neuron": "indigo", "Glia": "ochre", "Non-neural": "light_gray"}}
+  }
+}

@@ -152,3 +152,12 @@ figures:
     # c Gria2 (Allen), d Fgfr2 (TMS), e Nrxn1 SS4 (Allen), f Ptprc (TMS). 183 mm wide, 164 mm tall (limit 165).
     panels: {AN_a: {w: 96, h: 50}, AN_b: {w: 85, h: 50}, AN_c: {w: 90.5, h: 55}, AN_d: {w: 90.5, h: 55}, AN_e: {w: 90.5, h: 55}, AN_f: {w: 90.5, h: 55}}
     layout: [[AN_a, AN_b], [AN_c, AN_d], [AN_e, AN_f]]
+  "SG":
+    title: "Supplementary gallery: known-biology events (GALLERY_KNOWN_BIOLOGY_DRAFT.md, final 2026-11-10)"
+    width: appnote
+    formats: [pdf, png]
+    # 10 rows of the final list, 2 per row, same event-panel style as figure AN (fig_gallery.py). 183 x 220 mm (limit 220).
+    # row c/d is taller (Nrxn1 shows seven lineages); 41 + 48 + 41 * 3 + 8 gaps = 220 mm
+    panels: {SG_a: {w: 90.5, h: 41}, SG_b: {w: 90.5, h: 41}, SG_c: {w: 90.5, h: 48}, SG_d: {w: 90.5, h: 48}, SG_e: {w: 90.5, h: 41},
+             SG_f: {w: 90.5, h: 41}, SG_g: {w: 90.5, h: 41}, SG_h: {w: 90.5, h: 41}, SG_i: {w: 90.5, h: 41}, SG_j: {w: 90.5, h: 41}}
+    layout: [[SG_a, SG_b], [SG_c, SG_d], [SG_e, SG_f], [SG_g, SG_h], [SG_i, SG_j]]

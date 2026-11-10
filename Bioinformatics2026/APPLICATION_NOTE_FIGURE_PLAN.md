@@ -27,8 +27,15 @@ Unchanged from 2026-11-05; current counts in the Overleaf comments.
 ## Build status (2026-11-10)
 - **Built from data:** `paper/figures/panels/fig_appnote.py` (`make_figures.py --figure AN`, sbatch). Output: `LeafletFA_bioinformatics/paper_figures/figAN/` (`figAN.pdf`, PNG preview, per-panel PDFs, `source_data/`). 183 × 164 mm.
 - **Caption facts:** `paper/captions/FIG_APPNOTE_CAPTION_FACTS.md`. The fixed cell-type, lineage and junction rules are in the module docstring.
-- **Open:**
-  - Panel a model schematic is a placeholder.
-  - *Gria2* flip vs flop exon identity is UNVERIFIED (exons labeled by coordinate).
-  - Panel e shows one SS4 junction, not SS4 inclusion. Decision needed to read the Nguyen 2016 direction.
-  - Lineage groupings are defined in the module, not in `cell_type_maps/`.
+- **Resolved 2026-11-10 (Karin's decisions and review):**
+  - *Gria2* flip/flop identified by annotation and sequence (flip = Gria2-202 exon, flop = Gria2-201 exon).
+  - Panel e shows the SS4-skipping junction, with inhibitory groups split into PV / SST / VIP / Lamp5.
+  - Lineages live in `GenomeBiology_Submission2026/cell_type_maps/mouse_lineage_map.json`, shared with the browser.
+  - Panel b uses neutral atlas markers and "error" instead of "TV".
+  - Intervals are thinner and semi-transparent.
+  - Gray variant built: `figAN_grey_noiv/`.
+- **Supplementary gallery built:** `paper/figures/panels/fig_gallery.py` (`--figure SG`), facts in `paper/captions/FIG_GALLERY_CAPTION_FACTS.md`.
+- **Still open:**
+  - Panel a model schematic (placeholder).
+  - Enah 11a is identified by length only (UNVERIFIED).
+  - Ctnnd1 and Pkm have no catalog ATSE.

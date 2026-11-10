@@ -177,9 +177,10 @@ function structureSVG(ev, exons) {
   return s + `</svg>`;
 }
 
-const groupKeys = (ds) => (ds === "Allen" ? [["group1", "Class"], ["group2", "Official subclass"]] : [["group1", "Tissue"], ["group2", "Cell type"]]);
+const groupKeys = (ds) => (ds === "Allen" ? [["group1", "Class"], ["lineage", "Lineage"], ["group2", "Official subclass"]] : [["group1", "Tissue"], ["lineage", "Lineage"], ["group2", "Cell type"]]);
 function groupOrder(ds, key, names) {
-  const pref = key === "group1" && ds === "Allen" ? ["excitatory", "inhibitory", "non-neuronal"] : null;
+  // Lineage: cell_type_maps/mouse_lineage_map.json, the same definition as the paper figures (order shipped in index.json)
+  const pref = key === "lineage" ? INDEX.lineage_order[ds] : key === "group1" && ds === "Allen" ? ["excitatory", "inhibitory", "non-neuronal"] : null;
   return [...names].sort((a, b) => (pref ? pref.indexOf(a) - pref.indexOf(b) : a.localeCompare(b)));
 }
 

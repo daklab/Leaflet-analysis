@@ -1,24 +1,23 @@
-"""Application Note figure (one figure, six panels; APPLICATION_NOTE_FIGURE_PLAN.md, layout approved 2026-11-06).
+"""Application Note figure (one figure, six panels; APPLICATION_NOTE_FIGURE_PLAN.md, layout approved 2026-11-06) and the shared
+event-panel code used by the supplementary gallery (fig_gallery.py).
 
-a  catalog per atlas and event types (ledger inputs) + model schematic placeholder (Karin finishes it)
+a  catalog per atlas and event types (ledger inputs) + model schematic placeholder (Karin finishes it) + legend for c-f
 b  check 10.1: held-out error, LeafletFA minus raw TRAIN pseudobulk, by cell-type size and by TRAIN reads, both atlases
-c  Gria2 flip/flop (Allen)   d  Fgfr2 IIIb/IIIc (TMS)   e  Nrxn1 SS4 (Allen)   f  Ptprc (TMS)
+c  Gria2 flip/flop (Allen)   d  Fgfr2 IIIb/IIIc (TMS)   e  Nrxn1 SS4 skipping (Allen)   f  Ptprc (TMS)
 
-Panels c-f, fixed rules (no hand-picking):
+Event panels, fixed rules (no hand-picking):
 - Cell types shown: every type (TMS tissue-cell type; Allen cell group) with >= 20 TRAIN reads and >= 3 TRAIN cells with reads
-  at the ATSE (the browser's "range" support rule, build_portal.RANGE_READS / RANGE_CELLS), grouped by lineage, sorted within
-  a lineage by LeafletFA psi of the first junction shown (highest at top).
-- Lineages: Allen = class of the group's TRAIN cells (Glutamatergic -> excitatory, GABAergic -> inhibitory, else non-neuronal;
-  the browser's rule). TMS = the broad cell type of the label (cell-type map: the part after the tissue), Fgfr2 by the check 10
-  epithelial / mesenchymal keyword lists (c10_catalog.EPI / MES), Ptprc by B cell / T cell / other immune / non-immune.
-- Junctions shown: c Gria2 = the two junctions from the shared left site of the MXE pair (L, b1), (a1, R), (L, b2), (a2, R)
-  (DEFINITIONS.md 1.6) into each of the two ~115-nt exons; d Fgfr2 = the IIIb junction (c10_catalog.FGFR2_IIIB);
-  e Nrxn1 = among junctions with an end at the annotated 30-nt SS4 exon (c10_known_biology_fix.SS4), the one with the most TRAIN
-  reads over all types; f Ptprc = among the lead junctions of the check 10.4 Ptprc calls (c10_TMS_s0_ptprc_direction.tsv), the
-  one with the most TRAIN reads over all types.
-- Marks: LeafletFA point estimate (check 10 point, seed 0) in teal, with the check 12 (a)+(b) interval where held-out TEST cells
-  have >= 100 reads and >= 10 cells with reads at the ATSE (point only elsewhere); raw TRAIN pseudobulk psi as a gray ring,
-  area by junction reads.
+  at the ATSE (the browser's "range" support rule), grouped by lineage, sorted within a lineage by LeafletFA psi of the first
+  junction shown (highest at top).
+- Lineages: GenomeBiology_Submission2026/cell_type_maps/mouse_lineage_map.json (one definition for the browser and the figures):
+  TMS by broad cell type, Allen by class with inhibitory groups split by cluster-name prefix; each panel uses one of its schemes.
+  The TMS Epithelial / Mesenchymal lineages are asserted equal to the check 10 keyword lists (c10_catalog.EPI / MES).
+- Junctions shown: chosen by annotation in paper/scripts/event_annotation.py (GENCODE vM19; rules in its docstring), read from
+  <output_dir>/data/figAN_event_junctions.tsv. Ptprc (panel f): among the lead junctions of the check 10.4 Ptprc calls
+  (c10_TMS_s0_ptprc_direction.tsv), the one with the most TRAIN reads over all types; labeled by its exons from that table.
+- Marks: LeafletFA point estimate (check 10 point, seed 0) in teal, with the check 12 (a)+(b) interval (thin, semi-transparent)
+  where held-out TEST cells have >= 100 reads and >= 10 cells with reads at the ATSE (point only elsewhere); raw TRAIN pseudobulk
+  psi as a gray ring, area ~ log junction reads. Variant (FIGAN_GREY_NOIV=1): types without a validated interval drawn in light gray.
 Panel functions draw only; numbers come from _event() / _accuracy() (cached) and are written as source data."""
 import functools
 import json
@@ -37,24 +36,18 @@ PRE = os.path.join(V, "portal_browser", "precomputed")
 B = "/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_splicevi_baseline"
 FIT = {ds: os.path.join(B, ds, "full_K20_s0_f64", "fit", "fit.npz") for ds in ("TMS", "Allen")}   # seed-0 fits (RELEASE_MANIFEST.md)
 NUMBERS = "/gpfs/commons/home/kisaev/Leaflet-analysis-bioinformatics/Bioinformatics2026/manuscript/numbers.tex"
+LINEAGE_MAP = "/gpfs/commons/home/kisaev/Leaflet-analysis-bioinformatics/GenomeBiology_Submission2026/cell_type_maps/mouse_lineage_map.json"
+ANNOTATION = "GENCODE vM19 (Ensembl 94, GRCm38)"
 MIN_READS, MIN_CELLS = 20, 3
 EPI = ("EPITHELIAL", "KERATINOCYTE", "BASAL", "HEPATOCYTE", "DUCTAL", "INTESTINAL", "ISLET", "KIDNEY CELL", "LUMINAL")   # c10_catalog
 MES = ("FIBROBLAST", "MESENCHYMAL", "STROMAL", "SMOOTH MUSCLE", "PERICYTE", "SKELETAL MUSCLE", "CARDIAC MUSCLE", "VLMC")
-FGFR2_IIIB = "chr7_130199905_130200982_-"
-SS4_NRXN1 = ("chr17", 90992115, 90992144)
-OTHER_IMMUNE = ("NK CELL", "MACROPHAGE", "MONOCYTE", "GRANULOCYTE", "DENDRITIC CELL", "MYELOID IMMUNE CELL", "MICROGLIA",
-                "GENERAL IMMUNE CELL", "HEMATOPOIETIC PROGENITOR")
+GREY_NOIV = os.environ.get("FIGAN_GREY_NOIV") == "1"
+# key -> event panel spec; junctions from the annotation table (key), lineage scheme from the lineage map
 EVENTS = {
-    "c": dict(ds="Allen", event="ENSMUSG00000033981.14_atse_3", gene="Gria2", title="flip/flop exons", rule="gria2"),
-    "d": dict(ds="TMS", event="ENSMUSG00000030849.18_atse_3", gene="Fgfr2", title="IIIb vs IIIc", rule="fgfr2"),
-    "e": dict(ds="Allen", event="ENSMUSG00000024109.18_atse_2", gene="Nrxn1", title="SS4", rule="nrxn1"),
-    "f": dict(ds="TMS", event="ENSMUSG00000026395.16_atse_2", gene="Ptprc", title="variable exons", rule="ptprc"),
-}
-# lineage -> palette token (strip and label only; data marks stay LeafletFA teal and raw gray). <= 3 colors + light gray.
-LINEAGES = {
-    "allen": [("Excitatory", "indigo"), ("Inhibitory", "ochre"), ("Non-neuronal", "light_gray")],
-    "fgfr2": [("Epithelial", "indigo"), ("Mesenchymal", "ochre"), ("Other", "light_gray")],
-    "ptprc": [("B cell", "indigo"), ("T cell", "ochre"), ("Other immune", "olive"), ("Non-immune", "light_gray")],
+    "c": dict(key="gria2", gene="Gria2", title="flip/flop", scheme="allen"),
+    "d": dict(key="fgfr2", gene="Fgfr2", title="IIIb vs IIIc", scheme="tms_epithelial"),
+    "e": dict(key="nrxn1", gene="Nrxn1", title="SS4 skipping", scheme="allen_inhibitory_split"),
+    "f": dict(key="ptprc", gene="Ptprc", title="variable exons", scheme="tms_immune", pick="ptprc_10_4"),
 }
 
 
@@ -64,6 +57,15 @@ def _catalog():
     v = pd.read_parquet(os.path.join(PRE, "catalog_junctions.parquet"))
     cat = json.load(open(os.path.join(PRE, "catalog_events.json")))
     return v, cat
+
+
+@functools.lru_cache(None)
+def _lineage_map():
+    return json.load(open(LINEAGE_MAP))
+
+
+def junction_table(cfg):
+    return pd.read_csv(os.path.join(cfg["output_dir"], "data", "figAN_event_junctions.tsv"), sep="\t")
 
 
 @functools.lru_cache(None)
@@ -82,79 +84,82 @@ def _ds(ds):
                 treads=IV["test_reads"], tcells=IV["test_cells"], meta=meta, jid=jid, inv=inv, ev=ev, tau2=str(IV["tau2"]))
 
 
-def _lineage(rule, m):
-    if rule in ("gria2", "nrxn1"):
-        c = m.get("allen_class")
-        return "Excitatory" if c == "Glutamatergic" else "Inhibitory" if c == "GABAergic" else "Non-neuronal"
-    ct = m["cell_type"].upper()
-    if rule == "fgfr2":
-        return "Epithelial" if any(k in ct for k in EPI) else "Mesenchymal" if any(k in ct for k in MES) else "Other"
-    return "B cell" if ct == "B CELL" else "T cell" if ct == "T CELL" else "Other immune" if ct in OTHER_IMMUNE else "Non-immune"
+def lineage_of(ds, m):
+    """fine lineage of a type from the lineage map (TMS: broad cell type; Allen: class, inhibitory split by cluster-name prefix)"""
+    L = _lineage_map()
+    if ds == "TMS":
+        lin = L["tms_broad_to_lineage"][m["cell_type"]]
+        ct = m["cell_type"].upper()   # the map reproduces the check 10 keyword lists
+        kw = "Epithelial" if any(k in ct for k in EPI) else "Mesenchymal" if any(k in ct for k in MES) else None
+        assert (lin in ("Epithelial", "Mesenchymal")) == (kw is not None) and (kw is None or kw == lin), (m["cell_type"], lin, kw)
+        return lin
+    lin = L["allen_class_to_lineage"].get(m.get("allen_class"), L["allen_class_to_lineage"]["_other"])
+    if lin == "Inhibitory":
+        lin = next((lab for pre, lab in L["allen_inhibitory_prefix"] if m["type"].split(" ")[0] == pre), L["allen_inhibitory_other"])
+    return lin
 
 
-def _lineage_key(rule):
-    return "allen" if rule in ("gria2", "nrxn1") else rule
+def scheme(name):
+    return _lineage_map()["schemes"][name]
 
 
-def _junctions(rule, d, e):
-    """indices (fit order) of the junctions shown, by the rules in the module docstring"""
-    J = np.flatnonzero(d["inv"] == e)
-    ids = d["jid"][J]
-    a = np.array([int(x.rsplit("_", 3)[1]) for x in ids]); b = np.array([int(x.rsplit("_", 3)[2]) for x in ids])
-    if rule == "fgfr2":
-        return [J[list(ids).index(FGFR2_IIIB)]]
-    if rule == "gria2":
-        # MXE pair (L, b1), (a1, R), (L, b2), (a2, R): exon 1 = [b1 + 1, a1] before exon 2 = [b2 + 1, a2], both > 100 nt
-        pairs = set()
-        for i in range(len(J)):
-            for k in range(len(J)):
-                if a[i] != a[k] or not b[i] < b[k]:
-                    continue
-                for p in range(len(J)):
-                    for q in range(len(J)):
-                        if (b[i] < a[p] <= b[k] and a[q] > b[k] and b[p] == b[q] and b[p] > a[q]
-                                and a[p] - b[i] > 100 and a[q] - b[k] > 100):
-                            pairs.add((i, k))
-        assert len(pairs) == 1, f"Gria2 MXE rule: {pairs}"
-        i, k = pairs.pop()
-        return [J[i], J[k]]
-    if rule == "nrxn1":
-        c, s, t = SS4_NRXN1
-        cand = [J[m] for m in range(len(J)) if b[m] == s - 1 or a[m] == t]
-    else:
-        P = pd.read_csv(os.path.join(V, "tsv", "c10_TMS_s0_ptprc_direction.tsv"), sep="\t")
-        cand = [J[list(ids).index(x)] for x in P.lead_junction.unique()]
-    tot = d["jreads"][:, cand].sum(0)
-    return [cand[int(np.argmax(tot))]]
+def collapse(sch, lin):
+    m = scheme(sch)["map"]
+    return m.get(lin, m.get("_other"))
 
 
 @functools.lru_cache(None)
-def _event(pid):
-    spec = EVENTS[pid]; d = _ds(spec["ds"])
-    e = int(np.flatnonzero(d["ev"] == spec["event"])[0])
-    js = _junctions(spec["rule"], d, e)
+def _event_cached(cfg_dir, spec_items):
+    import yaml
+    cfg = yaml.safe_load(open(os.path.join(cfg_dir, "paper_config.yaml")))
+    spec = dict(spec_items)
+    JT = junction_table(cfg); JT = JT[JT.key == spec["key"]]
+    if JT.junction_id.isna().all():
+        return None
+    ds = JT.dataset.iloc[0]; event = JT.event_id.iloc[0]; d = _ds(ds)
+    e = int(np.flatnonzero(d["ev"] == event)[0])
+    jx = {x: i for i, x in enumerate(d["jid"])}
+    if spec.get("pick") == "ptprc_10_4":
+        P = pd.read_csv(os.path.join(V, "tsv", "c10_TMS_s0_ptprc_direction.tsv"), sep="\t")
+        cand = [jx[x] for x in P.lead_junction.unique()]
+        js = [cand[int(np.argmax(d["jreads"][:, cand].sum(0)))]]
+        labels = {r.junction_id: f"{r.label} ({r.transcripts.split()[0]})" for r in JT.itertuples()}
+    else:
+        js = [jx[x] for x in JT.junction_id]
+        labels = dict(zip(JT.junction_id, JT.label))
+    assert all(d["inv"][j] == e for j in js)
     keep = (d["ereads"][:, e] >= MIN_READS) & (d["cov"][:, e] >= MIN_CELLS)
     rows = []
     for k in np.flatnonzero(keep):
-        m = d["meta"][k]
+        m = d["meta"][k]; fine = lineage_of(ds, m)
         for n, j in enumerate(js):
             er = float(d["ereads"][k, e])
-            rows.append(dict(panel=pid, dataset=spec["ds"], event_id=spec["event"], gene=spec["gene"], junction=d["jid"][j], junction_index=n,
-                             cell_type=d["types"][k], lineage=_lineage(spec["rule"], m), psi=float(d["point"][k, j]),
-                             interval_lo=float(d["lo"][k, j]), interval_hi=float(d["hi"][k, j]),
+            rows.append(dict(key=spec["key"], dataset=ds, event_id=event, gene=spec["gene"], junction=d["jid"][j], junction_label=labels[d["jid"][j]],
+                             junction_index=n, cell_type=d["types"][k], lineage_fine=fine, lineage=collapse(spec["scheme"], fine),
+                             psi=float(d["point"][k, j]), interval_lo=float(d["lo"][k, j]), interval_hi=float(d["hi"][k, j]),
                              has_interval=bool(np.isfinite(d["lo"][k, j])), raw_psi=float(d["jreads"][k, j]) / er,
                              junction_reads=int(d["jreads"][k, j]), atse_reads=int(er), cells_with_reads=int(d["cov"][k, e]),
                              test_reads=int(d["treads"][k, e]), test_cells=int(d["tcells"][k, e])))
     D = pd.DataFrame(rows)
-    order = [l for l, _ in LINEAGES[_lineage_key(spec["rule"])]]
+    order = scheme(spec["scheme"])["order"]
     first = D[D.junction_index == 0].copy()
     first["lin_rank"] = first.lineage.map({l: i for i, l in enumerate(order)})
     first = first.sort_values(["lin_rank", "psi"], ascending=[True, False])
     D["row"] = D.cell_type.map({t: i for i, t in enumerate(first.cell_type)})
     v, cat = _catalog()
-    exons = cat["structure"][spec["event"]]
+    exons = cat["structure"][event]
     jall = d["jid"][d["inv"] == e]
-    return D.sort_values(["junction_index", "row"]).reset_index(drop=True), list(d["jid"][js]), exons, list(jall), order
+    return D.sort_values(["junction_index", "row"]).reset_index(drop=True), list(d["jid"][js]), exons, list(jall), order, ds
+
+
+def event_data(cfg, spec):
+    return _event_cached(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."), tuple(sorted(spec.items())))
+
+
+def _event(pid, cfg=None):
+    import style
+    cfg = cfg or style.load_config()
+    return event_data(cfg, EVENTS[pid])
 
 
 @functools.lru_cache(None)
@@ -193,20 +198,22 @@ def panel_a(cfg, fig):
     bx.set_yticks(np.arange(len(Ev))); bx.set_yticklabels([t[0].upper() + t[1:] for t in Ev.event_type]); bx.invert_yaxis()
     bx.set_xlim(0, Ev.atses.max() * 1.9); bx.set_xticks([]); bx.spines["bottom"].set_visible(False); bx.tick_params(axis="y", length=0)
     bx.set_title("Event types (24,475 ATSEs)", fontsize=sm, loc="left", pad=1.5, color=ink)
-    px = axes_in(sub_slot(fig, w * 0.54, h * 0.36, w * 0.46, h * 0.64), (1, 0.5, 1, 3.5)); px.axis("off"); px.set_xlim(0, 1); px.set_ylim(0, 1)
+    px = axes_in(sub_slot(fig, w * 0.54, h * 0.44, w * 0.46, h * 0.56), (1, 0.5, 1, 3.5)); px.axis("off"); px.set_xlim(0, 1); px.set_ylim(0, 1)
     px.add_patch(mpatches.FancyBboxPatch((0.02, 0.04), 0.96, 0.9, boxstyle="round,pad=0,rounding_size=0.03", fc="#F2F3F4",
                                          ec=cfg["palette"]["light_gray"], lw=0.5))
     px.text(0.5, 0.70, "Model schematic (placeholder)", ha="center", va="center", fontsize=fs, color=cfg["palette"]["gray"])
     px.text(0.5, 0.36, "cells × junctions ≈ φ × ψ\nDirichlet-multinomial per ATSE\nK = 20 programs", ha="center", va="center",
             fontsize=sm, color=cfg["palette"]["gray"], linespacing=1.3)
     # one legend for panels c-f (shared encoding)
-    gx = axes_in(sub_slot(fig, w * 0.54, 0, w * 0.46, h * 0.36), (1, 0.5, 0.5, 0.5)); gx.axis("off"); gx.set_xlim(0, 1); gx.set_ylim(0, 1)
+    gx = axes_in(sub_slot(fig, w * 0.54, 0, w * 0.46, h * 0.44), (1, 0.5, 0.5, 0.5)); gx.axis("off"); gx.set_xlim(0, 1); gx.set_ylim(0, 1)
     teal, gray = color(cfg, "leafletfa"), cfg["palette"]["gray"]
-    gx.text(0.0, 0.95, "Panels c–f", ha="left", va="top", fontsize=sm, color=ink, fontweight="bold")
-    gx.plot([0.03, 0.13], [0.68, 0.68], color=teal, lw=0.6); gx.scatter([0.08], [0.68], s=6, color=teal, lw=0)
-    gx.text(0.17, 0.68, "LeafletFA ψ, 95% predictive interval\n(where held-out cells have ≥ 100 reads\nand ≥ 10 cells with reads)", ha="left", va="center", fontsize=sm, color=ink, linespacing=1.0)
-    gx.scatter([0.08], [0.16], s=10, facecolors="none", edgecolors=gray, linewidths=0.5)
-    gx.text(0.17, 0.16, "Raw TRAIN pseudobulk ψ\n(area ~ log junction reads)", ha="left", va="center", fontsize=sm, color=ink, linespacing=1.0)
+    gx.text(0.0, 1.0, "Panels c–f", ha="left", va="top", fontsize=sm, color=ink, fontweight="bold")
+    gx.plot([0.03, 0.13], [0.72, 0.72], color=teal, lw=0.4, alpha=0.55); gx.scatter([0.08], [0.72], s=6, color=teal, lw=0)
+    gx.text(0.17, 0.72, "LeafletFA ψ, 95% predictive interval\n(where held-out cells have ≥ 100 reads\nand ≥ 10 cells with reads)", ha="left", va="center", fontsize=sm, color=ink, linespacing=1.0)
+    gx.scatter([0.08], [0.40], s=10, facecolors="none", edgecolors=gray, linewidths=0.5)
+    gx.text(0.17, 0.40, "Raw TRAIN pseudobulk ψ\n(area ~ log junction reads)", ha="left", va="center", fontsize=sm, color=ink, linespacing=1.0)
+    gx.text(0.0, 0.0, "Exons: GENCODE vM19 (GRCm38)" + ("\nLight gray: no validated interval" if GREY_NOIV else ""), ha="left", va="bottom",
+            fontsize=sm, color=gray)
 
 
 def _a_tables(cfg):
@@ -239,16 +246,17 @@ def panel_b(cfg, fig):
     for f, (by, bins, xlabel) in enumerate(B_FACETS):
         ax = axes_in(sub_slot(fig, f * w / 2, 0, w / 2, h), (12.5 if f == 0 else 6.5, 12.0, 1.5, 5.5))
         ax.axhline(0, color=cfg["palette"]["gray"], lw=cfg["style"]["line"]["reference_pt"], ls=(0, (3, 2)), zorder=0)
-        for o, (ds, key) in zip((-0.13, 0.13), (("TMS", "tms_data"), ("Allen", "allen_data"))):
+        # atlases in neutral black / gray (Karin 2026-11-10: not the lineage or dataset colors)
+        for o, (ds, key, c) in zip((-0.13, 0.13), (("TMS", "tms_data", cfg["palette"]["ink"]), ("Allen", "allen_data", cfg["palette"]["gray"]))):
             S = A[(A.dataset == ds) & (A.by == by)].set_index("bin").loc[bins]
             x = np.arange(len(bins)) + o
-            c = color(cfg, key)
             ax.vlines(x, S.diff_lo, S.diff_hi, color=c, lw=0.8)
-            ax.plot(x, S["diff"], ls="none", marker=cfg["data"][key]["marker"], ms=3.2, mfc=c, mec=c, label=cfg["data"][key]["label"])
+            ax.plot(x, S["diff"], ls="none", marker=cfg["data"][key]["marker"], ms=3.2, mfc=c if ds == "TMS" else "white", mec=c, mew=0.8,
+                    label=cfg["data"][key]["label"])
         ax.set_xticks(np.arange(len(bins))); ax.set_xticklabels([b.replace(">=", "≥").replace("-", "–") for b in bins], rotation=35, ha="right", rotation_mode="anchor")
         ax.set_xlabel(xlabel); ax.set_ylim(lo_y * 1.08, hi_y + 0.012); ax.set_xlim(-0.5, len(bins) - 0.5)
         if f == 0:
-            ax.set_ylabel("Held-out error,\nLeafletFA − raw (TV)")
+            ax.set_ylabel("Held-out error,\nLeafletFA − raw")
             ax.legend(loc="lower right", frameon=False, handletextpad=0.2, borderaxespad=0.1)
         else:
             ax.set_yticklabels([])
@@ -272,7 +280,7 @@ def _xmap(exons, J):
 def _structure(cfg, ax, exons, Jall, shown):
     pos, jl, ex = _xmap(exons, Jall)
     ink, gray, light = cfg["palette"]["ink"], cfg["palette"]["gray"], cfg["palette"]["light_gray"]
-    ax.axis("off"); ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.32, 1.12)
+    ax.axis("off"); ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.32, 1.32)
     ax.plot([-0.02, 1.02], [0, 0], color=light, lw=0.5, zorder=0)
     for a, b, kind in ex:
         x0, x1 = pos[a], pos[b]
@@ -292,25 +300,30 @@ def _structure(cfg, ax, exons, Jall, shown):
                     color=ink, fontweight="bold")
 
 
-def _jdesc(j, exons, rule, n):
-    s, e = int(j.rsplit("_", 3)[1]), int(j.rsplit("_", 3)[2])
-    if rule == "gria2":
-        ex = [x for x in exons if x[0] == e + 1]
-        return f"into exon {ex[0][0]:,}–{str(ex[0][1])[-3:]}" if ex else j
-    return {"fgfr2": "IIIb junction", "nrxn1": "SS4 junction", "ptprc": "lead junction (10.4)"}[rule]
-
-
-def event_panel(cfg, fig, pid):
-    spec = EVENTS[pid]
-    D, shown, exons, Jall, order = _event(pid)
+def event_panel(cfg, fig, spec, subtitle=None):
+    """One known event: structure on top, psi per cell type below (rules in the module docstring). spec: EVENTS entry or a
+    gallery entry; subtitle: extra text after the title (the gallery's evidence type)."""
     w, h = container_mm(fig)
     fs, sm = cfg["style"]["font"]["size_pt"], cfg["style"]["font"]["small_pt"]
-    ink, gray = cfg["palette"]["ink"], cfg["palette"]["gray"]
+    ink, gray, light = cfg["palette"]["ink"], cfg["palette"]["gray"], cfg["palette"]["light_gray"]
     teal = color(cfg, "leafletfa")
-    top_h, title_h = 13.0, 4.0
+    title_h = 4.0 if subtitle is None else 8.0
+    out = event_data(cfg, spec)
     tax = axes_in(sub_slot(fig, 0, h - title_h, w, title_h), (4, 0, 1, 0)); tax.axis("off")
-    tax.text(0, 0.5, f"$\\it{{{spec['gene']}}}$ {spec['title']} ({spec['ds']})", ha="left", va="center", fontsize=fs, color=ink)
-    tax.text(1, 0.5, f"{D.cell_type.nunique()} {'cell groups' if spec['ds'] == 'Allen' else 'cell types'}", ha="right", va="center", fontsize=sm, color=gray)
+    if out is None:
+        tax.text(0, 0.5, f"$\\it{{{spec['gene']}}}$ {spec['title']}", ha="left", va="center", fontsize=fs, color=ink)
+        if subtitle:
+            tax.text(0, -0.2, subtitle, ha="left", va="center", fontsize=sm, color=gray)
+        nx = axes_in(sub_slot(fig, 0, 0, w, h - title_h), (4, 2, 2, 2)); nx.axis("off")
+        nx.text(0.5, 0.85, "No ATSE of this gene in the catalog\n(not shown; nothing to estimate)", ha="center", va="center", fontsize=sm, color=gray)
+        return
+    D, shown, exons, Jall, order, ds = out
+    yt = 0.78 if subtitle else 0.5
+    tax.text(0, yt, f"$\\it{{{spec['gene']}}}$ {spec['title']} ({ds})", ha="left", va="center", fontsize=fs, color=ink)
+    tax.text(1, yt, f"{D.cell_type.nunique()} {'cell groups' if ds == 'Allen' else 'cell types'}", ha="right", va="center", fontsize=sm, color=gray)
+    if subtitle:
+        tax.text(0, 0.28, subtitle, ha="left", va="center", fontsize=sm, color=gray)
+    top_h = min(13.0, 0.26 * h)
     sax = axes_in(sub_slot(fig, 0, h - title_h - top_h, w, top_h), (24, 0.5, 2, 0.5))
     _structure(cfg, sax, exons, Jall, shown)
     lab_w = 24.0
@@ -323,57 +336,68 @@ def event_panel(cfg, fig, pid):
     gap = 1.2   # rows between lineages
     row_lin = D[D.junction_index == 0].set_index("row").lineage
     ypos = lambda r: np.atleast_1d(r) + gap * np.array([present.index(row_lin[x]) for x in np.atleast_1d(r)])   # noqa: E731
-    ytot = nrow + gap * (len(lin) - 1)
+    ytot = nrow + gap * (len(present) - 1)
     rmax = max(D.junction_reads.max(), 1)
-    lkey = _lineage_key(spec["rule"])
     for n, j in enumerate(shown):
         ax = axes_in(sub_slot(fig, lab_w + n * col_w, 0, col_w, body_h), (2.0 if n else 0.5, 7.2, 1.0, 3.6))
         S = D[D.junction_index == n]
         y = ypos(S.row.values)
         for g in (0, 0.5, 1):
-            ax.axvline(g, color=cfg["palette"]["light_gray"], lw=0.4, zorder=0)
+            ax.axvline(g, color=light, lw=0.4, zorder=0)
         iv = S.has_interval.values
-        ax.hlines(y[iv], S.interval_lo.values[iv], S.interval_hi.values[iv], color=teal, lw=0.6, zorder=2)
+        ax.hlines(y[iv], S.interval_lo.values[iv], S.interval_hi.values[iv], color=teal, lw=0.4, alpha=0.55, zorder=2)
         rs = 1.0 + 9.0 * np.log10(S.junction_reads.values + 1) / np.log10(rmax + 1)
-        ax.scatter(S.raw_psi, y, s=rs, facecolors="none", edgecolors=gray, linewidths=0.45, zorder=3)
-        ax.scatter(S.psi, y, s=4.5, color=teal, linewidths=0, zorder=4)
+        pc = np.where(iv | (not GREY_NOIV), teal, light)          # variant: no validated interval -> light gray
+        rc = np.where(iv | (not GREY_NOIV), gray, light)
+        ax.scatter(S.raw_psi, y, s=rs, facecolors="none", edgecolors=list(rc), linewidths=0.45, zorder=3)
+        ax.scatter(S.psi, y, s=4.5, c=list(pc), linewidths=0, zorder=4)
         ax.set_ylim(ytot - 0.5, -0.5); ax.set_xlim(-0.03, 1.03); ax.set_yticks([])
         ax.set_xticks([0, 0.5, 1]); ax.set_xticklabels(["0", "0.5", "1"])
         ax.spines["left"].set_visible(False)
         ax.set_xlabel("ψ", labelpad=1)
-        ax.set_title(f"J{n + 1}: {_jdesc(j, exons, spec['rule'], n)}", fontsize=sm, color=ink, pad=1.5)
+        ax.set_title(f"J{n + 1}: {S.junction_label.iloc[0]}", fontsize=sm, color=ink, pad=1.5)
     lax = axes_in(sub_slot(fig, 0, 0, lab_w, body_h), (0.5, 7.2, 0.3, 3.6)); lax.axis("off")
     lax.set_ylim(ytot - 0.5, -0.5); lax.set_xlim(0, 1)
-    cmap = dict(LINEAGES[lkey])
-    for l, r in lin.iterrows():
-        y0, y1 = ypos(r["min"])[0], ypos(r["max"])[0]
+    cmap = scheme(spec["scheme"])["colors"]
+    ax_h_mm = body_h - 7.2 - 3.6
+    sep = 2.2 / ax_h_mm * ytot                      # minimum label spacing (one 6-pt line) in row units
+    spans = [(l, ypos(lin.loc[l, "min"])[0], ypos(lin.loc[l, "max"])[0]) for l in present]
+    lab_y = [(y0 + y1) / 2 for _, y0, y1 in spans]
+    for i in range(1, len(lab_y)):                  # push labels apart, top to bottom, then shift the block up if it overflows
+        lab_y[i] = max(lab_y[i], lab_y[i - 1] + sep)
+    if lab_y and lab_y[-1] > ytot - 0.5 - sep / 2:   # overflow at the bottom: pull up only the labels that collide
+        lab_y[-1] = ytot - 0.5 - sep / 2
+        for i in range(len(lab_y) - 2, -1, -1):
+            lab_y[i] = min(lab_y[i], lab_y[i + 1] - sep)
+    for (l, y0, y1), ly in zip(spans, lab_y):
         lax.add_patch(mpatches.Rectangle((0.90, y0 - 0.45), 0.07, y1 - y0 + 0.9, fc=cfg["palette"][cmap[l]], ec="none"))
-        lax.text(0.86, (y0 + y1) / 2, f"{l} ({int(r['count'])})", ha="right", va="center", fontsize=sm, color=ink, linespacing=1.0)
+        lax.text(0.80, ly, f"{l} ({int(lin.loc[l, 'count'])})", ha="right", va="center", fontsize=sm, color=ink, linespacing=1.0)
+        lax.plot([0.81, 0.89], [ly, (y0 + y1) / 2], color=light, lw=0.4)   # leader from label to its strip
 
 
 def panel_c(cfg, fig):
     """Gria2 flip/flop (Allen); rules in the module docstring."""
-    event_panel(cfg, fig, "c")
+    event_panel(cfg, fig, EVENTS["c"])
 
 
 def panel_d(cfg, fig):
     """Fgfr2 IIIb/IIIc (TMS); rules in the module docstring."""
-    event_panel(cfg, fig, "d")
+    event_panel(cfg, fig, EVENTS["d"])
 
 
 def panel_e(cfg, fig):
     """Nrxn1 SS4 (Allen); rules in the module docstring."""
-    event_panel(cfg, fig, "e")
+    event_panel(cfg, fig, EVENTS["e"])
 
 
 def panel_f(cfg, fig):
     """Ptprc (TMS); rules in the module docstring."""
-    event_panel(cfg, fig, "f")
+    event_panel(cfg, fig, EVENTS["f"])
 
 
 PANELS = {"AN_a": panel_a, "AN_b": panel_b, "AN_c": panel_c, "AN_d": panel_d, "AN_e": panel_e, "AN_f": panel_f}
 SOURCE_DATA = {
     "AN_a": lambda cfg: dict(zip(("figAN_a_catalog", "figAN_a_event_types"), (lambda C, E: (C.reset_index(), E))(*_a_tables(cfg)))),
     "AN_b": lambda cfg: {"figAN_b_accuracy_10_1": _accuracy()},
-    **{f"AN_{p}": (lambda p: lambda cfg: {f"figAN_{p}_{EVENTS[p]['gene']}": _event(p)[0]})(p) for p in "cdef"},
+    **{f"AN_{p}": (lambda p: lambda cfg: {f"figAN_{p}_{EVENTS[p]['gene']}": event_data(cfg, EVENTS[p])[0]})(p) for p in "cdef"},
 }

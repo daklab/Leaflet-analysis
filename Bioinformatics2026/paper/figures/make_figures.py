@@ -28,7 +28,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "panels"))
 from style import DEFAULT_CONFIG, MM, Slot, apply_style, load_config, save  # noqa: E402
 
-FIGURE_MODULES = {"1": "fig1", "AN": "fig_appnote"}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
+FIGURE_MODULES = {"1": "fig1", "AN": "fig_appnote", "SG": "fig_gallery"}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
 
 
 def panels_of(fig_id):
@@ -56,7 +56,7 @@ def build_panel(cfg, fig_id, pid):
     fig = plt.figure(figsize=(w * MM, h * MM))
     panels_of(fig_id)[pid](cfg, fig)
     formats = cfg["figures"][fig_id].get("formats", ("pdf", "tiff", "png"))
-    path = save(cfg, fig, os.path.join(cfg["output_dir"], f"fig{fig_id}", "panels", pid), formats=formats)
+    path = save(cfg, fig, os.path.join(cfg["output_dir"], f"fig{fig_id}" + os.environ.get("FIG_SUFFIX", ""), "panels", pid), formats=formats)
     write_source_data(cfg, fig_id, pid)
     return path
 
@@ -67,7 +67,7 @@ def write_source_data(cfg, fig_id, pid):
     fn = getattr(importlib.import_module(FIGURE_MODULES[fig_id]), "SOURCE_DATA", {}).get(pid)
     if fn is None:
         return
-    d = os.path.join(cfg["output_dir"], f"fig{fig_id}", "source_data")
+    d = os.path.join(cfg["output_dir"], f"fig{fig_id}" + os.environ.get("FIG_SUFFIX", ""), "source_data")
     os.makedirs(d, exist_ok=True)
     for name, df in fn(cfg).items():
         df.to_csv(os.path.join(d, name + ".tsv"), sep="\t", index=False)
@@ -125,7 +125,7 @@ def build_assembled(cfg, fig_id, gap_mm=2.0):
             x += cw + gap_mm
         y -= rh + gap_mm
     suffix = "" if lay == "layout" else "_" + lay
-    path = save(cfg, page, os.path.join(cfg["output_dir"], f"fig{fig_id}", f"fig{fig_id}{suffix}"))
+    path = save(cfg, page, os.path.join(cfg["output_dir"], f"fig{fig_id}" + os.environ.get("FIG_SUFFIX", ""), f"fig{fig_id}{suffix}"))
     print(f"[FIG] assembled {path} ({page_w} x {page_h:.0f} mm)")
 
 
