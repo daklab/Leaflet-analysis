@@ -1,6 +1,33 @@
-# Outline session prep, Wed 11 Nov 2026 (no prose)
+# Outline session prep, Wed 11 Nov 2026 (no prose; refreshed 2026-11-11)
 
-Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines). Word counts are approximate: prose only, with comments, red `\unsure{}` text, equations and citations removed.
+Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines; unchanged since the first version, no manuscript edits made). Word counts are approximate: prose only, with comments, red `\unsure{}` text, equations and citations removed (counted again 2026-11-11; the sentence-level screen is `LEAFLETFA_SCREEN.md`).
+
+## 0. What changed since the first version of this file
+- **Figure AN built** (32c3206, 2026-11-10): panels a–f, 183 × 164 mm (limit 165); gray no-interval variant in `figAN_grey_noiv/`.
+  - Junctions chosen by annotation (GENCODE vM19, `paper/scripts/event_annotation.py`), no usage value read.
+  - Lineages from one map (`cell_type_maps/mouse_lineage_map.json`), shared with the browser.
+  - Panel a model schematic is still a placeholder.
+- **Gallery built** (`figSG`, 183 × 220 mm): all 10 rows, whatever they give.
+  - *Ctnnd1* (row 7) and *Pkm* (row 10) have no ATSE in the catalog; the panel says so.
+  - *Nrxn1* is already row 3 (SG_c).
+- **Gria2 flip/flop by annotation and sequence:**
+  - flip = exon of Gria2-202 (ENSMUST00000107745.7); flop = exon of Gria2-201 (ENSMUST00000075316.9); translated and compared with UniProt P19491.
+  - J1 `chr3_80689351_80690403_-` = into flip; J2 `chr3_80689351_80691319_-` = into flop.
+  - Flop is 5′ of flip on this minus-strand annotation.
+- **Panel e (*Nrxn1* SS4) shows no SS4 difference:**
+  - J1 is the SS4-skipping junction (`chr17_90704367_91087954_-`, three vM19 transcripts without SS4).
+  - It carries about **1–2 %** of ATSE reads in every neuronal group; medians LeafletFA / raw: excitatory 0.013 / 0.011; PV 0.019 / 0.018; SST 0.019 / 0.022.
+  - The expected direction (Nguyen 2016: skipped more in excitatory, less in PV and SST) is **not seen**.
+  - The junction also skips two small exons (18 nt and 12 nt) that flank SS4 in the seven transcripts that include it.
+  - Only 2 PV and 3 SST groups pass the support rule.
+  - This is consistent with the ATSE-level rule (`main.tex:293`): the 10.4 "pairs differ" result says the ATSE differs, not that SS4 drives it. It is **not** a contradiction, but the figure cannot be captioned as an SS4 switch.
+  - Two variants built for Karin's decision (section 7).
+- **Check 12 export done** (f879a6d, b65f8ec):
+  - Intervals shipped in the catalog export for validated rows only, with `interval_status`, TEST reads and cells, `raw_psi`, `junction_reads`, mice.
+  - `leafletfa/catalog.py` estimator port: unit test, and full-size check (max difference 5.9e-8 vs check 10, both atlases).
+  - Zenodo catalog TSVs carry no 10.2 call columns (`tv`, `specific`, `call_eligible`); interval arrays unchanged.
+  - Users' own fits get ψ but no interval (stated in the tutorial plan and in `catalog.py`).
+- **Browser:** version preview-2026-11-10 (Lineage group-by, 46 headless checks pass). The 597 MB size in `RELEASE_MANIFEST.md` is for the 2026-11-07 build; not re-measured for 11-10. URL still unpublished.
 
 ## 1. Application Note limits
 
@@ -16,18 +43,18 @@ Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines). 
 | Section | Lines | Budget | Current prose | Status |
 |---|---|---|---|---|
 | Abstract | 68-74 | 150 | 15 (Supplementary line only) | all red |
-| Introduction | 79-115 | 200 | 255 | **over budget by about 55**; framing red |
-| Data and event catalog | 120-122 (`shared_data_catalog.tex`) | 250 | about 221 (per `:122`) | ported, shared with SpliceVI |
+| Introduction | 79-115 | 200 | 256 | **over by about 56**; framing red |
+| Data and event catalog | 120-122 (`shared_data_catalog.tex`) | 250 | 221 by the file's own count (247 by the script, which counts numbers and macros) | ported, shared with SpliceVI |
 | ATSEmapper | 124-142 | 150 | 156 | ported; inputs/outputs missing |
 | LeafletFA model and fitting | 144-181 | 200 | 267 | **over by about 67** |
-| Cell-type usage and intervals | 183-205 | 150 | 84 | interval sentences **stale** |
-| The catalog | 210-219 | 120 | 39 | numbers to choose |
+| Cell-type usage and intervals | 183-205 | 150 | 77 | interval sentences **stale** |
+| The catalog | 210-219 | 120 | 42 | numbers to choose |
 | Accuracy (10.1) | 221-232 | 180 | 11 | facts only |
 | Limits | 234-279 | 170 | 31 | facts only |
-| Known biology and the portal | 281-295 | 120 | 129 | Gria2 missing; portal missing |
+| Known biology and the portal | 281-295 | 120 | 129 | Gria2 and Nrxn1 facts now exist, no prose |
 | Scale | 297-303 | 60 | 77 | over by about 17; benchmark line stale |
 | Discussion | 313-354 | 250 | 230 | framing red |
-| **Total (abstract + body)** | | **2,000** | **about 1,535** | Implementation sections over, Results under |
+| **Total (abstract + body)** | | **2,000** | **about 1,520** | Implementation sections over, Results under |
 
 Back matter (not in the budget): Availability `:356-362`, Data availability `:364-370`, Acknowledgements, Funding `:376-381`, Conflict of interest.
 
@@ -97,7 +124,8 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
   - **Where it exists:** where held-out cells have ≥ 100 reads and ≥ 10 cells with reads at the ATSE. That is **28 % of TMS rows** (1,829,935 of 6,478,290) and **35 % of Allen rows** (1,530,439 of 4,420,578). Other rows show ψ with no interval and an `interval_status` reason.
   - **Atlas only:** users' own fits get ψ (`leafletfa.catalog.celltype_psi`) but no interval, because the calibration needs held-out cells.
   - **Rest ψ:** has no interval.
-- **Missing:** the rewritten interval sentences. A "users' own fits" sentence is also needed here and in the tutorial (Methods and tutorial both, per Karin).
+- **Missing:** the rewritten interval sentences (lines 191-193 are unchanged and still describe the check 10 interval). A "users' own fits" sentence is also needed here and in the tutorial (Methods and tutorial both, per Karin).
+- **Export is done** (f879a6d, b65f8ec): the shipped catalog carries the check 12 interval for validated rows, with `interval_status`; `leafletfa/catalog.py` reproduces check 10 to 5.9e-8. The Methods sentence can now point at a shipped file, not a plan.
 
 ### Results: The catalog (`:210-219`)
 - **Exists:** `:215-218`: junctions, ATSEs and genes via ledger macros (79,768 junctions, 24,475 ATSEs, 11,233 genes, 132,706 cells).
@@ -146,15 +174,15 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 
   | Gene | Event | Atlas | Fact on file | Status in main.tex |
   |---|---|---|---|---|
-  | *Gria2* | flip/flop, linked MXE, `atse_3`, 7 junctions | Allen | no 10.4 row; descriptive only; citation Sommer 1990 marked VERIFY (`GALLERY_KNOWN_BIOLOGY_DRAFT.md:18`) | **missing** |
+  | *Gria2* | flip/flop, linked MXE, `atse_3`, 7 junctions | Allen | no 10.4 row; descriptive only. Flip and flop identified by annotation and translation (section 0). Medians LeafletFA / raw: flip excitatory 0.154 / 0.155, inhibitory 0.067 / 0.104; flop excitatory 0.338 / 0.339, inhibitory 0.468 / 0.431. Citation Sommer 1990 (rat, abstract only) marked VERIFY | **missing** |
   | *Fgfr2* | IIIb/IIIc, `atse_3` | TMS | 10.4 PASS: epithelial min 0.704 > mesenchymal max 0.649; covered mesenchymal cells 0.05–0.15 (11 of 12 types); uncovered 0.35–0.63 (prior = posterior) | framing only; result red (`:287`) |
-  | *Nrxn1* | SS4, `atse_2` | Allen | 10.4 PASS: 270 of 1,891 neuronal pairs differ (226 with the read/cell condition) | red (`:293`) |
+  | *Nrxn1* | SS4, `atse_2` | Allen | 10.4: 270 of 1,891 neuronal pairs differ (226 with the read/cell condition), ATSE-level. **Panel e: the SS4-skipping junction is 1–2 % of reads in every neuronal group; no SS4 difference** | red (`:293`); needs the panel e decision (section 7) |
   | *Ptprc* | lymphoid lead junction, `atse_2` | TMS | 10.4 PASS: 27 B/T calls, 25 confirmed in TEST; B cells lower than rest, T cells mostly higher | red (`:290`) |
 
   - **Note:** the 10.4 *Fgfr2* "IIIb specific in 10 epithelial types" and the *Ptprc* / *Nrxn* counts use the call machinery that failed 10.2 / 10.7. The word "calls" is tied to that decision (`:289`).
-- **Gallery citations:** not verified (Karin verifies before any ranking).
+- **Gallery citations:** volumes and pages verified against PubMed (6970a68); direction-in-mouse check in section 6.
 - **Browser facts:**
-  - Version preview-2026-11-07; static site, 597 MB.
+  - Version preview-2026-11-10 (Lineage group-by; 46 headless checks); the 597 MB figure is from the 11-07 build.
   - Pages: gene, event (structure + per-type panel), compare two, one vs. all.
   - Beside every LeafletFA estimate: raw TRAIN pseudobulk ψ, reads, cells and mice with reads, and held-out TEST reads and cells.
   - The check 12 interval appears only where validated.
@@ -172,15 +200,16 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 - **Cut:** about 17 words.
 
 ### Figure (`:305-310`)
-- **Stale:** the caption (`:308`) lists panels a–e (model, representation checks). The approved layout is a–f:
+- **Stale:** the caption (`:308`) lists panels a–e (model, representation checks), and `:307` includes the old `Figures/fig1_catalog.pdf`. The built layout (figAN) is a–f:
   - a: catalog and model;
   - b: accuracy (10.1);
   - c: *Gria2*;
   - d: *Fgfr2*;
   - e: *Nrxn1* SS4;
   - f: *Ptprc*.
-- **Missing:** the drawn figure and the caption. Panels c–f use the check 12 interval wording (figure plan updated 2026-11-07).
-- **Candidate inputs:** browser screenshots of *Gria2* (below).
+- **Drawn** (figAN, built 32c3206, rebuilt as variants 2026-11-11); **missing:** the caption and the panel a model schematic. Panels c–f use the check 12 interval wording.
+- **Panel e is undecided** (section 7). Panel c is drawn from data in the figure theme (teal for LeafletFA), so the browser screenshots in section 5 are no longer needed as a panel.
+- **Caption limits to state** (`FIG_APPNOTE_CAPTION_FACTS.md`): per-cell split, interval coverage 28 % / 35 % of rows, seed 0 only, no programs and no specificity calls shown, and that in types with ≥ 1,000 TRAIN cells raw is slightly closer to held-out cells than LeafletFA (+0.0054 TMS, +0.0057 Allen; panel b).
 
 ### Discussion (`:313-354`)
 - **Exists:**
@@ -216,7 +245,8 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 - Limits section: which of calls, smoothing, check 13, check 12 go in the 170 words vs the Supplement.
 - Whether "calls" appears anywhere (10.4 rows use the call machinery).
 - *Gria2*: one sentence, with or without the citation (VERIFY).
-- Whether the *Gria2* browser screenshot is a figure panel, a Supplement panel, or neither (font sizes below).
+- Panel e: variant A (kept, with a caption fact) or variant B (five panels, *Nrxn1* only in the gallery); section 7.
+- *Gria2* browser screenshot: now only a Supplement or portal illustration, if at all (panel c is drawn from data).
 
 ## 5. *Gria2* browser screenshots (candidates; `portal/make_pub_screenshots.py`, sbatch job 23120924)
 
@@ -235,7 +265,7 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - No font change was made to the browser.
   - **Color:** the browser draws LeafletFA in ochre. The figure plan and theme reserve teal for LeafletFA, so a screenshot used as a figure panel would break the method-color rule.
 
-## 6. Gallery status (Karin 2026-11-09)
+## 6. Gallery status (Karin 2026-11-09; built 2026-11-10)
 - The list is final with Karin's changes (`GALLERY_KNOWN_BIOLOGY_DRAFT.md`):
   - *Ptprc*: B vs T, with the CD45 review.
   - *Nrxn1*: "differs", with Nguyen 2016 added.
@@ -243,5 +273,17 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - *Pkm*: Noguchi 1986.
   - Row 11 (*Src* N1): dropped (Karin 2026-11-10; the catalog exon is 18 nt, Irimia 2014 defines microexons as 3–15 nt).
 - No alt 3′ or alt 5′ event; the caption must say so.
-- No values read.
+- **Built** (`figSG`, 10 rows, 8 drawn; *Ctnnd1* and *Pkm* have no catalog ATSE). Values were read only after the list was final.
+- Readings so far (facts, no verdict): *Cd44* and *Enah* in the expected direction in raw; *Fgfr2* mesenchymal types compressed toward 0.4; *Nrxn1* not seen at the skipping junction; *Ptbp2* and *Dlg4* rest on one TMS neuron type.
 - Citation volume and pages verified against PubMed (all match). Direction-in-mouse check (10 Nov): only row 3 (Nguyen 2016) is stated in mouse cell types; rows 1, 5–7 are human cell lines; 8–9 mouse developmental; 4 rat; 2 and 10 paywalled. Proposals in `GALLERY_KNOWN_BIOLOGY_DRAFT.md`.
+
+## 7. Panel e: two variants for Karin's decision (built 2026-11-11, sbatch; nothing substituted for *Nrxn1*)
+- **A, panel e kept as is** (`figAN_varA/`): the figure is unchanged; the caption states the fact.
+  - Fact for the caption: the junction shown is the SS4-skipping junction; it carries 1–2 % of the ATSE's reads in every neuronal group, and the expected direction (skipped more in excitatory, less in PV and SST) is not seen; the junction also skips two small exons.
+  - Cost: a main-figure panel with no visible result, in a note that says it shows known biology.
+- **B, five panels without *Nrxn1*** (`figAN5_varB/`): a, b, c *Gria2*, d *Fgfr2*, e *Ptprc* (was f); 183 × 164 mm (the same height as figure AN).
+  - Row 3 holds *Ptprc* alone at the left; the right half is empty.
+  - *Nrxn1* stays in the supplementary gallery as row 3 (SG_c), unchanged; nothing needs moving.
+  - Legend of panel a reads "Panels c–e".
+  - Cost: the neuron example is gone from the main figure; `main.tex:293` and the abstract plan lose the *Nrxn* sentence or move it to the Supplement.
+- Both variants use the same code and the same data as figAN (variant B adds `fig_appnote5.py` and an `AN5` entry in `paper_config.yaml`).

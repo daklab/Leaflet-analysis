@@ -152,6 +152,13 @@ figures:
     # c Gria2 (Allen), d Fgfr2 (TMS), e Nrxn1 SS4 (Allen), f Ptprc (TMS). 183 mm wide, 164 mm tall (limit 165).
     panels: {AN_a: {w: 96, h: 50}, AN_b: {w: 85, h: 50}, AN_c: {w: 90.5, h: 55}, AN_d: {w: 90.5, h: 55}, AN_e: {w: 90.5, h: 55}, AN_f: {w: 90.5, h: 55}}
     layout: [[AN_a, AN_b], [AN_c, AN_d], [AN_e, AN_f]]
+  "AN5":
+    title: "Application Note figure, variant B: five panels without Nrxn1 (Nrxn1 stays in the supplementary gallery, SG_c)"
+    width: appnote
+    formats: [pdf, png]
+    # a, b as in AN; c Gria2, d Fgfr2 in row 2; e Ptprc alone in row 3 (left; the right half is empty). 183 x 164 mm.
+    panels: {AN5_a: {w: 96, h: 50}, AN5_b: {w: 85, h: 50}, AN5_c: {w: 90.5, h: 55}, AN5_d: {w: 90.5, h: 55}, AN5_e: {w: 90.5, h: 55}}
+    layout: [[AN5_a, AN5_b], [AN5_c, AN5_d], [AN5_e]]
   "SG":
     title: "Supplementary gallery: known-biology events (GALLERY_KNOWN_BIOLOGY_DRAFT.md, final 2026-11-10)"
     width: appnote

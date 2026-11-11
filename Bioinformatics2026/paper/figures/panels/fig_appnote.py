@@ -172,7 +172,7 @@ def _accuracy():
 
 
 # ---------------------------------------------------------------- panel a
-def panel_a(cfg, fig):
+def panel_a(cfg, fig, last="f"):
     """Catalog per atlas (cells, cell types, junctions, ATSEs, genes; ledger inputs) and event types of the 24,475 ATSEs;
     model schematic placeholder. Inputs: inputs.fig1.catalog, inputs.fig1.event_types, c10 estimates (types per atlas)."""
     w, h = container_mm(fig)
@@ -207,7 +207,7 @@ def panel_a(cfg, fig):
     # one legend for panels c-f (shared encoding)
     gx = axes_in(sub_slot(fig, w * 0.54, 0, w * 0.46, h * 0.44), (1, 0.5, 0.5, 0.5)); gx.axis("off"); gx.set_xlim(0, 1); gx.set_ylim(0, 1)
     teal, gray = color(cfg, "leafletfa"), cfg["palette"]["gray"]
-    gx.text(0.0, 1.0, "Panels c–f", ha="left", va="top", fontsize=sm, color=ink, fontweight="bold")
+    gx.text(0.0, 1.0, f"Panels c–{last}", ha="left", va="top", fontsize=sm, color=ink, fontweight="bold")
     gx.plot([0.03, 0.13], [0.72, 0.72], color=teal, lw=0.4, alpha=0.55); gx.scatter([0.08], [0.72], s=6, color=teal, lw=0)
     gx.text(0.17, 0.72, "LeafletFA ψ, 95% predictive interval\n(where held-out cells have ≥ 100 reads\nand ≥ 10 cells with reads)", ha="left", va="center", fontsize=sm, color=ink, linespacing=1.0)
     gx.scatter([0.08], [0.40], s=10, facecolors="none", edgecolors=gray, linewidths=0.5)

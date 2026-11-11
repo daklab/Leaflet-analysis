@@ -6,6 +6,8 @@
 |---|---|
 | `figAN/` | `figAN.pdf` (vector, editable text), `figAN.tiff` (350 dpi), `figAN_review.png`, `panels/AN_{a..f}.pdf`, `source_data/` |
 | `figAN_grey_noiv/` | **Variant for comparison** (`FIGAN_GREY_NOIV=1`): in c–f, every type without a validated interval is drawn in light gray (point and ring). Same events and rules otherwise |
+| `figAN_varA/` | **Variant A** (decision pending, 2026-11-11): the figure as is, panel e kept; byte-identical TIFF to `figAN/`. Caption fact below |
+| `figAN5_varB/` | **Variant B**: five panels, *Nrxn1* removed (`fig_appnote5.py`, `AN5` in `paper_config.yaml`); c *Gria2*, d *Fgfr2*, e *Ptprc*; legend reads "Panels c–e"; 183 × 164 mm; *Nrxn1* stays in the gallery (row 3, SG_c) |
 
 - **Size:** 183 × 164 mm (limit 165).
 - **Fonts:** 6 pt minimum; 7 pt labels.
@@ -135,6 +137,8 @@
   - Those transcripts: Nrxn1-203 (ENSMUST00000159419.1), Nrxn1-205 (ENSMUST00000160467.7), Nrxn1-210 (ENSMUST00000161637.7).
   - All three give one junction: **`chr17_90704367_91087954_-`**, joining the exon starting at 91,087,955 to the exon ending at 90,704,367.
   - 7 annotated transcripts include SS4. In them, SS4 is flanked by an 18-nt exon (90,995,461–478) and a 12-nt exon (90,991,367–378), so **the skipping junction also skips those two small exons**.
+- **Caption fact (variant A, 2026-11-11):** the junction drawn is the SS4-skipping junction. It carries about 1–2 % of the ATSE's reads in every neuronal group, and no SS4 difference is seen at it: skipping is not higher in excitatory than in PV or SST (medians 0.013 / 0.019 / 0.019). The junction also skips the two small exons (18 nt and 12 nt) that flank SS4 in the seven transcripts that include it. The panel is therefore not an SS4 switch.
+- **Variant B:** this panel is not in the main figure; the same panel is row 3 of the gallery (SG_c). *Ptprc* becomes panel e.
 - **Not shown:** a summed SS4 estimate.
 - **Types:** 57 cell groups: excitatory 41; inhibitory split PV 2, SST 3, VIP 3, Lamp5 2, other inhibitory 4; non-neuronal 2. With an interval: 21 (excitatory 14; PV 1, SST 1, VIP 2, Lamp5 1, other 1; non-neuronal 1).
 - **Medians, LeafletFA / raw:**
