@@ -156,6 +156,35 @@
 - **Expected direction** (Nguyen 2016, mouse): skipping higher in excitatory, lower in PV and SST. **It is not seen at this junction.** The junction carries about 1–2 % of the ATSE's reads in every neuronal group, and PV and SST are not lower than excitatory.
   - Only 2 PV and 3 SST groups pass the support rule (Pvalb, Pvalb Vipr2; Sst, Sst Chodl, Sst HPF).
 
+### e, variant C. *Nrxn1* SS4 by the SpliceVI Fig 2 definition (Allen, `ENSMUSG00000024109.18_atse_7`; Karin 2026-11-11)
+- **Build:** `figAN_varC/` (`FIGAN_PANEL_E=ss4 FIG_SUFFIX=_varC make_figures.py --figure AN`, sbatch). Panels a–d and f are identical to figure AN.
+- **Definition:** SpliceVI STAGE5 §111, fixed 2026-10-06 before any LeafletFA value was read.
+  - SS4 = the 90-nt exon chr17:90,163,792–90,163,881.
+  - It translates to residues 1248–1277 of mouse neurexin-1α (UniProt Q9CS84), inside the 30-residue variable segment 1247–1276 (VSP_043946) in Laminin G-like domain 6. Treutlein et al. 2014 put SS#4 "in the sixth LNS domain".
+  - **J1** `chr17_90162433_90163791_-` = SS4 inclusion (the scored junction, as in SpliceVI Fig 2).
+  - **J2** `chr17_90162433_90208322_-` = SS4 skipping (reference).
+  - Both are asserted against GENCODE vM19 in `event_annotation.py`:
+    - J1 joins SS4 to its downstream exon;
+    - J2 joins the exons flanking SS4 in the 8 transcripts that include it (CCDS: Nrxn1-206 ENSMUST00000160800.8, Nrxn1-207 ENSMUST00000160844.9, Nrxn1-213, Nrxn1-217).
+- **Types:** 64 cell groups: excitatory 47; PV 2 (Pvalb, Pvalb Vipr2), SST 3 (Sst, Sst Chodl, Sst HPF), VIP 3 (Vip, Vip HPF, Vip Igfbp6), Lamp5 2 (Lamp5, Lamp5 Lhx6), other inhibitory 5 (Meis2, Meis2 HPF, Ntng1 HPF, Pax6, Sncg); non-neuronal 2.
+- **With an interval:** 48 (excitatory 35, PV 2, SST 3, VIP 3, Lamp5 2, other inhibitory 2, non-neuronal 1).
+- **Medians, LeafletFA / raw:**
+
+  | Lineage | J1 inclusion | J2 skipping |
+  |---|---|---|
+  | Excitatory | **0.153 / 0.128** (LeafletFA range 0.057–0.372) | **0.704 / 0.765** |
+  | PV | 0.367 / 0.371 | 0.285 / 0.270 |
+  | SST | 0.405 / 0.471 | 0.237 / 0.106 |
+  | VIP | 0.432 / 0.479 | 0.193 / 0.086 |
+  | Lamp5 | 0.370 / 0.388 | 0.302 / 0.252 |
+  | Other inhibitory | 0.330 / 0.370 | 0.320 / 0.212 |
+  | Non-neuronal | 0.483 / 0.459 | 0.077 / 0.107 |
+
+- **Expected direction:** Nguyen et al. 2016, mouse: SS4 largely skipped in excitatory (CamK2) pyramidal neurons, included in PV and SST interneurons. **It is seen:** inclusion is lower and skipping higher in excitatory groups than in PV and SST, in LeafletFA and in raw. VIP and Lamp5 go the same way.
+- **Panel e of variant A is not SS4.** `atse_2`'s 30-nt exon chr17:90,992,115–90,992,144 (the c10_known_biology_fix.SS4 rule, "the gene's single annotated 30-nt exon") is one of three small early exons of Nrxn1α (18, 30 and 12 nt; exons 2–4 of the α transcripts). It translates to residues about 259–274 of Q9CS84, after EGF-like 1 (219–256) and before Laminin G-like 2 (283–480), about 1,000 residues before SS4.
+  - Treutlein et al. 2014 place SS#1 at "Nrxn1α exons 3a and 4". The early position is consistent with SS#1; the SS number is not verified against the domain map.
+  - The same 30-nt rule was used for Nrxn2 (chr19:6,448,255–284) and Nrxn3 (chr12:88,850,279–308) in check 10.4, while SpliceVI's SS4 exons are chr19:6,513,716–805 and chr12:90,199,147–236. **The 10.4 Nrxn1–3 rows therefore scored a different splice site than SS4** (flag for Karin; the report and verdicts are unchanged here).
+
 ### f. *Ptprc* variable exons (TMS, `ENSMUSG00000026395.16_atse_2`; linked MXE, 10 junctions)
 - **J1 rule (unchanged):** among the lead junctions of the check 10.4 Ptprc calls, the one with the most TRAIN reads.
   - Candidates: `chr1_138117025_138126302_-` (13 calls), `chr1_138115642_138116953_-` (13 calls), `chr1_138115642_138126302_-` (1 call).

@@ -245,7 +245,7 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 - Limits section: which of calls, smoothing, check 13, check 12 go in the 170 words vs the Supplement.
 - Whether "calls" appears anywhere (10.4 rows use the call machinery).
 - *Gria2*: one sentence, with or without the citation (VERIFY).
-- Panel e: variant A (kept, with a caption fact) or variant B (five panels, *Nrxn1* only in the gallery); section 7.
+- Panel e: variant A (atse_2, not SS4), B (five panels) or C (SS4 by the SpliceVI definition; direction seen); section 7. Also whether the gallery row 3 and the 10.4 Nrxn rows are redone with the SS4 definition.
 - *Gria2* browser screenshot: now only a Supplement or portal illustration, if at all (panel c is drawn from data).
 
 ## 5. *Gria2* browser screenshots (candidates; `portal/make_pub_screenshots.py`, sbatch job 23120924)
@@ -277,7 +277,7 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
 - Readings so far (facts, no verdict): *Cd44* and *Enah* in the expected direction in raw; *Fgfr2* mesenchymal types compressed toward 0.4; *Nrxn1* not seen at the skipping junction; *Ptbp2* and *Dlg4* rest on one TMS neuron type.
 - Citation volume and pages verified against PubMed (all match). Direction-in-mouse check (10 Nov): only row 3 (Nguyen 2016) is stated in mouse cell types; rows 1, 5–7 are human cell lines; 8–9 mouse developmental; 4 rat; 2 and 10 paywalled. Proposals in `GALLERY_KNOWN_BIOLOGY_DRAFT.md`.
 
-## 7. Panel e: two variants for Karin's decision (built 2026-11-11, sbatch; nothing substituted for *Nrxn1*)
+## 7. Panel e: three variants for Karin's decision (A and B built 2026-11-11; C added 2026-11-11 after Karin's SS4 definition)
 - **A, panel e kept as is** (`figAN_varA/`): the figure is unchanged; the caption states the fact.
   - Fact for the caption: the junction shown is the SS4-skipping junction; it carries 1–2 % of the ATSE's reads in every neuronal group, and the expected direction (skipped more in excitatory, less in PV and SST) is not seen; the junction also skips two small exons.
   - Cost: a main-figure panel with no visible result, in a note that says it shows known biology.
@@ -287,3 +287,10 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - Legend of panel a reads "Panels c–e".
   - Cost: the neuron example is gone from the main figure; `main.tex:293` and the abstract plan lose the *Nrxn* sentence or move it to the Supplement.
 - Both variants use the same code and the same data as figAN (variant B adds `fig_appnote5.py` and an `AN5` entry in `paper_config.yaml`).
+- **C, panel e = *Nrxn1* SS4 by the SpliceVI Fig 2 definition** (`figAN_varC/`): 90-nt exon chr17:90,163,792–881, `atse_7`; J1 inclusion `chr17_90162433_90163791_-` (scored), J2 skipping `chr17_90162433_90208322_-`; PV / SST / VIP / Lamp5 split.
+  - **The expected direction is seen.** SS4 inclusion median LeafletFA / raw: excitatory 0.153 / 0.128 vs PV 0.367 / 0.371, SST 0.405 / 0.471. Skipping: excitatory 0.704 / 0.765 vs PV 0.285 / 0.270, SST 0.237 / 0.106.
+  - 64 cell groups; 48 with an interval.
+- **Variant A's panel e is not SS4.**
+  - `atse_2` holds three small early exons of Nrxn1α (18 / 30 / 12 nt; exons 2–4 of the α transcripts; residues about 259–274 of Q9CS84, after EGF-like 1), consistent with SS#1 (Treutlein 2014: SS#1 = "Nrxn1α exons 3a and 4"; SS number not verified).
+  - The check 10.4 Nrxn1–3 rows used the same 30-nt-exon rule (c10_known_biology_fix.SS4), so they scored this early site, not SS4.
+  - The gallery (SG_c) and `main.tex:293` also describe that site as SS4.

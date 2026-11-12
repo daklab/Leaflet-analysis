@@ -9,7 +9,11 @@ exon_number attribute and no MANE set exists for mouse, so the named transcript 
 - Gria2 flip/flop: the MXE pair of atse_3 (two exons > 100 nt joined to a shared site on each side). Each exon is translated
   (reverse strand) and assigned flip or flop by the residues that UniProt P19491 (rat GRIA2) gives for the two isoforms:
   flop N-A ... N ... L ... SGGGD, flip T-P ... S ... V ... AKDSG. Shown: the junction from the shared genomic-left site into each exon.
-- Nrxn1 SS4: the annotated 30-nt SS4 exon (c10_known_biology_fix.SS4). Shown (Karin 2026-11-10): the SS4-skipping junction, i.e.
+- Nrxn1 "SS4" (atse_2, variant A): the annotated 30-nt exon of c10_known_biology_fix.SS4, which is NOT SS4 (see the SpliceVI
+  definition below; it is an early small exon of Nrxn1-alpha, consistent with SS#1).
+- Nrxn1 SS4 (atse_7, variant C): the SpliceVI Fig 2 definition, 90-nt exon chr17:90163792-90163881 (residues 1248-1277 of Q9CS84,
+  in Laminin G-like 6), inclusion junction chr17_90162433_90163791_- (scored) and skipping junction chr17_90162433_90208322_-.
+- Nrxn1 30-nt-exon rule, kept for variant A: Shown (Karin 2026-11-10): the SS4-skipping junction, i.e.
   the junction joining the two exons that are consecutive in the annotated transcripts lacking SS4 and that straddle SS4.
 - Fgfr2 IIIb: the IIIb junction of atse_3 (c10_catalog.FGFR2_IIIB). IIIb is the 3' exon of the pair on the minus strand.
 - Ptprc: every junction of atse_2 labeled by its exons in Ptprc-207 (the only transcript with variable exons 4, 5 and 6); the
@@ -154,6 +158,27 @@ def main():
     row("nrxn1", "Nrxn1", "Allen", ev, j, "SS4-skipping junction", "skip", ";".join(used), f"SS4 chr17:{ss4[0]}-{ss4[1]} (30 nt)",
         "junction joining the exons that straddle SS4 in annotated transcripts lacking it")
     log(f"Nrxn1: {len(inc)} transcripts include SS4; skipping transcripts {used}")
+
+    # ---- Nrxn1 SS4, SpliceVI Fig 2 definition (STAGE5 §111, fixed 2026-10-06 before any LeafletFA value was read; Karin 2026-11-11):
+    # 90-nt exon chr17:90163792-90163881 in atse_7; scored = inclusion junction chr17_90162433_90163791_-, reference = skipping
+    # junction chr17_90162433_90208322_-. Asserted here against GENCODE vM19: the exon exists (90 nt), the inclusion junction joins
+    # it to its downstream exon and the skipping junction joins the two exons flanking it, in the transcripts that include it.
+    # The 30-nt exon used above (atse_2, c10_known_biology_fix.SS4) is NOT SS4: it is one of three small early exons of Nrxn1-alpha
+    # (18, 30, 12 nt; exons 2-4 of the alpha transcripts, residues ~259-274 of Q9CS84, after EGF-like 1), consistent with SS#1.
+    ss4b = (90163792, 90163881); ev7 = "ENSMUSG00000024109.18_atse_7"
+    inc_t = [t for t in T.values() if t["gene"] == "Nrxn1" and ss4b in t["exons"]]
+    assert inc_t and ss4b[1] - ss4b[0] + 1 == 90
+    flank = {(t["exons"][t["exons"].index(ss4b) - 1], t["exons"][t["exons"].index(ss4b) + 1]) for t in inc_t
+             if 0 < t["exons"].index(ss4b) < len(t["exons"]) - 1}
+    incl = {join(t, ss4b, t["exons"][t["exons"].index(ss4b) + 1]) for t in inc_t if t["exons"].index(ss4b) < len(t["exons"]) - 1}
+    skp = {join(inc_t[0], u, d) for u, d in flank}
+    assert "chr17_90162433_90163791_-" in incl and "chr17_90162433_90208322_-" in skp, (incl, skp)
+    tr7 = ";".join(f"{t['name']} {t['id']}" for t in inc_t if t["ccds"])
+    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90163791_-", "SS4 inclusion (scored)", "incl", tr7,
+        f"SS4 chr17:{ss4b[0]}-{ss4b[1]} (90 nt)", "SpliceVI Fig 2 definition (STAGE5 §111)")
+    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90208322_-", "SS4 skipping (reference)", "skip", tr7,
+        f"SS4 chr17:{ss4b[0]}-{ss4b[1]} (90 nt)", "SpliceVI Fig 2 definition (STAGE5 §111)")
+    log(f"Nrxn1 SS4 (SpliceVI): {len(inc_t)} transcripts include the 90-nt exon; flanking exon pairs {sorted(flank)}")
 
     # ---- Fgfr2 IIIb
     iiib = sorted({e for t in T.values() if t["gene"] == "Fgfr2" for e in t["exons"] if e[1] == 130199905})

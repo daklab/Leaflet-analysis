@@ -49,6 +49,9 @@ EVENTS = {
     "e": dict(key="nrxn1", gene="Nrxn1", title="SS4 skipping", scheme="allen_inhibitory_split"),
     "f": dict(key="ptprc", gene="Ptprc", title="variable exons", scheme="tms_immune", pick="ptprc_10_4"),
 }
+# Variant C (Karin 2026-11-11): panel e = Nrxn1 SS4 by the SpliceVI Fig 2 definition (atse_7, 90-nt exon; event_annotation.py)
+if os.environ.get("FIGAN_PANEL_E") == "ss4":
+    EVENTS["e"] = dict(key="nrxn1_ss4", gene="Nrxn1", title="SS4 (90-nt exon)", scheme="allen_inhibitory_split")
 
 
 # ---------------------------------------------------------------- data
