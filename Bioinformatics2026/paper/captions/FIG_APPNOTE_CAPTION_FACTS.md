@@ -132,7 +132,7 @@
   - The lineage direction (epithelial above mesenchymal) holds in LeafletFA and raw.
 - **Direction source:** Bebee et al. 2015 (mouse Esrp1/2 knockout epidermis) and Warzecha et al. 2009.
 
-### e. *Nrxn1* SS4 skipping (Allen, `ENSMUSG00000024109.18_atse_2`; complex, 10 junctions)
+### e, old (variant A only, `figAN_varA/`; NOT SS4): early *Nrxn1*α site (Allen, `ENSMUSG00000024109.18_atse_2`; complex, 10 junctions)
 - **Rule (annotation; Karin 2026-11-10):** J1 = the SS4-skipping junction, i.e. the junction joining the two exons that are consecutive in the annotated transcripts lacking SS4 and that straddle the 30-nt SS4 exon (chr17:90,992,115–90,992,144).
   - Those transcripts: Nrxn1-203 (ENSMUST00000159419.1), Nrxn1-205 (ENSMUST00000160467.7), Nrxn1-210 (ENSMUST00000161637.7).
   - All three give one junction: **`chr17_90704367_91087954_-`**, joining the exon starting at 91,087,955 to the exon ending at 90,704,367.
@@ -156,13 +156,14 @@
 - **Expected direction** (Nguyen 2016, mouse): skipping higher in excitatory, lower in PV and SST. **It is not seen at this junction.** The junction carries about 1–2 % of the ATSE's reads in every neuronal group, and PV and SST are not lower than excitatory.
   - Only 2 PV and 3 SST groups pass the support rule (Pvalb, Pvalb Vipr2; Sst, Sst Chodl, Sst HPF).
 
-### e, variant C. *Nrxn1* SS4 by the SpliceVI Fig 2 definition (Allen, `ENSMUSG00000024109.18_atse_7`; Karin 2026-11-11)
-- **Build:** `figAN_varC/` (`FIGAN_PANEL_E=ss4 FIG_SUFFIX=_varC make_figures.py --figure AN`, sbatch). Panels a–d and f are identical to figure AN.
+### e. *Nrxn1* SS4 (Allen, `ENSMUSG00000024109.18_atse_7`): **the main panel e since 2026-11-11** (Karin: variant C becomes figure AN)
+- **Build:** `figAN/` (default since 2026-11-11; `figAN_varC/` is the same panel from the first build). The old atse_2 panel: `FIGAN_PANEL_E=atse2`.
+- **Titles:** J1 "SS4 inclusion", J2 "SS4 skipping". Small lineage blocks (PV, SST, VIP, Lamp5) are padded to one label height; their rows are centered in the block.
 - **Definition:** SpliceVI STAGE5 §111, fixed 2026-10-06 before any LeafletFA value was read.
   - SS4 = the 90-nt exon chr17:90,163,792–90,163,881.
   - It translates to residues 1248–1277 of mouse neurexin-1α (UniProt Q9CS84), inside the 30-residue variable segment 1247–1276 (VSP_043946) in Laminin G-like domain 6. Treutlein et al. 2014 put SS#4 "in the sixth LNS domain".
-  - **J1** `chr17_90162433_90163791_-` = SS4 inclusion (the scored junction, as in SpliceVI Fig 2).
-  - **J2** `chr17_90162433_90208322_-` = SS4 skipping (reference).
+  - **J1** `chr17_90162433_90163791_-` = SS4 inclusion (the junction SpliceVI Fig 2 scores).
+  - **J2** `chr17_90162433_90208322_-` = SS4 skipping.
   - Both are asserted against GENCODE vM19 in `event_annotation.py`:
     - J1 joins SS4 to its downstream exon;
     - J2 joins the exons flanking SS4 in the 8 transcripts that include it (CCDS: Nrxn1-206 ENSMUST00000160800.8, Nrxn1-207 ENSMUST00000160844.9, Nrxn1-213, Nrxn1-217).

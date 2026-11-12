@@ -46,12 +46,13 @@ GREY_NOIV = os.environ.get("FIGAN_GREY_NOIV") == "1"
 EVENTS = {
     "c": dict(key="gria2", gene="Gria2", title="flip/flop", scheme="allen"),
     "d": dict(key="fgfr2", gene="Fgfr2", title="IIIb vs IIIc", scheme="tms_epithelial"),
-    "e": dict(key="nrxn1", gene="Nrxn1", title="SS4 skipping", scheme="allen_inhibitory_split"),
+    "e": dict(key="nrxn1_ss4", gene="Nrxn1", title="SS4", scheme="allen_inhibitory_split"),   # Karin 2026-11-11: variant C is panel e
     "f": dict(key="ptprc", gene="Ptprc", title="variable exons", scheme="tms_immune", pick="ptprc_10_4"),
 }
-# Variant C (Karin 2026-11-11): panel e = Nrxn1 SS4 by the SpliceVI Fig 2 definition (atse_7, 90-nt exon; event_annotation.py)
-if os.environ.get("FIGAN_PANEL_E") == "ss4":
-    EVENTS["e"] = dict(key="nrxn1_ss4", gene="Nrxn1", title="SS4 (90-nt exon)", scheme="allen_inhibitory_split")
+# Panel e = Nrxn1 SS4 by the SpliceVI Fig 2 definition (atse_7, 90-nt exon; event_annotation.py), Karin 2026-11-11 (variant C).
+# The old panel e (atse_2, the note-4 30-nt exon, an early Nrxn-alpha site, NOT SS4) is kept only as variant A:
+if os.environ.get("FIGAN_PANEL_E") == "atse2":
+    EVENTS["e"] = dict(key="nrxn1", gene="Nrxn1", title="early site (atse_2; not SS4)", scheme="allen_inhibitory_split")
 
 
 # ---------------------------------------------------------------- data
@@ -338,8 +339,24 @@ def event_panel(cfg, fig, spec, subtitle=None):
     present = [l for l in order if l in lin.index]
     gap = 1.2   # rows between lineages
     row_lin = D[D.junction_index == 0].set_index("row").lineage
-    ypos = lambda r: np.atleast_1d(r) + gap * np.array([present.index(row_lin[x]) for x in np.atleast_1d(r)])   # noqa: E731
-    ytot = nrow + gap * (len(present) - 1)
+    # every lineage block is at least one 6-pt label tall (2.4 mm), so small groups (e.g. PV, SST) get their own label space;
+    # a small group's rows are centered in its block
+    ax_h_mm = body_h - 7.2 - 3.6
+    cnt = [int(lin.loc[l, "count"]) for l in present]
+    k = 1
+    for _ in range(20):
+        tot = sum(max(c, k) for c in cnt) + gap * (len(present) - 1)
+        k_new = int(np.ceil(2.4 / (ax_h_mm / tot)))
+        if k_new == k:
+            break
+        k = k_new
+    base, y = {}, 0.0
+    for l, c in zip(present, cnt):
+        size = max(c, k)
+        base[l] = y + (size - c) / 2 - lin.loc[l, "min"]
+        y += size + gap
+    ytot = y - gap
+    ypos = lambda r: np.array([x + base[row_lin[x]] for x in np.atleast_1d(r)], dtype=float)   # noqa: E731
     rmax = max(D.junction_reads.max(), 1)
     for n, j in enumerate(shown):
         ax = axes_in(sub_slot(fig, lab_w + n * col_w, 0, col_w, body_h), (2.0 if n else 0.5, 7.2, 1.0, 3.6))
@@ -362,7 +379,6 @@ def event_panel(cfg, fig, spec, subtitle=None):
     lax = axes_in(sub_slot(fig, 0, 0, lab_w, body_h), (0.5, 7.2, 0.3, 3.6)); lax.axis("off")
     lax.set_ylim(ytot - 0.5, -0.5); lax.set_xlim(0, 1)
     cmap = scheme(spec["scheme"])["colors"]
-    ax_h_mm = body_h - 7.2 - 3.6
     sep = 2.2 / ax_h_mm * ytot                      # minimum label spacing (one 6-pt line) in row units
     spans = [(l, ypos(lin.loc[l, "min"])[0], ypos(lin.loc[l, "max"])[0]) for l in present]
     lab_y = [(y0 + y1) / 2 for _, y0, y1 in spans]

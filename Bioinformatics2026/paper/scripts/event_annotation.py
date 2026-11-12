@@ -174,9 +174,9 @@ def main():
     skp = {join(inc_t[0], u, d) for u, d in flank}
     assert "chr17_90162433_90163791_-" in incl and "chr17_90162433_90208322_-" in skp, (incl, skp)
     tr7 = ";".join(f"{t['name']} {t['id']}" for t in inc_t if t["ccds"])
-    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90163791_-", "SS4 inclusion (scored)", "incl", tr7,
+    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90163791_-", "SS4 inclusion", "incl", tr7,
         f"SS4 chr17:{ss4b[0]}-{ss4b[1]} (90 nt)", "SpliceVI Fig 2 definition (STAGE5 §111)")
-    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90208322_-", "SS4 skipping (reference)", "skip", tr7,
+    row("nrxn1_ss4", "Nrxn1", "Allen", ev7, "chr17_90162433_90208322_-", "SS4 skipping", "skip", tr7,
         f"SS4 chr17:{ss4b[0]}-{ss4b[1]} (90 nt)", "SpliceVI Fig 2 definition (STAGE5 §111)")
     log(f"Nrxn1 SS4 (SpliceVI): {len(inc_t)} transcripts include the 90-nt exon; flanking exon pairs {sorted(flank)}")
 

@@ -10,8 +10,8 @@ ROWS = [  # (panel, spec, evidence; expected) -- text from the final gallery lis
      "Mouse in vivo (Esrp knockout epidermis) + cell lines; expected: IIIb higher in epithelial types"),
     ("b", dict(key="ptprc", gene="Ptprc", title="variable exons", scheme="tms_immune", pick="ptprc_10_4"),
      "Not verified; descriptive (differs between immune types)"),
-    ("c", dict(key="nrxn1", gene="Nrxn1", title="SS4 skipping", scheme="allen_inhibitory_split"),
-     "Mouse cell types (Nguyen 2016); expected: skipping higher in excitatory, lower in PV and SST"),
+    ("c", dict(key="nrxn1_ss4", gene="Nrxn1", title="SS4", scheme="allen_inhibitory_split"),   # SpliceVI §111 SS4 (Karin 2026-11-11)
+     "Mouse cell types (Nguyen 2016); expected: SS4 included in PV and SST, skipped in excitatory"),
     ("d", dict(key="gria2", gene="Gria2", title="flip/flop", scheme="allen"),
      "Rat brain regions (abstract only); descriptive"),
     ("e", dict(key="cd44", gene="Cd44", title="variable exons v8–v10", scheme="tms_epithelial"),

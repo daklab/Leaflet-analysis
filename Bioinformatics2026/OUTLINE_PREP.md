@@ -245,7 +245,7 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 - Limits section: which of calls, smoothing, check 13, check 12 go in the 170 words vs the Supplement.
 - Whether "calls" appears anywhere (10.4 rows use the call machinery).
 - *Gria2*: one sentence, with or without the citation (VERIFY).
-- Panel e: variant A (atse_2, not SS4), B (five panels) or C (SS4 by the SpliceVI definition; direction seen); section 7. Also whether the gallery row 3 and the 10.4 Nrxn rows are redone with the SS4 definition.
+- ~~Panel e~~ **decided (Karin 2026-11-11): variant C is panel e** (SS4, SpliceVI §111). Gallery row 3 redrawn on SS4; 10.4 Nrxn rows corrected by amendment 6 note 6 (old rows relabeled as an early Nrxn site, new SS4 rows added); `main.tex:293` marked STALE.
 - *Gria2* browser screenshot: now only a Supplement or portal illustration, if at all (panel c is drawn from data).
 
 ## 5. *Gria2* browser screenshots (candidates; `portal/make_pub_screenshots.py`, sbatch job 23120924)

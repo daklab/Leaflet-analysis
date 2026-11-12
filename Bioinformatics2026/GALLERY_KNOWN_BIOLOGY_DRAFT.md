@@ -15,7 +15,7 @@ journal before use (section "Citation check" below).
 |---|---|---|---|---|---|---|
 | 1 | *Fgfr2* | IIIb vs IIIc exon (MXE), atse_3 | TMS | IIIb higher in epithelial types, IIIc in mesenchymal (ESRP1/2) | mouse in vivo (Esrp1/2 knockout epidermis, E18.5: full IIIb to IIIc switch) + cell lines (human) | Warzecha et al. 2009, Mol Cell 33:591–601 (PMID 19285943); Bebee et al. 2015, eLife 4:e08954 (PMID 26371508) |
 | 2 | *Ptprc* | Variable exons 4–6 (CD45RA/RB/RC), atse_2 | TMS | **Descriptive:** differs between immune types (the B vs T direction is not verified; Hermiston 2003 paywalled) | not verified | Hermiston, Xu and Weiss 2003, Annu Rev Immunol 21:107–137 (PMID 12414720) |
-| 3 | *Nrxn1* | SS4 exon, atse_2 | Allen | **SS4 skipped in excitatory (pyramidal) neurons, included in PV and SST interneurons** | mouse cell types (hippocampus and neocortex, ribosome-tagged CamK2, PV, SST neurons) | Nguyen et al. 2016, eLife 5:e22757 (PMID 27960072); Traunmüller et al. 2016, Science 352:982–986 (PMID 27174676; paywalled, abstract only) |
+| 3 | *Nrxn1* | SS4 exon (90 nt, chr17:90,163,792–90,163,881), `atse_7` (SpliceVI §111 definition; corrected 2026-11-11, was the note-4 30-nt exon in `atse_2`, an early Nrxn1α site, not SS4) | Allen | **SS4 skipped in excitatory (pyramidal) neurons, included in PV and SST interneurons** | mouse cell types (hippocampus and neocortex, ribosome-tagged CamK2, PV, SST neurons) | Nguyen et al. 2016, eLife 5:e22757 (PMID 27960072); Traunmüller et al. 2016, Science 352:982–986 (PMID 27174676; paywalled, abstract only) |
 | 4 | *Gria2* | Flip vs flop (MXE), atse_3 | Allen | **Descriptive:** flip/flop ratio differs between neuron types | rat brain regions (CA1 vs CA3; abstract only) | Sommer et al. 1990, Science 249:1580–1585 (PMID 1699275) |
 | 5 | *Cd44* | Variable exons **v8–v10** | TMS | Inclusion higher in epithelial than mesenchymal types (ESRP) | cell lines (human; v8–v10) + mouse in vivo (Esrp1/2 knockout epidermis converts Cd44v to Cd44s; all 10 variable exons as one block) | Warzecha et al. 2009 (as row 1); Bebee et al. 2015 (as row 1) |
 | 6 | *Enah* | Exon 11a | TMS | Included in epithelial, skipped in mesenchymal types (ESRP) | cell lines (human) + mouse in vivo (an "Esrp enhanced" Enah event in epidermis; the exon is not named in the text) | Warzecha et al. 2009 (as row 1); Bebee et al. 2015 (as row 1) |
@@ -116,3 +116,9 @@ known-biology example with a stated direction was available for those classes.
 - Rows 2, 4, 10: descriptive. Rows 2 and 10 change only if PDFs Karin adds to `refs/` state a direction.
 - Optional PDFs for `refs/` (none blocks anything): Traunmüller 2016, Sommer 1990, Hermiston 2003, Noguchi 1986.
 - **Still no values looked up against this list until Karin approves it.**
+
+## Correction (Karin 2026-11-11)
+- Row 3 was drawn on `atse_2` (the check 10.4 note-4 "single annotated 30-nt exon" rule), which is an early Nrxn1α site
+  (residues ~259–274, consistent with SS#1), not SS4. It is redrawn on the SS4 exon of the SpliceVI §111 event list (fixed
+  2026-10-06): 90-nt exon in `atse_7`, inclusion `chr17_90162433_90163791_-`, skipping `chr17_90162433_90208322_-`.
+- The expected direction (Nguyen 2016) is unchanged; it now applies to the right exon.
