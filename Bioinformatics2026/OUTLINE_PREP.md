@@ -1,8 +1,41 @@
-# Outline session prep, Wed 11 Nov 2026 (no prose; refreshed 2026-11-11)
+# Outline session prep (no prose; first version Wed 11 Nov 2026, refreshed 2026-11-13)
 
-Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines; unchanged since the first version, no manuscript edits made). Word counts are approximate: prose only, with comments, red `\unsure{}` text, equations and citations removed (counted again 2026-11-11; the sentence-level screen is `LEAFLETFA_SCREEN.md`).
+Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines). Since then: 556f14a (STALE comment at `:293`) and c17d35b (stale items wrapped in `\unsure`, facts in comments; no rewording), which shift later lines by up to about 40. **Line numbers below are the 78436ab numbers.** Word counts are approximate: prose only, with comments, red `\unsure{}` text, equations and citations removed (counted 2026-11-11, before the stale wraps; the sentence-level screen is `LEAFLETFA_SCREEN.md`).
 
-## 0. What changed since the first version of this file
+## 0a. What changed since 11 Nov (refresh 2026-11-13)
+- **Panel e decided (Karin 2026-11-11): variant C is figAN.** *Nrxn1* SS4 by the SpliceVI definition (STAGE5 §111):
+  - 90-nt exon chr17:90,163,792–881, `atse_7`.
+  - J1 SS4 inclusion `chr17_90162433_90163791_-`; J2 SS4 skipping `chr17_90162433_90208322_-`.
+  - Panel titles "J1: SS4 inclusion" / "J2: SS4 skipping"; PV / SST / VIP / Lamp5 split; 64 cell groups, 48 with an interval.
+  - **Expected direction seen.** Medians LeafletFA / raw (`figAN_e_Nrxn1.tsv`):
+
+    | Group (n) | SS4 inclusion | SS4 skipping |
+    |---|---|---|
+    | Excitatory (47) | **0.153** / 0.128 | 0.704 / 0.765 |
+    | PV (2) | **0.367** / 0.371 | 0.285 / 0.270 |
+    | SST (3) | **0.405** / 0.471 | 0.237 / 0.106 |
+    | VIP (3) | **0.432** / 0.479 | 0.193 / 0.086 |
+    | Lamp5 (2) | 0.370 / 0.388 | 0.302 / 0.252 |
+    | Other inhibitory (5) | 0.330 / 0.370 | 0.320 / 0.212 |
+    | Non-neuronal (2) | 0.483 / 0.459 | 0.077 / 0.107 |
+
+- **Check 10.4 *Nrxn* rows corrected** (amendment 6 note 6, committed 6d7c648 before computing; result 685df1b, job 23230218). Rule unchanged (point TV > 0.10 and non-overlapping check 10 intervals at ≥ 1 junction; 1,891 neuronal pairs):
+
+  | Gene | SS4 ATSE | Pairs differ | With read/cell condition | Verdict |
+  |---|---|---|---|---|
+  | *Nrxn1* | `atse_7` | **1,256** | 1,256 | PASS |
+  | *Nrxn2* | `atse_6` | **946** | 581 | PASS |
+  | *Nrxn3* | `atse_7` | **1,129** | 812 | PASS |
+
+  - Each SS4 ATSE holds both the inclusion and the skipping junction (the old *Nrxn3* "no spanning junction" limit applied to the early site only).
+  - Descriptive SS4 inclusion medians, excitatory vs inhibitory: *Nrxn1* 0.153 vs 0.396; *Nrxn2* 0.185 vs 0.334; *Nrxn3* 0.361 vs 0.525.
+  - Old rows kept, relabeled "early Nrxn site (not SS4)", verdicts unchanged: `atse_2`, three small early exons of Nrxn1α (18 / 30 / 12 nt), consistent with SS#1 (SS number not verified).
+  - The ATSE-level caveat still holds: a differing pair says the ATSE differs, not that the SS4 junctions drive it.
+- **Gallery row c rebuilt on SS4** (SG_c, same source data as figAN e, md5 ef77be6b980f9873333a221a21d261a1).
+- **main.tex stale items wrapped** (c17d35b): `:113-114`, `:191-193`, `:236`, `:279`, `:283-293`, `:303`, `:307-308`, `:368` and Smart-seq2 at `:111`, `:216`, `:366`. Each has the current fact and source in a comment above; no wording changed.
+- **Benchmarks pulled** into the Scale facts (section 3).
+
+## 0. What changed between the first version and 11 Nov
 - **Figure AN built** (32c3206, 2026-11-10): panels a–f, 183 × 164 mm (limit 165); gray no-interval variant in `figAN_grey_noiv/`.
   - Junctions chosen by annotation (GENCODE vM19, `paper/scripts/event_annotation.py`), no usage value read.
   - Lineages from one map (`cell_type_maps/mouse_lineage_map.json`), shared with the browser.
@@ -14,14 +47,7 @@ Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines; u
   - flip = exon of Gria2-202 (ENSMUST00000107745.7); flop = exon of Gria2-201 (ENSMUST00000075316.9); translated and compared with UniProt P19491.
   - J1 `chr3_80689351_80690403_-` = into flip; J2 `chr3_80689351_80691319_-` = into flop.
   - Flop is 5′ of flip on this minus-strand annotation.
-- **Panel e (*Nrxn1* SS4) shows no SS4 difference:**
-  - J1 is the SS4-skipping junction (`chr17_90704367_91087954_-`, three vM19 transcripts without SS4).
-  - It carries about **1–2 %** of ATSE reads in every neuronal group; medians LeafletFA / raw: excitatory 0.013 / 0.011; PV 0.019 / 0.018; SST 0.019 / 0.022.
-  - The expected direction (Nguyen 2016: skipped more in excitatory, less in PV and SST) is **not seen**.
-  - The junction also skips two small exons (18 nt and 12 nt) that flank SS4 in the seven transcripts that include it.
-  - Only 2 PV and 3 SST groups pass the support rule.
-  - This is consistent with the ATSE-level rule (`main.tex:293`): the 10.4 "pairs differ" result says the ATSE differs, not that SS4 drives it. It is **not** a contradiction, but the figure cannot be captioned as an SS4 switch.
-  - Two variants built for Karin's decision (section 7).
+- ~~Panel e (*Nrxn1* `atse_2`) shows no SS4 difference~~ **Superseded (section 0a):** `atse_2` is not SS4 but an early Nrxn1α site; its junction `chr17_90704367_91087954_-` carried 1–2 % of ATSE reads. Panel e is now SS4 `atse_7` (variant C).
 - **Check 12 export done** (f879a6d, b65f8ec):
   - Intervals shipped in the catalog export for validated rows only, with `interval_status`, TEST reads and cells, `raw_psi`, `junction_reads`, mice.
   - `leafletfa/catalog.py` estimator port: unit test, and full-size check (max difference 5.9e-8 vs check 10, both atlases).
@@ -176,8 +202,8 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
   |---|---|---|---|---|
   | *Gria2* | flip/flop, linked MXE, `atse_3`, 7 junctions | Allen | no 10.4 row; descriptive only. Flip and flop identified by annotation and translation (section 0). Medians LeafletFA / raw: flip excitatory 0.154 / 0.155, inhibitory 0.067 / 0.104; flop excitatory 0.338 / 0.339, inhibitory 0.468 / 0.431. Citation Sommer 1990 (rat, abstract only) marked VERIFY | **missing** |
   | *Fgfr2* | IIIb/IIIc, `atse_3` | TMS | 10.4 PASS: epithelial min 0.704 > mesenchymal max 0.649; covered mesenchymal cells 0.05–0.15 (11 of 12 types); uncovered 0.35–0.63 (prior = posterior) | framing only; result red (`:287`) |
-  | *Nrxn1* | SS4, `atse_2` | Allen | 10.4: 270 of 1,891 neuronal pairs differ (226 with the read/cell condition), ATSE-level. **Panel e: the SS4-skipping junction is 1–2 % of reads in every neuronal group; no SS4 difference** | red (`:293`); needs the panel e decision (section 7) |
-  | *Ptprc* | lymphoid lead junction, `atse_2` | TMS | 10.4 PASS: 27 B/T calls, 25 confirmed in TEST; B cells lower than rest, T cells mostly higher | red (`:290`) |
+  | *Nrxn1* | SS4 (SpliceVI §111), `atse_7` | Allen | 10.4 (note 6): **1,256 of 1,891** neuronal pairs differ (1,256 with the read/cell condition), PASS, ATSE-level; *Nrxn2* `atse_6` 946 (581), *Nrxn3* `atse_7` 1,129 (812), both PASS. Panel e SS4 inclusion: excitatory **0.153** vs PV 0.367, SST 0.405, VIP 0.432 (LeafletFA medians; table in section 0a) | facts as comments; old *Nrxn3* limit sentence wrapped (c17d35b) |
+  | *Ptprc* | lymphoid lead junction, `atse_2` | TMS | 10.4 PASS: 27 B/T calls, 25 confirmed in TEST; B cells lower than rest, T cells mostly higher | red (`:290`); "calls" flagged stale (c17d35b) |
 
   - **Note:** the 10.4 *Fgfr2* "IIIb specific in 10 epithelial types" and the *Ptprc* / *Nrxn* counts use the call machinery that failed 10.2 / 10.7. The word "calls" is tied to that decision (`:289`).
 - **Gallery citations:** volumes and pages verified against PubMed (6970a68); direction-in-mouse check in section 6.
@@ -196,7 +222,21 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 
 ### Results: Scale (`:297-303`)
 - **Exists:** GPU and CPU timings, atlas-size run (`:299-302`).
-- **Stale:** `:303` says the scQuint and LeafCutter catalog benchmarks are "not run yet". Both have run: scQuint job 22725257; LeafCutter TMS_full array 22780123. Results not pulled into the text.
+- **Stale:** `:303` says the scQuint and LeafCutter catalog benchmarks are "not run yet" (wrapped, c17d35b). Both have run. Descriptive cost, no pass rule; different hardware:
+
+  | Tool | Job | Data | Hardware | Time | Peak memory |
+  |---|---|---|---|---|---|
+  | LeafletFA, TMS seed 0 | (manifest) | 54,694 TRAIN cells | GPU (RTX PRO 6000) | **10.6 min** | — |
+  | LeafletFA, Allen seed 0 | (manifest) | 38,199 TRAIN cells | GPU | **31.6 min** | — |
+  | LeafletFA, atlas size | 22597359 | 132,706 cells | GPU (b6k) | fit **73.2 min** (0.27 s/step); whole job 119.4 min | 40.7 GB host |
+  | scQuint | 22725257 | TMS TRAIN, 54,694 cells; 51,119 introns, 21,742 groups | 16 CPUs | training **86.0 min** (early stop); job 1 h 27 min | 1.7 GB |
+  | LeafCutter cell type × event catalog | 22780123 | TMS, 128 tasks | 4 CPUs per task | **19.2 task-h** (77.0 core-h allocated); longest task 48 min | 1.28 GB per task |
+
+  - Sources: sacct; logs `lfa_c10_scquint_22725257.log`, `lfa_c10_atlasfull_c1_22597359.log`; `run_record.json`; `RELEASE_MANIFEST.md` fits table.
+- **Numbers to fix in `:299-302` (not wrapped; not on the stale list):**
+  - "the full 16,200-step fit took 119 min": the fit took 73.2 min; 119.4 min is the whole job.
+  - "15–40 min per fit" vs the 10.6 / 31.6 min primary fits.
+  - CPU "about 10× slower (6 s/step)" vs 0.05 s/step GPU is 120×: VERIFY ([M] section 4).
 - **Cut:** about 17 words.
 
 ### Figure (`:305-310`)
@@ -205,10 +245,13 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
   - b: accuracy (10.1);
   - c: *Gria2*;
   - d: *Fgfr2*;
-  - e: *Nrxn1* SS4;
-  - f: *Ptprc*.
-- **Drawn** (figAN, built 32c3206, rebuilt as variants 2026-11-11); **missing:** the caption and the panel a model schematic. Panels c–f use the check 12 interval wording.
-- **Panel e is undecided** (section 7). Panel c is drawn from data in the figure theme (teal for LeafletFA), so the browser screenshots in section 5 are no longer needed as a panel.
+  - e: *Nrxn1* SS4 (`atse_7`, J1 SS4 inclusion, J2 SS4 skipping; PV / SST / VIP / Lamp5 split);
+  - f: *Ptprc* (J1 = exon 7→8 of Ptprc-207).
+- **Current figAN** (`paper_figures/figAN/figAN.pdf`, built 2026-11-11 22:08): variant C. 183 × 164 mm (limit 165).
+  - Panel a legend: "Exons: GENCODE vM19 (GRCm38)". Panel b: neutral markers, axis "Held-out error, LeafletFA − raw". Intervals 0.4 pt, alpha 0.55.
+  - Other builds kept for reference: `figAN_varA/` (old `atse_2`), `figAN5_varB/` (no *Nrxn1*), `figAN_grey_noiv/`.
+- **Missing:** the caption, the panel a model schematic, and copying figAN into Overleaf `Figures/` (main.tex still includes `fig1_catalog.pdf`; wrapped, c17d35b). Panels c–f use the check 12 interval wording.
+- **Panel e decided** (variant C, Karin 2026-11-11). Panel c is drawn from data in the figure theme (teal for LeafletFA), so the browser screenshots in section 5 are no longer needed as a panel.
 - **Caption limits to state** (`FIG_APPNOTE_CAPTION_FACTS.md`): per-cell split, interval coverage 28 % / 35 % of rows, seed 0 only, no programs and no specificity calls shown, and that in types with ≥ 1,000 TRAIN cells raw is slightly closer to held-out cells than LeafletFA (+0.0054 TMS, +0.0057 Allen; panel b).
 
 ### Discussion (`:313-354`)
@@ -274,12 +317,17 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - Row 11 (*Src* N1): dropped (Karin 2026-11-10; the catalog exon is 18 nt, Irimia 2014 defines microexons as 3–15 nt).
 - No alt 3′ or alt 5′ event; the caption must say so.
 - **Built** (`figSG`, 10 rows, 8 drawn; *Ctnnd1* and *Pkm* have no catalog ATSE). Values were read only after the list was final.
-- Readings so far (facts, no verdict): *Cd44* and *Enah* in the expected direction in raw; *Fgfr2* mesenchymal types compressed toward 0.4; *Nrxn1* not seen at the skipping junction; *Ptbp2* and *Dlg4* rest on one TMS neuron type.
+- Readings so far (facts, no verdict):
+  - *Cd44* and *Enah* in the expected direction in raw.
+  - *Fgfr2* mesenchymal types compressed toward 0.4.
+  - *Nrxn1* (row 3, rebuilt on SS4 `atse_7`): expected direction seen; SS4 inclusion excitatory 0.153 vs PV 0.367, SST 0.405 (LeafletFA medians; same data as figAN e).
+  - *Ptbp2* and *Dlg4* rest on one TMS neuron type.
+  - **Stale:** `captions/FIG_GALLERY_CAPTION_FACTS.md` row c and its *Nrxn1* reading still describe the old skipping junction `chr17_90704367_91087954_-`; not updated here.
 - Citation volume and pages verified against PubMed (all match). Direction-in-mouse check (10 Nov): only row 3 (Nguyen 2016) is stated in mouse cell types; rows 1, 5–7 are human cell lines; 8–9 mouse developmental; 4 rat; 2 and 10 paywalled. Proposals in `GALLERY_KNOWN_BIOLOGY_DRAFT.md`.
 
-## 7. Panel e: three variants for Karin's decision (A and B built 2026-11-11; C added 2026-11-11 after Karin's SS4 definition)
+## 7. Panel e: three variants (history; **resolved 2026-11-11: C**, see section 0a)
 - **A, panel e kept as is** (`figAN_varA/`): the figure is unchanged; the caption states the fact.
-  - Fact for the caption: the junction shown is the SS4-skipping junction; it carries 1–2 % of the ATSE's reads in every neuronal group, and the expected direction (skipped more in excitatory, less in PV and SST) is not seen; the junction also skips two small exons.
+  - Fact for the caption: the junction shown (`atse_2`, later found not to be SS4) is a skipping junction; it carries 1–2 % of the ATSE's reads in every neuronal group, and the expected direction (skipped more in excitatory, less in PV and SST) is not seen; the junction also skips two small exons.
   - Cost: a main-figure panel with no visible result, in a note that says it shows known biology.
 - **B, five panels without *Nrxn1*** (`figAN5_varB/`): a, b, c *Gria2*, d *Fgfr2*, e *Ptprc* (was f); 183 × 164 mm (the same height as figure AN).
   - Row 3 holds *Ptprc* alone at the left; the right half is empty.
