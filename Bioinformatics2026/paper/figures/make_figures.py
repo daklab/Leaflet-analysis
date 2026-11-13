@@ -28,7 +28,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "panels"))
 from style import DEFAULT_CONFIG, MM, Slot, apply_style, load_config, save  # noqa: E402
 
-FIGURE_MODULES = {"1": "fig1", "AN": "fig_appnote", "AN5": "fig_appnote5", "SG": "fig_gallery"}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
+FIGURE_MODULES = {"1": "fig1", "AN": "fig_appnote", "AN5": "fig_appnote5", "SG": "fig_gallery", "AN_b_abs": "fig_appnote_babs"}   # supplementary figures by content; numbers live in the captions   # add figures here as they are written
 
 
 def panels_of(fig_id):

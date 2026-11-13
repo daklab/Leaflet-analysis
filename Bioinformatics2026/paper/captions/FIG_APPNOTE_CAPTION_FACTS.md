@@ -240,3 +240,39 @@
   - J1 + J2: LeafletFA median 0.513 (range 0.439–0.554); raw median 0.509 (0.347–0.614).
   - The other 5 junctions of `atse_3` carry about half: LeafletFA median **0.487** (0.446–0.561); raw median 0.491 (0.386–0.653).
   - By lineage (LeafletFA median): excitatory 0.493, PV 0.461, SST 0.468, VIP 0.463, Lamp5 0.498, other inhibitory 0.466, non-neuronal 0.540.
+
+## Alternative panel b, absolute errors (`figAN_b_abs`; Karin 2026-11-13; current b kept)
+- **Build:** `figures/panels/fig_appnote_babs.py` (`make_figures.py --figure AN_b_abs`, sbatch). 85 × 68 mm, 18 mm taller than the current b (figure AN would be about 182 mm tall; earlier limit 165).
+  - Output: `paper_figures/figAN_b_abs/` (`figAN_b_abs.pdf`, `.tiff`, review PNG). Numbers table: `source_data/figAN_b_abs_numbers.tsv`.
+- **Same check 10.1 numbers; no new analysis for the two methods.** The absolute-error CIs use the 10.1 bootstrap (cell types, 1,000, seed 0) on the saved 10.1 units. Means are asserted equal to the 10.1 table.
+- **Marks:** raw (gray open) → LeafletFA (teal filled), joined by a line; TMS square, Allen circle.
+  - Gray dashed: no cell-type information (pooled TRAIN ψ for every type).
+  - Gray band from 0: noise floor (TEST split halves scaled to full depth).
+  - Both references come from amendment 9 note 1 and are not tests.
+- **Above bins:** change in error, LeafletFA vs raw, shown where the 10.1 difference CI excludes 0. Top row TMS, second row Allen.
+  - Not shown: Allen 0 reads (−5 %, CI includes 0) and Allen ≥ 100 reads (+1 %, CI includes 0).
+- **Under bins (gray):** % of shipped catalog rows in the bin, TMS over Allen.
+- **Axis:** "Error against held-out cells (0 = identical)". The error is the TV distance: 0.06 = 6 % of the event's usage on the wrong junctions.
+- **"Raw" at 0 TRAIN reads:** the type has no TRAIN reads at the event, so raw falls back to the event's pooled TRAIN ψ over all TRAIN cells (check 10 comparator rule). Raw therefore equals the no-cell-type-information reference in that bin. No shipped catalog row has 0 TRAIN reads; those units exist only in the 10.1 evaluation (TMS 3,731, Allen 385).
+
+| Atlas | Bin | Raw | LeafletFA | Change | No cell-type info | Noise floor | Catalog rows |
+|---|---|---|---|---|---|---|---|
+| TMS | 10–49 cells | 0.126 | 0.107 | −15 % | 0.119 | 0.066 | 15 % |
+| TMS | 50–199 | 0.118 | 0.103 | −13 % | 0.114 | 0.064 | 36 % |
+| TMS | 200–999 | 0.099 | 0.093 | −7 % | 0.103 | 0.059 | 35 % |
+| TMS | ≥ 1,000 | 0.076 | 0.082 | +7 % | 0.087 | 0.049 | 14 % |
+| TMS | 0 reads | 0.164 | 0.150 | −8 % | 0.164 | 0.081 | 0 % |
+| TMS | 1–19 | **0.215** | **0.152** | **−29 %** | 0.169 | 0.078 | 16 % |
+| TMS | 20–99 | 0.160 | 0.136 | −15 % | 0.154 | 0.075 | 21 % |
+| TMS | ≥ 100 | 0.094 | 0.089 | −5 % | 0.098 | 0.057 | 63 % |
+| Allen | 10–49 cells | 0.087 | 0.075 | −13 % | 0.081 | 0.063 | 14 % |
+| Allen | 50–199 | 0.083 | 0.075 | −9 % | 0.088 | 0.058 | 43 % |
+| Allen | 200–999 | 0.063 | 0.061 | −4 % | 0.070 | 0.047 | 24 % |
+| Allen | ≥ 1,000 | 0.043 | 0.048 | +13 % | 0.054 | 0.033 | 20 % |
+| Allen | 0 reads | 0.186 | 0.176 | (−5 %, n.s.) | 0.186 | 0.101 | 0 % |
+| Allen | 1–19 | **0.200** | **0.146** | **−27 %** | 0.157 | 0.099 | 25 % |
+| Allen | 20–99 | 0.112 | 0.100 | −11 % | 0.110 | 0.077 | 25 % |
+| Allen | ≥ 100 | 0.052 | 0.053 | (+1 %, n.s.) | 0.062 | 0.040 | 50 % |
+
+- At 1–19 TRAIN reads raw is above the no-cell-type-information line in both atlases; LeafletFA is below it in every bin.
+- Both methods stay well above the noise floor in the low-read bins (TMS 1–19: LeafletFA 0.152 vs floor 0.078).

@@ -159,6 +159,13 @@ figures:
     # a, b as in AN; c Gria2, d Fgfr2 in row 2; e Ptprc alone in row 3 (left; the right half is empty). 183 x 164 mm.
     panels: {AN5_a: {w: 96, h: 50}, AN5_b: {w: 85, h: 50}, AN5_c: {w: 90.5, h: 55}, AN5_d: {w: 90.5, h: 55}, AN5_e: {w: 90.5, h: 55}}
     layout: [[AN5_a, AN5_b], [AN5_c, AN5_d], [AN5_e]]
+  "AN_b_abs":
+    title: "Application Note figure, alternative panel b: check 10.1 as absolute errors with reference levels (Karin 2026-11-13; current b kept)"
+    width: appnote
+    formats: [pdf, png]
+    # 85 x 68 mm: 18 mm taller than the current b (85 x 50); figure AN would grow to about 182 mm.
+    panels: {ANbabs_b: {w: 85, h: 68}}
+    layout: [[ANbabs_b]]
   "SG":
     title: "Supplementary gallery: known-biology events (GALLERY_KNOWN_BIOLOGY_DRAFT.md, final 2026-11-10)"
     width: appnote
