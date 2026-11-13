@@ -163,9 +163,9 @@ figures:
     title: "Application Note figure, alternative panel b: check 10.1 as absolute errors with reference levels (Karin 2026-11-13; current b kept)"
     width: appnote
     formats: [pdf, png]
-    # 85 x 68 mm: 18 mm taller than the current b (85 x 50); figure AN would grow to about 182 mm.
-    panels: {ANbabs_b: {w: 85, h: 68}}
-    layout: [[ANbabs_b]]
+    # ANbabsR_b: main-figure version (reads facet only), 85 x 50 mm = figure AN's panel b. ANbabs_b: supplementary, both facets.
+    panels: {ANbabsR_b: {w: 85, h: 50}, ANbabs_b: {w: 85, h: 70}}
+    layout: [[ANbabsR_b], [ANbabs_b]]
   "SG":
     title: "Supplementary gallery: known-biology events (GALLERY_KNOWN_BIOLOGY_DRAFT.md, final 2026-11-10)"
     width: appnote

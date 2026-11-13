@@ -264,6 +264,15 @@ B_FACETS = [("size", ["10-49", "50-199", "200-999", ">=1000"], "TRAIN cells per 
 
 
 def panel_b(cfg, fig):
+    """Panel b (Karin 2026-11-13): absolute errors, reads facet, with shrinkage comparator and reference levels
+    (fig_appnote_babs.panel_b_main). FIGAN_PANEL_B=diff gives the earlier difference panel (panel_b_diff)."""
+    if os.environ.get("FIGAN_PANEL_B", "abs") == "diff":
+        return panel_b_diff(cfg, fig)
+    import fig_appnote_babs
+    return fig_appnote_babs.panel_b_main(cfg, fig)
+
+
+def panel_b_diff(cfg, fig):
     """Check 10.1: error vs held-out TEST pseudobulk (TV), LeafletFA minus raw TRAIN pseudobulk, with 95% CI, by cell-type
     size and by TRAIN reads at the event, TMS and Allen. Input: tsv/c10_{TMS,Allen}_s0_accuracy.tsv (saved check 10)."""
     w, h = container_mm(fig)
@@ -446,6 +455,7 @@ def panel_f(cfg, fig):
 PANELS = {"AN_a": panel_a, "AN_b": panel_b, "AN_c": panel_c, "AN_d": panel_d, "AN_e": panel_e, "AN_f": panel_f}
 SOURCE_DATA = {
     "AN_a": lambda cfg: dict(zip(("figAN_a_catalog", "figAN_a_event_types"), (lambda C, E: (C.reset_index(), E))(*_a_tables(cfg)))),
-    "AN_b": lambda cfg: {"figAN_b_accuracy_10_1": _accuracy()},
+    "AN_b": lambda cfg: ({"figAN_b_accuracy_10_1": _accuracy()} if os.environ.get("FIGAN_PANEL_B", "abs") == "diff" else
+                         {"figAN_b_accuracy_10_1": _accuracy(), "figAN_b_abs_numbers": __import__("fig_appnote_babs")._table()}),
     **{f"AN_{p}": (lambda p: lambda cfg: {f"figAN_{p}_{EVENTS[p]['gene']}": event_data(cfg, EVENTS[p])[0]})(p) for p in "cdef"},
 }
