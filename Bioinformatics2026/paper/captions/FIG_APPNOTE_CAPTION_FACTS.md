@@ -276,3 +276,13 @@
 
 - At 1–19 TRAIN reads raw is above the no-cell-type-information line in both atlases; LeafletFA is below it in every bin.
 - Both methods stay well above the noise floor in the low-read bins (TMS 1–19: LeafletFA 0.152 vs floor 0.078).
+
+## Panel b, simplified main version (2026-11-13; figure AN's panel b, 85 × 50 mm)
+- One facet per atlas (TMS, Allen Brain); bins 1–19, 20–99, ≥ 100 TRAIN reads at the event. The 0-read bin is dropped: no catalog row is in it, and raw equals the all-cells average there.
+- Marks: raw pseudobulk (open gray), LeafletFA (teal), shrinkage to pooled ψ (check 14 comparator B, indigo), each with its 10.1 bootstrap CI.
+- Reference levels (amendment 9 note 1; not tests):
+  - "All-cells average" (dashed) = pooled TRAIN ψ for every type.
+  - "Best achievable" (gray bar) = the noise floor from TEST split halves scaled to full depth.
+- Percent label: change in error, LeafletFA vs raw, shown only where the 10.1 CI excludes 0. Allen ≥ 100 (+1 %) is not significant and has no label.
+- **Catalog shares (for the caption):** 16 % of TMS rows and 25 % of Allen rows have 1–19 TRAIN reads at the event. ≥ 100 reads: 63 % TMS, 50 % Allen. No catalog row has 0 TRAIN reads.
+- The difference panel is still buildable (`FIGAN_PANEL_B=diff`, output `figAN_bdiff/`). The supplementary two-facet version is `figAN_b_abs/`.

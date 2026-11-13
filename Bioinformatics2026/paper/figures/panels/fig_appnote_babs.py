@@ -73,8 +73,8 @@ def _handles(S):
     return [Line2D([], [], ls="none", marker="o", ms=2.8, mfc=S["teal"], mec=S["teal"], label="LeafletFA"),
             Line2D([], [], ls="none", marker="o", ms=2.8, mfc=S["indigo"], mec=S["indigo"], label=B_LABEL),
             Line2D([], [], ls="none", marker="o", ms=2.8, mfc="white", mec=S["gray"], mew=0.7, label="Raw pseudobulk"),
-            Line2D([], [], color=S["gray"], lw=S["ref_lw"], ls=(0, (3, 2)), label="No cell-type information"),
-            Patch(facecolor=S["light"], alpha=0.6, lw=0, label="Noise floor"),
+            Line2D([], [], color=S["gray"], lw=S["ref_lw"], ls=(0, (3, 2)), label="All-cells average"),
+            Patch(facecolor=S["light"], alpha=0.6, lw=0, label="Best achievable"),
             Line2D([], [], ls="none", marker=S["mk"]["TMS"], ms=2.8, mfc=S["ink"], mec=S["ink"], label="TMS"),
             Line2D([], [], ls="none", marker=S["mk"]["Allen"], ms=2.8, mfc=S["ink"], mec=S["ink"], label="Allen Brain")]
 
@@ -85,17 +85,47 @@ def _top(A, bys):
 
 
 def panel_b_main(cfg, fig):
-    """85 x 50 mm: reads facet only; legend in a column at the right"""
+    """85 x 50 mm (Karin 2026-11-13, simplified): one facet per atlas (TMS, Allen), bins 1-19, 20-99, >=100 TRAIN reads
+    (the 0-read bin has no catalog row and raw equals the all-cells average there); one marker shape; one percent label per
+    bin (LeafletFA vs raw, where the 10.1 CI excludes 0); catalog shares go to the caption facts."""
     w, h = container_mm(fig); A = _table(); S = _style(cfg)
-    leg_w = 29.0
-    ax = axes_in(sub_slot(fig, 0, 0, w - leg_w, h), (13.0, 14.0, 1.0, 1.5))
-    _facet(ax, A, "reads", S, _top(A, ["reads"]), rotate=False)
-    ax.set_ylabel("Error against held-out cells\n(0 = identical)")
-    lx = axes_in(sub_slot(fig, w - leg_w, 0, leg_w, h), (0.5, 3.0, 0.2, 1.5)); lx.axis("off")
-    lx.legend(handles=_handles(S), loc="upper left", frameon=False, fontsize=S["sm"], handlelength=1.2, labelspacing=0.35,
-              borderpad=0.1, borderaxespad=0)
-    lx.text(0.0, 0.0, "Gray under bins:\n% of catalog rows\n(TMS over Allen)", transform=lx.transAxes, ha="left", va="bottom",
-            fontsize=S["sm"], color=S["gray"], linespacing=1.0)
+    bins = ["1-19", "20-99", ">=100"]; leg_h = 7.0
+    a = A[(A.by == "reads") & A.bin.isin(bins)]
+    top = max(a.raw_hi.max(), a.upper_hi.max(), a.leafletfa_hi.max(), a.B_hi.max()) * 1.18
+    wl = 13.0; wf = (w - wl - 3.0) / 2
+    for f, (ds, title) in enumerate((("TMS", "TMS"), ("Allen", "Allen Brain"))):
+        x0 = 0 if f == 0 else wl + wf + 1.5
+        ax = axes_in(sub_slot(fig, x0, 0, (wl + wf) if f == 0 else wf + 1.5, h - leg_h), (wl if f == 0 else 1.5, 9.0, 0.5, 3.2))
+        for i, b in enumerate(bins):
+            r = a[(a.dataset == ds) & (a.bin == b)].iloc[0]
+            ax.fill_between([i - 0.36, i + 0.36], 0, r.floor, color=S["light"], alpha=0.6, lw=0, zorder=0)
+            ax.plot([i - 0.36, i + 0.36], [r.upper] * 2, color=S["gray"], lw=S["ref_lw"], ls=(0, (3, 2)), zorder=1)
+            xr, xl, xb = i - 0.2, i, i + 0.2
+            ax.plot([xr, xl], [r.raw, r.leafletfa], color=S["gray"], lw=0.6, zorder=2)
+            for xx, lo, hi, c in ((xr, r.raw_lo, r.raw_hi, S["gray"]), (xl, r.leafletfa_lo, r.leafletfa_hi, S["teal"]),
+                                  (xb, r.B_lo, r.B_hi, S["indigo"])):
+                ax.vlines(xx, lo, hi, color=c, lw=0.8, zorder=3)
+            ax.plot(xr, r.raw, ls="none", marker="o", ms=2.8, mfc="white", mec=S["gray"], mew=0.7, zorder=4)
+            ax.plot(xl, r.leafletfa, ls="none", marker="o", ms=2.8, mfc=S["teal"], mec=S["teal"], zorder=5)
+            ax.plot(xb, r.B, ls="none", marker="o", ms=2.8, mfc=S["indigo"], mec=S["indigo"], zorder=4)
+            if r.diff_ci_excludes_0:
+                ch = -r.pct_reduction
+                ax.text(i, 0.99, f"{ch:+.0f}%".replace("-", "−"), transform=ax.get_xaxis_transform(), ha="center", va="top",
+                        fontsize=S["sm"], color=S["teal"] if ch < 0 else S["ink"])
+        ax.set_xticks(np.arange(len(bins))); ax.set_xticklabels([b.replace(">=", "≥").replace("-", "–") for b in bins])
+        ax.set_xlim(-0.5, len(bins) - 0.5); ax.set_ylim(0, top)
+        ax.set_title(title, fontsize=S["sm"], loc="left", pad=1.0, color=S["ink"])
+        if f == 0:
+            ax.set_ylabel("Error against held-out cells\n(0 = identical)")
+        else:
+            ax.set_yticklabels([])
+    xl_ = axes_in(sub_slot(fig, wl, 0, w - wl, 4.0), (0, 0, 0, 0)); xl_.axis("off")
+    xl_.text(0.5, 0.15, "TRAIN reads at the event", ha="center", va="bottom", fontsize=cfg["style"]["font"]["size_pt"],
+             color=S["ink"], transform=xl_.transAxes)
+    lx = axes_in(sub_slot(fig, 0, h - leg_h, w, leg_h), (wl, 0.2, 0.5, 0.2)); lx.axis("off")
+    hs = [hh for hh in _handles(S) if hh.get_label() not in ("TMS", "Allen Brain")]
+    lx.legend(handles=hs, loc="center left", ncol=3, frameon=False, fontsize=S["sm"], handlelength=1.2, columnspacing=0.8,
+              labelspacing=0.2, borderpad=0.0, borderaxespad=0)
 
 
 def panel_b_supp(cfg, fig):
