@@ -185,28 +185,32 @@ def panel_a(cfg, fig, last="f"):
     C, Ev = _a_tables(cfg)
     ax = axes_in(sub_slot(fig, 0, h * 0.50, w * 0.52, h * 0.50), (1, 0.5, 1, 3.5)); ax.axis("off")
     ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-    cols = [("TMS", "tms_data"), ("Allen", "allen_data")]
+    cols = [("TMS", "tms_data"), ("Allen", "allen_data"), ("Combined", None)]
+    xs = (0.51, 0.72, 1.0)
     ax.text(0.0, 0.97, "Catalog", ha="left", va="top", fontsize=fs, color=ink)
-    for j, (ds, key) in enumerate(cols):
-        ax.text(0.68 + 0.30 * j, 0.80, cfg["data"][key]["label"], ha="right", va="center", fontsize=sm, color=color(cfg, key), fontweight="bold")
+    for x, (ds, key) in zip(xs, cols):
+        ax.text(x, 0.75, (cfg["data"][key]["label"] if key else ds).replace(" ", "\n"), ha="right", va="bottom", fontsize=sm,
+                color=color(cfg, key) if key else ink, fontweight="bold", linespacing=1.0)
     rows = [("cells", "Cells"), ("types", "Cell types / groups"), ("junctions", "Junctions"), ("atses", "ATSEs"), ("genes", "Genes")]
     for i, (col, lab) in enumerate(rows):
-        y = 0.66 - i * 0.145
+        y = 0.67 - i * 0.12
         ax.text(0.0, y, lab, ha="left", va="center", fontsize=sm, color=ink)
-        for j, (ds, _) in enumerate(cols):
-            ax.text(0.68 + 0.30 * j, y, f"{int(C.loc[ds, col]):,}", ha="right", va="center", fontsize=sm, color=ink)
+        for x, (ds, _) in zip(xs, cols):
+            ax.text(x, y, f"{int(C.loc[ds, col]):,}", ha="right", va="center", fontsize=sm, color=ink)
+    ax.text(0.0, 0.0, "One catalog; atlas columns: ≥ 1 read in that atlas", ha="left", va="bottom", fontsize=sm,
+            color=cfg["palette"]["gray"])
     bx = axes_in(sub_slot(fig, 0, 0, w * 0.52, h * 0.47), (19, 1.0, 12, 4.0))
     bx.barh(np.arange(len(Ev)), Ev.atses, color=cfg["palette"]["dark_gray"], height=0.62)
     for i, r in Ev.iterrows():
         bx.text(r.atses + Ev.atses.max() * 0.03, i, f"{r.atses:,} ({100 * r.share:.0f}%)", va="center", fontsize=sm, color=ink)
-    bx.set_yticks(np.arange(len(Ev))); bx.set_yticklabels([t[0].upper() + t[1:] for t in Ev.event_type]); bx.invert_yaxis()
+    bx.set_yticks(np.arange(len(Ev))); bx.set_yticklabels([(t[0].upper() + t[1:]).replace("mutually exclusive", "mutually\nexclusive") for t in Ev.event_type]); bx.invert_yaxis()
     bx.set_xlim(0, Ev.atses.max() * 1.9); bx.set_xticks([]); bx.spines["bottom"].set_visible(False); bx.tick_params(axis="y", length=0)
     bx.set_title("Event types (24,475 ATSEs)", fontsize=sm, loc="left", pad=1.5, color=ink)
     px = axes_in(sub_slot(fig, w * 0.54, h * 0.44, w * 0.46, h * 0.56), (1, 0.5, 1, 3.5)); px.axis("off"); px.set_xlim(0, 1); px.set_ylim(0, 1)
     px.add_patch(mpatches.FancyBboxPatch((0.02, 0.04), 0.96, 0.9, boxstyle="round,pad=0,rounding_size=0.03", fc="#F2F3F4",
                                          ec=cfg["palette"]["light_gray"], lw=0.5))
     px.text(0.5, 0.70, "Model schematic (placeholder)", ha="center", va="center", fontsize=fs, color=cfg["palette"]["gray"])
-    px.text(0.5, 0.36, "cells × junctions ≈ φ × ψ\nDirichlet-multinomial per ATSE\nK = 20 programs", ha="center", va="center",
+    px.text(0.5, 0.36, "cells × junctions ≈ φ × ψ\nDirichlet-multinomial per ATSE", ha="center", va="center",
             fontsize=sm, color=cfg["palette"]["gray"], linespacing=1.3)
     # one legend for panels c-f (shared encoding)
     gx = axes_in(sub_slot(fig, w * 0.54, 0, w * 0.46, h * 0.44), (1, 0.5, 0.5, 0.5)); gx.axis("off"); gx.set_xlim(0, 1); gx.set_ylim(0, 1)
@@ -232,6 +236,25 @@ def _a_tables(cfg):
             assert mac[f"Catalog{col.capitalize() if col != 'atses' else 'ATSEs'}{ds}"].replace(",", "") == str(int(C.loc[ds, col])), (ds, col)
     for t, m in (("alt 3' site", "EventShareAltThree"), ("alt 5' site", "EventShareAltFive"), ("skipped exon", "EventShareSkippedExon"), ("complex", "EventShareComplex")):
         assert mac[m] == f"{100 * Ev.set_index('event_type').loc[t, 'share']:.0f}\\%", (t, mac[m])
+    # one catalog for both atlases (Karin 2026-11-13): both fits and the catalog summary use the same var (24,475 ATSEs,
+    # 79,768 junctions); the per-atlas columns count those with >= 1 read in that atlas, so each atlas is a subset.
+    num = lambda k: int(mac[k].replace(",", ""))
+    C.loc["Combined"] = dict(cells=num("CatalogCellsMouse"), junctions=num("CatalogJunctionsMouse"), atses=num("CatalogATSEsMouse"),
+                             genes=num("CatalogGenesMouse"), types=int(C.loc[["TMS", "Allen"], "types"].sum()))
+    assert C.loc["Combined", "cells"] == C.loc[["TMS", "Allen"], "cells"].sum()
+    for col in ("junctions", "atses", "genes"):
+        assert (C.loc[["TMS", "Allen"], col] <= C.loc["Combined", col]).all(), col
+    # split "complex" into linked MXE and other complex with the browser's 5 classes (precompute.py); the other classes
+    # must agree with the geometric rule's counts, and linked + other must equal the ledger's complex
+    cl = pd.Series(json.load(open(os.path.join(V, "portal_browser", "precomputed", "catalog_events.json")))["classes"]).value_counts()
+    assert cl.sum() == C.loc["Combined", "atses"]
+    E = Ev.set_index("event_type").atses
+    assert (cl["alt3"], cl["alt5"], cl["skipped_exon"]) == (E["alt 3' site"], E["alt 5' site"], E["skipped exon"])
+    assert cl["mxe_linked"] + cl["complex"] == E["complex"]
+    Ev = pd.concat([Ev[Ev.event_type != "complex"],
+                    pd.DataFrame(dict(event_type=["linked mutually exclusive exons", "other complex"],
+                                      atses=[cl["mxe_linked"], cl["complex"]]))], ignore_index=True)
+    Ev["share"] = Ev.atses / Ev.atses.sum()
     return C, Ev
 
 
@@ -262,10 +285,16 @@ def panel_b(cfg, fig):
         if f == 0:
             ax.set_ylabel("Held-out error,\nLeafletFA − raw")
             ax.legend(loc="lower right", frameon=False, handletextpad=0.2, borderaxespad=0.1)
+            # direction arrows beside the y-axis (Karin 2026-11-13; replace the gray sentence above the axes)
+            y0, y1 = ax.get_ylim(); z = (0 - y0) / (y1 - y0)              # axes fraction of the zero line
+            for (a, b), lab in (((z - 0.06, 0.20), "LeafletFA better"), ((z + 0.04, 0.97), "raw better")):
+                ax.annotate("", xy=(0.035, b), xytext=(0.035, a), xycoords="axes fraction",
+                            arrowprops=dict(arrowstyle="-|>,head_length=0.25,head_width=0.12", color=cfg["palette"]["gray"],
+                                            lw=cfg["style"]["line"]["reference_pt"], shrinkA=0, shrinkB=0))
+                ax.text(0.07, (a + b) / 2, lab, transform=ax.transAxes, ha="left", va="center", fontsize=sm,
+                        color=cfg["palette"]["gray"])
         else:
             ax.set_yticklabels([])
-        ax.text(0.02, 1.0, "LeafletFA closer to held-out cells below 0", transform=ax.transAxes, ha="left", va="bottom",
-                fontsize=sm, color=cfg["palette"]["gray"]) if f == 0 else None
 
 
 # ---------------------------------------------------------------- panels c-f

@@ -213,3 +213,30 @@
 - TEST cells are new cells of the same mice (per-cell split). Generalization to new donors is untested.
 - The interval exists only where held-out data are deep enough: 28 % of TMS catalog rows and 35 % of Allen rows overall.
 - Seed-0 fits only (K = 20). Programs are not shown (they did not reproduce; checks 3, 8). No cell-type-specificity calls are shown (10.2, 10.7 failed).
+
+## Update 2026-11-13 (Karin's figure changes; rebuilt via sbatch, job 23263785)
+- **Panel a table:** a "Combined" column was added (cells 132,706; cell types / groups 200 = 132 + 68, no shared names; junctions 79,768; ATSEs 24,475; genes 11,233; asserted equal to the `Catalog*Mouse` macros), plus the note "One catalog; atlas columns: ≥ 1 read in that atlas".
+  - **Checked:** ATSEs and junctions are defined once for both atlases. Both seed-0 fits carry the identical 24,475-ATSE / 79,768-junction list (`fit.npz` `event_id`, `junction_id`), and `fig1_catalog_summaries.py` classifies one shared var. The per-atlas columns count those with ≥ 1 read in that atlas, so each atlas is a subset.
+- **Panel a bars:** "Complex" split with the browser's classes (`precompute.py`): linked mutually exclusive exons **1,034 (4 %)**, other complex **7,056 (29 %)**. Asserted: alt 3′ / alt 5′ / skipped exon counts agree with the geometric rule, and 1,034 + 7,056 = 8,090 (the ledger's complex, `EventShareComplex` 33 %).
+- **Panel a placeholder:** "K = 20 programs" removed.
+- **Panel b:** gray sentence replaced by arrows beside the y-axis: down "LeafletFA better", up "raw better" (6 pt).
+
+### Caption facts (no prose; source data `figAN_e_Nrxn1.tsv`, `figAN_c_Gria2.tsv`)
+- **(a) *Nrxn1* SS4 inclusion > 0.35 among the 47 excitatory groups:**
+
+  | Group | LeafletFA ψ | Raw ψ | Interval | ATSE reads | Cells with reads |
+  |---|---|---|---|---|---|
+  | CR | **0.372** | 0.485 | none (not validated) | 136 | 5 |
+  | L2 IT ENTl | 0.347 | **0.438** | 0.220–0.479 | 582 | 94 |
+  | DG | 0.339 | **0.485** | 0.286–0.391 | 8,492 | 905 |
+  | L5/6 NP CTX | 0.324 | **0.385** | 0.272–0.375 | 13,177 | 914 |
+
+  - By LeafletFA only CR (Cajal–Retzius) is above 0.35, without an interval. By raw, all four are above 0.35.
+- **(b) *Gria2* flop (J2), extremes:**
+  - Lowest (LeafletFA / raw): Astro 0.033 / 0.028; Oligo 0.048 / 0.022 (non-neuronal); then excitatory L6b ENT 0.099 / 0.028, L6 IT ENTl 0.108 / 0.034, L2/3 IT ENTl 0.115 / 0.054.
+  - Highest: Pvalb 0.504 / 0.487 (PV); Vip Igfbp6 0.497 / 0.474 (VIP); Meis2 0.492 / 0.505 (other inhibitory); Vip 0.480 / 0.429; L2 IT RSPv-POST-PRE 0.477 / 0.474 (excitatory).
+  - All ten have an interval.
+- **(c) *Gria2* J1 + J2 (panel c), 64 groups:** below 1 in every group, LeafletFA and raw (raw: none at 1).
+  - J1 + J2: LeafletFA median 0.513 (range 0.439–0.554); raw median 0.509 (0.347–0.614).
+  - The other 5 junctions of `atse_3` carry about half: LeafletFA median **0.487** (0.446–0.561); raw median 0.491 (0.386–0.653).
+  - By lineage (LeafletFA median): excitatory 0.493, PV 0.461, SST 0.468, VIP 0.463, Lamp5 0.498, other inhibitory 0.466, non-neuronal 0.540.
