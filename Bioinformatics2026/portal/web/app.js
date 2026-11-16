@@ -411,7 +411,7 @@ async function viewOne(ds, an) {
   ds = ds || lastDS; lastDS = ds;
   const A = an ? typeByName(ds, an) : null;
   setPage(`<h1>One ${typeLabel(ds)} vs. all others</h1>
-  <div class="note">${esc(CONFIG.COMPARE_NOTE)}</div>
+  <div class="note">${esc(CONFIG.ONE_VS_REST_NOTE)}</div>
   <div class="controls"><label>Dataset ${dsToggle(ds, (d) => `#/one/${d}`)}</label><label>${ds === "Allen" ? "Cell group" : "Cell type"} ${typeSelect("sel-a", ds, A ? A.name : "", `Pick a ${typeLabel(ds)}`)}</label></div>
   <div id="one-body"><p class="hint">Pick a ${typeLabel(ds)}.</p></div>`);
   $("sel-a").onchange = () => { const a = $("sel-a").value; location.hash = `#/one/${ds}${a ? "/" + encodeURIComponent(a) : ""}`; };
@@ -448,7 +448,7 @@ async function viewOne(ds, an) {
       const gap = Number.isNaN(mn) ? -1 : Math.max(0, a.p - mx, mn - a.p);
       rows.push({ e, id: CAT.ids[e], gene: CAT.genes[CAT.gene_idx[e]], cls: CAT.classes[CAT.cls[e]], jn, lead, j, delta: best / SCALE, a, b, pa: a.p, pb: b.p, mn, mx, gap, raw: dec(X.raw[j]), ovl: overlap(a, b), ra: X.reads[e], ca: X.cov[e], ma: X.mice[e] });
     }
-    st.download = (sorted) => downloadTSV(`one_vs_rest_${ds}_${slug(A.name)}.tsv`, ds, [`type = ${A.label}`, filterLine(st), CONFIG.COMPARE_NOTE],
+    st.download = (sorted) => downloadTSV(`one_vs_rest_${ds}_${slug(A.name)}.tsv`, ds, [`type = ${A.label}`, filterLine(st), CONFIG.ONE_VS_REST_NOTE],
       ["gene", "event_id", "event_class", "lead_junction", "max_abs_delta_psi", "psi", "lo", "hi", "psi_rest", "others_min", "others_max", "beyond_range", "raw_psi", "reads", "cells", "mice", "test_reads", "test_cells", "grey", "splicevi_ds_call"],
       sorted.map((r) => [r.gene, r.id, r.cls, jId(r.j, eventInfo(r.e)), f4(r.delta), f4(r.a.p), f4(r.a.lo), f4(r.a.hi), f4(r.b.p), f4(r.mn), f4(r.mx), r.gap < 0 ? "NA" : f4(r.gap), f4(r.raw), r.ra, r.ca, r.ma, X.treads[r.e], X.tcells[r.e], grey, sv.map[r.id] ?? ""]));
     renderTable(st, cols, rows, $("one-table"));

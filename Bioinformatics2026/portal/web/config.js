@@ -4,7 +4,8 @@ const CONFIG = {
   IV_MIN_TEST_READS: 100,   // check 12 units; must equal c12_export.MIN_READS / MIN_CELLS
   IV_MIN_TEST_CELLS: 10,
   REST_INTERVAL_NOTE: "rest ψ has no validated interval",
-  COMPARE_NOTE: "Ranking for exploration; LeafletFA's cell-type specificity calls did not pass validation (see paper).",
+  COMPARE_NOTE: "Ranked by the size of the difference, for exploration. Comparisons between two cell types have not been validated yet. No difference is flagged as significant.",
+  ONE_VS_REST_NOTE: "Ranked by the size of the difference, for exploration. TMS validation (checks 16 and 16b), one cell type against the rest: at an equal number of calls per cell type, LeafletFA's top differences were confirmed in held-out cells of other mice more often than raw pseudobulk's at every read depth, and more often than LeafCutter's at 100 reads or more (LeafCutter could test almost nothing below 100). The pre-registered verdicts were a fail (check 16) and \"at least partly explained by concentration in a few cell types\" (check 16b). Allen is not validated. No difference is flagged as significant.",
   // Which cell types show estimates in grey.
   //   "n_mice_lt2": fewer than 2 mice (Karin's spec, 2026-11-06; default). No type has fewer than 2 mice at present, so nothing is grey.
   //   "eligible": alternative, the saved check 10 flag is false (fewer than 2 mice, or no TRAIN cells in one of the two frozen mouse halves)
