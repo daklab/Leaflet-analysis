@@ -3,7 +3,8 @@ figure AN and its panel b are unchanged. Built by figures/build_validation_figur
 paper_config.yaml). Every number is read from the validation outputs under $V; nothing is computed here beyond selecting rows.
 
   ANb17_b   85 x 50 mm, figure AN panel b candidate: check 17 (pairwise TMS), excess confirmation by read bin.
-  Sds_a     183 x 62 mm, supplementary: checks 16, 16b (designs 1 and 2) and 17, LeafletFA - comparator excess by bin.
+  ANb18_b   85 x 50 mm, the same for check 18a (refit on half the mice, confirmed only in unseen mice).
+  Sds_a     183 x 120 mm, supplementary: checks 16, 16b (designs 1 and 2), 17, 18a and 18b, LeafletFA - comparator excess by bin.
   Ssim_a    183 x 112 mm, supplementary: simulations, checks 15 (amendment 10) and 15b (amendment 11).
   Sscale_a  183 x 58 mm, supplementary: scaling runs (time and memory against cells).
 
@@ -43,8 +44,10 @@ def _ci(ax, x, y, lo, hi, c, marker, filled=True):
 
 
 # ---------------------------------------------------------------- data
-def c17_table():
-    s = pd.read_csv(os.path.join(V, "c17", "summary.tsv"), sep="\t")
+def c17_table(check="17"):
+    """check 17 ($V/c17/summary.tsv, column pairs) or check 18a ($V/c18/18a_summary.tsv, same layout, column units)"""
+    path = os.path.join(V, "c17", "summary.tsv") if check == "17" else os.path.join(V, "c18", "18a_summary.tsv")
+    s = pd.read_csv(path, sep="\t").rename(columns={"units": "pairs"})
     s = s[s.scope == "all"]
     rows = []
     for b in BINS:
@@ -52,14 +55,14 @@ def c17_table():
         for m in ("LeafletFA", "raw_pseudobulk"):
             x = r[r.method == m].iloc[0]
             rows.append(dict(bin=b, method=m, pairs=int(x.pairs), calls=int(x.calls), excess=x.excess, lo=x.excess_lo, hi=x.excess_hi,
-                             source="c17/summary.tsv, LeafletFA vs raw_pseudobulk"))
+                             source=f"{os.path.basename(path)}, LeafletFA vs raw_pseudobulk"))
         r = s[(s.bin == b) & (s.comparison == "LeafletFA vs LeafCutter")]
         for m, lab in (("LeafletFA", "LeafletFA_subset"), ("LeafCutter", "LeafCutter")):
             x = r[r.method == m]
             if len(x):
                 x = x.iloc[0]
                 rows.append(dict(bin=b, method=lab, pairs=int(x.pairs), calls=int(x.calls), excess=x.excess, lo=x.excess_lo,
-                                 hi=x.excess_hi, source="c17/summary.tsv, LeafletFA vs LeafCutter (50-pair subset)"))
+                                 hi=x.excess_hi, source=f"{os.path.basename(path)}, LeafletFA vs LeafCutter (50-pair subset)"))
     return pd.DataFrame(rows)
 
 
@@ -76,6 +79,10 @@ def ds_tables():
     d = pd.read_csv(os.path.join(V, "c17", "differences.tsv"), sep="\t")
     d = d[(d.scope == "all") & d.compared]
     out.append(d.assign(check="17", units=d.pairs)[["check", "bin", "comparator", "units", "diff", "diff_lo", "diff_hi"]])
+    for k in ("18a", "18b"):
+        d = pd.read_csv(os.path.join(V, "c18", f"{k}_differences.tsv"), sep="\t")
+        d = d[(d.scope == "all") & d.compared]
+        out.append(d.assign(check=k)[["check", "bin", "comparator", "units", "diff", "diff_lo", "diff_hi"]])
     return pd.concat(out, ignore_index=True)
 
 
@@ -97,12 +104,12 @@ def scaling_table():
 
 
 # ---------------------------------------------------------------- ANb17_b
-def panel_b17(cfg, fig):
+def panel_b17(cfg, fig, check="17"):
     """Check 17 (amendment 13), TMS cell-type pairs: excess confirmation (confirmed in half-B TEST cells minus the
     within-mouse shuffled rate) of each method's top 5 calls per pair and read bin, 95 % pair-bootstrap intervals.
     LeafletFA and raw on all sampled pairs (n under the bins); LeafCutter on the 50-pair subset (41 and 48 pairs), none
     testable below 100 reads. Input: $V/c17/summary.tsv."""
-    w, h = container_mm(fig); S = _S(cfg); T = c17_table(); leg_h = 10.0
+    w, h = container_mm(fig); S = _S(cfg); T = c17_table(check); leg_h = 10.0
     ax = axes_in(sub_slot(fig, 0, 0, w, h - leg_h), (13.0, 11.0, 0.8, 1.5))
     off = {"LeafletFA": -0.27, "raw_pseudobulk": -0.09, "LeafletFA_subset": 0.09, "LeafCutter": 0.27}
     sty = {"LeafletFA": (S["lfa"], "o"), "raw_pseudobulk": (S["raw"], "s"), "LeafletFA_subset": (S["lfa"], "o", False),
@@ -138,21 +145,25 @@ def panel_b17(cfg, fig):
 DS_FACETS = [("16", "Check 16: type vs rest,\ntop 500 per bin", "FAIL"),
              ("16b_d1", "Check 16b design 1: 5 calls\nper type, same types", "BETTER"),
              ("16b_d2", "Check 16b design 2: types\nwhere all methods call", "FAIL"),
-             ("17", "Check 17: cell-type pairs,\n5 calls per pair", "BETTER")]
+             ("17", "Check 17: cell-type pairs,\n5 calls per pair", "BETTER"),
+             ("18a", "Check 18a: pairs; refit on half the mice,\nconfirmed only in unseen mice", "BETTER"),
+             ("18b", "Check 18b: type vs rest; refit on half the\nmice, confirmed only in unseen mice", "BETTER")]
 
 
 def panel_ds(cfg, fig):
-    """Checks 16, 16b and 17 (TMS; calls on half-A TRAIN cells, confirmation in half-B TEST cells): LeafletFA minus
-    comparator excess confirmation by read bin, 95 % bootstrap intervals (over types in 16/16b, over pairs in 17), with
-    the pre-registered verdict of each design. Dashed line 0; dotted line the -0.05 non-inferiority margin. LeafCutter
-    appears only where it was compared. Inputs: $V/c16/differences.tsv, $V/c16b/design{1,2}_differences.tsv,
-    $V/c17/differences.tsv."""
-    w, h = container_mm(fig); S = _S(cfg); T = ds_tables(); leg_h = 6.0
-    lo_, hi_ = min(T.diff_lo.min(), -0.1) - 0.02, T.diff_hi.max() + 0.06
-    wl = 12.5; wf = (w - wl - 1.0) / 4
+    """Checks 16, 16b, 17 and 18 (TMS): LeafletFA minus comparator excess confirmation by read bin, 95 % bootstrap
+    intervals (over types in 16/16b/18b, over pairs in 17/18a), with the pre-registered verdict of each design. 16-17:
+    calls on half-A TRAIN cells of the production fit, confirmation in half-B TEST cells. 18: LeafletFA refit on half-A
+    mice only, confirmation in all cells of half-B mice. Dashed line 0; dotted line the -0.05 non-inferiority margin.
+    LeafCutter appears only where it was compared. Inputs: $V/c16/differences.tsv, $V/c16b/design{1,2}_differences.tsv,
+    $V/c17/differences.tsv, $V/c18/18{a,b}_differences.tsv."""
+    w, h = container_mm(fig); S = _S(cfg); T = ds_tables(); leg_h = 6.0; xlab_h = 4.0
+    lo_, hi_ = min(T.diff_lo.min(), -0.1) - 0.02, T.diff_hi.max() + 0.08
+    wl = 12.5; nc = 3; wf = (w - wl - 1.0) / nc; rowh = (h - leg_h - xlab_h) / 2
     for f, (key, title, verdict) in enumerate(DS_FACETS):
-        x0 = 0 if f == 0 else wl + f * wf
-        ax = axes_in(sub_slot(fig, x0, 0, (wl + wf) if f == 0 else wf, h - leg_h), ((wl if f == 0 else 2.5), 10.5, 0.5, 8.5))
+        r_, c_ = divmod(f, nc)
+        x0 = 0 if c_ == 0 else wl + c_ * wf; y0 = xlab_h + (1 - r_) * rowh
+        ax = axes_in(sub_slot(fig, x0, y0, (wl + wf) if c_ == 0 else wf, rowh), ((wl if c_ == 0 else 2.5), 7.5, 0.5, 9.0))
         t = T[T.check == key]
         for i, b in enumerate(BINS):
             for comp, dx, c, mk in (("raw_pseudobulk", -0.13, S["raw"], "s"), ("LeafCutter", 0.13, S["lc"], "D")):
@@ -161,17 +172,17 @@ def panel_ds(cfg, fig):
                     r = r.iloc[0]; _ci(ax, i + dx, r["diff"], r.diff_lo, r.diff_hi, c, mk)
         ax.axhline(0, color=S["gray"], lw=S["ref"], ls=(0, (3, 2)), zorder=0)
         ax.axhline(-0.05, color=S["gray"], lw=S["ref"], ls=(0, (1, 1.5)), zorder=0)
-        ax.set_xticks(range(len(BINS))); ax.set_xticklabels(BIN_LAB, rotation=35, ha="right", rotation_mode="anchor")
+        ax.set_xticks(range(len(BINS))); ax.set_xticklabels(BIN_LAB)
         ax.set_xlim(-0.5, len(BINS) - 0.5); ax.set_ylim(lo_, hi_)
         ax.set_title(title, fontsize=S["sm"], loc="left", pad=8.0, color=S["ink"], linespacing=1.0)
         ax.text(0.02, 0.98, f"Pre-registered: {verdict}", transform=ax.transAxes, ha="left", va="top", fontsize=S["sm"],
                 color=S["ink"], fontweight="bold" if verdict == "FAIL" else "normal")
-        _letter(ax, "abcd"[f], S, dx_mm=1.0 if f else 10.5)
-        if f == 0:
+        _letter(ax, "abcdef"[f], S, dx_mm=1.0 if c_ else 10.5)
+        if c_ == 0:
             ax.set_ylabel("LeafletFA minus comparator\n(excess confirmation)")
         else:
             ax.set_yticklabels([])
-    xl = axes_in(sub_slot(fig, wl, 0, w - wl, 3.0), (0, 0, 0, 0)); xl.axis("off")
+    xl = axes_in(sub_slot(fig, wl, 0, w - wl, xlab_h), (0, 0, 0, 0)); xl.axis("off")
     xl.text(0.5, 0.0, "Reads at the event in the calling half (pairs: less-covered type)", ha="center", va="bottom",
             fontsize=S["fs"], color=S["ink"], transform=xl.transAxes)
     lx = axes_in(sub_slot(fig, 0, h - leg_h, w, leg_h), (wl, 0.2, 0.5, 0.2)); lx.axis("off")
@@ -295,8 +306,15 @@ def panel_scale(cfg, fig):
              transform=axa.transAxes, ha="right", va="bottom", fontsize=S["sm"] - 1, color=S["ink"]).set_y(0.16)
 
 
-PANELS = {"ANb17_b": panel_b17, "Sds_a": panel_ds, "Ssim_a": panel_sim, "Sscale_a": panel_scale}
+def panel_b18(cfg, fig):
+    """As ANb17_b for check 18a (refit on half-A mice; confirmation only in half-B mice the model never saw).
+    Input: $V/c18/18a_summary.tsv."""
+    panel_b17(cfg, fig, check="18a")
+
+
+PANELS = {"ANb17_b": panel_b17, "ANb18_b": panel_b18, "Sds_a": panel_ds, "Ssim_a": panel_sim, "Sscale_a": panel_scale}
 SOURCE_DATA = {"ANb17_b": lambda cfg: {"figAN_b17_check17_excess": c17_table()},
+               "ANb18_b": lambda cfg: {"figAN_b18_check18a_excess": c17_table("18a")},
                "Sds_a": lambda cfg: {"figS_ds_validation_differences": ds_tables()},
                "Ssim_a": lambda cfg: dict(zip(("figS_sim_m1", "figS_sim_m2", "figS_sim_m2_lc"), sim_tables())),
                "Sscale_a": lambda cfg: {"figS_scaling": scaling_table()}}
