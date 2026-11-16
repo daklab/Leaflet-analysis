@@ -1,4 +1,110 @@
-# Outline session prep (no prose; first version Wed 11 Nov 2026, refreshed 2026-11-13)
+# Outline session prep (no prose; first version Wed 11 Nov 2026, refreshed 2026-11-13; fact skeleton added 2026-11-16)
+
+## 00. Fact skeleton, in writing order (2026-11-16; fragments only, no prose)
+
+Each section: budget (words, abstract + body total 2,000), then the facts it needs in the order they would be written,
+each with its source. VR = `LeafletFA/scripts/validation/VALIDATION_REPORT.md` (LeafletFA repo, branch `leafletfa-validation`); PR = `VALIDATION_PREREG.md` (same
+dir). Older detail stays in sections 0a–7 below; this skeleton supersedes their ordering, not their facts.
+
+### Abstract — 150
+- Motivation: sparse full-length scRNA-seq junction counts; per-cell-type junction usage. Source: Introduction slots (`main.tex:83-114`).
+- Results, candidate facts (choose ≤ 3):
+  - Accuracy 10.1: LeafletFA closer to held-out pseudobulk than raw, largest gain at 1–19 TRAIN reads (TMS −0.0625, Allen −0.0543). VR "Check 10".
+  - Interval: check 12 (a)+(b) coverage 0.950–0.963 where validated (28 % TMS / 35 % Allen rows). VR "Check 12 — result".
+  - DS between cell types (TMS pairs): check 17 BETTER vs raw and LeafCutter at equal calls per pair. VR "Check 17" (26da281). Check 18 pending.
+  - Scale: TMS fit about 13 min, Allen about 38 min on one GPU. VR "Scaling and runtime record".
+- Availability: repo URLs, Zenodo DOI, browser URL — all missing (browser: separate `daklab/leafletfa-browser` repo, not created; nothing public before the paper, Karin 2026-11-15).
+- Contact: missing.
+
+### Introduction — 200 (now 256, about 55 over)
+- Slot order as ported: AS; full-length scRNA-seq; duplicate reads; existing tools (SpliZ, PsiX); what we built. `main.tex:83-114`.
+- Add: LeafCutter and scQuint as existing tools (`:105`).
+- Remove/reword: "latent splicing programs ... imputes" (`:113-114`): programs did not reproduce (checks 3, 8; VR "Check 3", "Check 8").
+- Cut about 55 words (section 3 below lists candidates).
+
+### Implementation: data and event catalog — 250 (now 221)
+- Shared with SpliceVI word for word (`shared_data_catalog.tex`); per-cell 70/30 split; singleton limitation; Allen Cre-line comment.
+- Counts: 79,768 junctions, 24,475 ATSEs, 11,233 genes, 132,706 cells (ledger macros, `main.tex:215-218`).
+- Per dataset: TMS 78,135 cells / 132 types; Allen 54,571 cells (38,199 TRAIN) / 68 groups. `CATALOG_NUMBERS.md`; VR item 1 (ceb5048).
+- Gap: the filter-chain table SpliceVI cites is empty (status PDF p. 2).
+
+### Implementation: ATSEmapper — 150 (now 156)
+- Junction extraction, motif check, splice graph, ATSE definition (`:127-140`).
+- Missing: inputs, outputs, run time (`:142`); URL to confirm (`:128`). Run time: UNSOURCED (no ATSEmapper timing record found).
+- Reconcile the ATSE definition with the shared catalog text (status PDF p. 2).
+
+### Implementation: LeafletFA model and fitting — 200 (now 267, about 65 over)
+- DM factor model, K = 20; concentration floor γ ≥ 2; SVI recipe: 16,200 steps, minibatch 8,192, lr 0.025 decaying to 0.0025, float64 φ. Run record of `TMS/full_K20_s0_f64` (LeafletFA_splicevi_baseline); `scaling/lfa_gpu_full/run_record.json` recipe block.
+- Entry point (`--preset paper`, `:180`): VERIFY it exists in the release CLI.
+- Cut the duplicated "SVI in Pyro" (`:148-152` vs `:174`).
+
+### Implementation: cell-type usage and intervals — 150 (now 77, stale)
+- Estimator: type mean of per-cell posterior-mean usage ρ̃ = (γρ + y)/(γ + N); comparator raw TRAIN pseudobulk. PR amendment 6.
+- Interval shipped = check 12: 95 % predictive interval for held-out pseudobulk ψ at its read depth, m ± 1.96 √(v + τ²_b); τ² TMS 0.01024 / 0.00256, Allen 0.00128 / 0.00032 (100–499 / ≥ 500 TEST reads), set on one mouse half. VR "Check 12 — result"; `tsv/c12_*_tau2.tsv`.
+- Where it exists: ≥ 100 TEST reads and ≥ 10 TEST cells: 28 % TMS rows (1,829,935 / 6,478,290), 35 % Allen (1,530,439 / 4,420,578). VR "Check 12 export".
+- Users' own fits: ψ, no interval (`leafletfa/catalog.py`).
+- Stale now: `:191-193` (check 10 interval; "amendment 7 draft").
+
+### Results: the catalog — 120 (now 42)
+- Lead numbers to choose: per-dataset size; event classes (complex 7,056; alt3 5,810; skipped exon 5,708; alt5 4,867; linked MXE 1,034). `portal/SOURCE.json`; `CATALOG_NUMBERS.md`.
+
+### Results: accuracy against held-out pseudobulk (10.1) — 180 (now 11)
+- Error = TV vs TEST pseudobulk; LeafletFA − raw (95 % CI over types). VR "Check 10" table 10.1.
+- TMS overall −0.0072 (−0.0094, −0.0050); Allen −0.0021 (−0.0039, −0.0005).
+- Smallest types (10–49 TRAIN cells): TMS −0.0194, Allen −0.0116. 1–19 TRAIN reads: TMS −0.0625, Allen −0.0543.
+- ≥ 100 TRAIN reads: TMS LeafletFA 0.0890 vs raw 0.0937; Allen 0.0529 vs 0.0522 (tie). Check 13 table, VR "Check 13" (`c13_pooled/*_accuracy.tsv`).
+- Types ≥ 1,000 TRAIN cells: raw slightly closer (+0.0054 TMS, +0.0057 Allen). `FIG_APPNOTE_CAPTION_FACTS.md`.
+- Simple shrinkage comparator B (check 14): LeafletFA beats B in TMS, ties in Allen; 1–19 reads LeafletFA 0.152 / 0.146 vs B 0.168 / 0.155. VR "Check 14".
+- Simulation (checks 15, 15b): recovery worse than raw and B at own truth (15b Δ raw +0.0097 / +0.0128 / +0.0125); differential AUROC 0.684 / 0.664 / 0.648; truth independent per type (least favorable). VR "Check 15", "Check 15b".
+- Limit: per-cell split, TEST and TRAIN share mice.
+
+### Results: differential splicing between cell types (NEW; budget not set — DECIDE, candidates: Limits 170 and the about 400 free Results words)
+- Design (checks 16–17): calls from half-A mice' TRAIN cells; confirmation in half-B mice' TEST cells only; confirmed = held-out TV > 0.05 with the same sign at the lead junction; excess = confirmed − within-mouse permuted null; equal calls per contrast. PR amendments 12, 12 note 1, 13.
+- Check 16 (type vs rest, 100 types, top 500 per bin; VR "Check 16", e205185): **FAIL**. Only miss: ≥ 500 reads vs raw, −0.028, lower bound −0.077 (margin −0.05). 1–19 reads supported (+0.157 vs raw). vs LeafCutter +0.34 / +0.27 (100–499 / ≥ 500). Uncertainty-weighted z = point ranking.
+- Check 16b (VR "Check 16b", cb3b05d): design 1 (5 per type, same types) **BETTER**: vs raw +0.102 / +0.152 / +0.077 / +0.048, vs LeafCutter +0.323 / +0.311; design 2 (types where all methods call) **FAIL** (100–499 vs raw −0.081). Pre-registered reading: **"at least partly explained by concentration"**.
+- Check 17 (pairs, 300 sampled, 5 per pair per bin; VR "Check 17", 26da281): **BETTER**.
+  - LeafletFA − raw: +0.079 (1–19), +0.068 (20–99), +0.070 (100–499), +0.055 (≥ 500); all lower bounds > 0.
+  - LeafletFA − LeafCutter (50-pair subset): +0.081 (lower bound +0.008, 41 pairs, 100–499), +0.061 (+0.004, 48 pairs, ≥ 500). Small margin.
+  - LeafCutter testable: 0 pairs with ≥ 5 scorable units below 100 reads.
+  - Same cell type across tissues: no gain over raw below 500 reads (CIs include 0); gain only at ≥ 500 (+0.091).
+  - Rank bands, LeafletFA excess: ranks 1–5 0.27–0.29, 6–20 0.22–0.26, 21–100 0.13–0.15 (`$V/c17/rank_bands.tsv`).
+- Limit: the model saw TRAIN cells of the confirming mice (fit on all 18 mice). check 18: pending, see VALIDATION_REPORT.
+- Allen coverage: 1,094 of 2,278 pairs (48 %) have no donor contributing both groups; median 1 (TRAIN). `$V/c17/allen_donors_summary.tsv`. Allen DS not validated.
+- Earlier fails stay reported: 10.2, 10.7 (rule ≥ 0.5 and ≥ 5× null), 10.2 LeafCutter control (descriptive). VR "Check 10", "LeafCutter descriptive control".
+
+### Results: limits of calls and intervals — 170 (now 31)
+- Check 12 coverage (a)+(b) 0.950–0.963; (a) alone 0.82–0.90; check 10 interval 0.136–0.346. TMS median width 0.225 at 100–499.
+- Shrinkage of top differences: top-100 error vs held-out TMS 0.224 vs raw 0.151 (browser-gap diagnosis; VR "Browser ranking vs raw Δψ"); check 13 pooled estimate fails (+0.253 overshoot). VR "Check 13".
+- Allen Cre-line donor confounding (VR "Allen donor check").
+- Stale: `:236`, `:279`.
+
+### Results: known biology and the portal — 120 (now 129)
+- *Gria2* flip/flop (Allen, descriptive): medians in section 3 table. Citation Sommer 1990 VERIFY.
+- *Fgfr2* IIIb (TMS, 10.4 PASS): epithelial min 0.704 > mesenchymal max 0.649. Cite Warzecha 2009 and **Bebee2015** (now in `manuscript/references.bib`, PMID 26371508).
+- *Nrxn1* SS4 (Allen, 10.4 note 6 PASS): 1,256 of 1,891 pairs; SS4 inclusion excitatory 0.153 vs PV 0.367, SST 0.405 (Nguyen 2016 direction).
+- *Ptprc* (TMS, 10.4 PASS): 25 of 27 B/T calls confirmed in TEST.
+- Portal: pages gene / event / compare / one-vs-rest; raw ψ, reads, cells, mice beside every estimate; check 12 interval only where validated; comparison notes now state checks 16, 16b, 17 (portal `web/config.js`); not published.
+
+### Results: scale — 60 (now 77; numbers wrong in `:299-302`)
+- Production fits, one RTX PRO 6000 Blackwell (b6k), 16,200 steps: **TMS about 13.2 min** (54,694 cells, 0.05 s/step, 9.2 GB host); **Allen about 38.5 min** (38,199 cells, 0.14 s/step, 21.3 GB host). VR "Scaling and runtime record" item 1 (ceb5048); RUNTIME_TABLE.md rows 26–29 give fit 12.9 min (TMS seeds 1–2) and 37.7 min (Allen seeds 1–2): consistent; VERIFY which seed the text quotes.
+- 10.6 / 31.6 min (old text) are projection times, not fit times.
+- Peak GPU memory of the production fits: **not recorded**. METHODS 9.0 / 29.7 GB: no source, remove or replace (controlled runs: 2.5–7.0 GB GPU at 5,000–54,694 cells; atlas-size run 25.03 GB GPU).
+- Controlled runs (2,000 steps): GPU 0.032–0.046 s/step, flat from 10,000 cells; CPU (16 cores) 3.27 s/step at 5,000 cells = **102×** slower. `$V/scaling/scaling.tsv` (0b355f1).
+- scQuint (16 CPUs, to early stop): 13.3 / 37.3 / 72.3 / 67.0 min at 5k / 10k / 25k / 50k cells; 86.0 min at 54,694.
+- Atlas-size fit: 132,706 cells, 73.2 min fit (0.271 s/step), 40.7 GB host.
+- LeafCutter catalog benchmark: 19.2 task-h (77 core-h).
+
+### Figure
+- figAN a–f (183 × 164 mm): a catalog/model (schematic placeholder), b accuracy 10.1, c *Gria2*, d *Fgfr2*, e *Nrxn1* SS4, f *Ptprc*. Candidate b showing check 17: in progress (overnight task 3).
+- Caption limits: per-cell split; interval 28 % / 35 % of rows; seed 0; no programs; no significance flags.
+
+### Discussion — 250 (now 230)
+- Lead (`:314`) and SpliceVI companion sentence (`:354`) missing.
+- Facts available for the DS paragraph: what held (thin data, pairs at equal calls, LeafCutter cannot test thin events) and what did not (16 FAIL, 16b concentration reading, same cell type across tissues, small LeafCutter margin, simulations). Sources as in the DS section above.
+
+### Availability and data availability — outside budget
+- Missing: versions/tags, browser URL, Zenodo DOI. Deposit contents: `LeafletFA/RELEASE_MANIFEST.md` §3. h5mu deposit: Karin's decision.
+- Released fit: the 70 % training fit, matching what was validated (Karin 2026-11-15).
 
 Source of line numbers: `~/LeafletFA_overleaf/main.tex` at 78436ab (394 lines). Since then: 556f14a (STALE comment at `:293`) and c17d35b (stale items wrapped in `\unsure`, facts in comments; no rewording), which shift later lines by up to about 40. **Line numbers below are the 78436ab numbers.** Word counts are approximate: prose only, with comments, red `\unsure{}` text, equations and citations removed (counted 2026-11-11, before the stale wraps; the sentence-level screen is `LEAFLETFA_SCREEN.md`).
 
@@ -322,7 +428,7 @@ Files in `/gpfs/commons/groups/knowles_lab/Karin/LeafletFA_validation/portal_bro
   - *Fgfr2* mesenchymal types compressed toward 0.4.
   - *Nrxn1* (row 3, rebuilt on SS4 `atse_7`): expected direction seen; SS4 inclusion excitatory 0.153 vs PV 0.367, SST 0.405 (LeafletFA medians; same data as figAN e).
   - *Ptbp2* and *Dlg4* rest on one TMS neuron type.
-  - **Stale:** `captions/FIG_GALLERY_CAPTION_FACTS.md` row c and its *Nrxn1* reading still describe the old skipping junction `chr17_90704367_91087954_-`; not updated here.
+  - ~~Stale: `captions/FIG_GALLERY_CAPTION_FACTS.md` row c~~ fixed 2026-11-16 (54bbf47): row c now lists SS4 `atse_7`, 64 types (48 with interval), and the lineage medians.
 - Citation volume and pages verified against PubMed (all match). Direction-in-mouse check (10 Nov): only row 3 (Nguyen 2016) is stated in mouse cell types; rows 1, 5–7 are human cell lines; 8–9 mouse developmental; 4 rat; 2 and 10 paywalled. Proposals in `GALLERY_KNOWN_BIOLOGY_DRAFT.md`.
 
 ## 7. Panel e: three variants (history; **resolved 2026-11-11: C**, see section 0a)
