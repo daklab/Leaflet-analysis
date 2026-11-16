@@ -53,11 +53,13 @@ def c17_table():
             x = r[r.method == m].iloc[0]
             rows.append(dict(bin=b, method=m, pairs=int(x.pairs), calls=int(x.calls), excess=x.excess, lo=x.excess_lo, hi=x.excess_hi,
                              source="c17/summary.tsv, LeafletFA vs raw_pseudobulk"))
-        r = s[(s.bin == b) & (s.comparison == "LeafletFA vs LeafCutter") & (s.method == "LeafCutter")]
-        if len(r):
-            x = r.iloc[0]
-            rows.append(dict(bin=b, method="LeafCutter", pairs=int(x.pairs), calls=int(x.calls), excess=x.excess, lo=x.excess_lo,
-                             hi=x.excess_hi, source="c17/summary.tsv, LeafletFA vs LeafCutter (50-pair subset)"))
+        r = s[(s.bin == b) & (s.comparison == "LeafletFA vs LeafCutter")]
+        for m, lab in (("LeafletFA", "LeafletFA_subset"), ("LeafCutter", "LeafCutter")):
+            x = r[r.method == m]
+            if len(x):
+                x = x.iloc[0]
+                rows.append(dict(bin=b, method=lab, pairs=int(x.pairs), calls=int(x.calls), excess=x.excess, lo=x.excess_lo,
+                                 hi=x.excess_hi, source="c17/summary.tsv, LeafletFA vs LeafCutter (50-pair subset)"))
     return pd.DataFrame(rows)
 
 
@@ -100,31 +102,35 @@ def panel_b17(cfg, fig):
     within-mouse shuffled rate) of each method's top 5 calls per pair and read bin, 95 % pair-bootstrap intervals.
     LeafletFA and raw on all sampled pairs (n under the bins); LeafCutter on the 50-pair subset (41 and 48 pairs), none
     testable below 100 reads. Input: $V/c17/summary.tsv."""
-    w, h = container_mm(fig); S = _S(cfg); T = c17_table(); leg_h = 8.0
+    w, h = container_mm(fig); S = _S(cfg); T = c17_table(); leg_h = 10.0
     ax = axes_in(sub_slot(fig, 0, 0, w, h - leg_h), (13.0, 11.0, 0.8, 1.5))
-    off = {"LeafletFA": -0.2, "raw_pseudobulk": 0.0, "LeafCutter": 0.2}
-    sty = {"LeafletFA": (S["lfa"], "o"), "raw_pseudobulk": (S["raw"], "s"), "LeafCutter": (S["lc"], "D")}
+    off = {"LeafletFA": -0.27, "raw_pseudobulk": -0.09, "LeafletFA_subset": 0.09, "LeafCutter": 0.27}
+    sty = {"LeafletFA": (S["lfa"], "o"), "raw_pseudobulk": (S["raw"], "s"), "LeafletFA_subset": (S["lfa"], "o", False),
+           "LeafCutter": (S["lc"], "D")}
     for i, b in enumerate(BINS):
         for m in off:
             r = T[(T.bin == b) & (T.method == m)]
             if len(r):
                 r = r.iloc[0]; _ci(ax, i + off[m], r.excess, r.lo, r.hi, *sty[m])
             elif m == "LeafCutter":
-                ax.text(i + off[m], 0.012, "n.t.", ha="center", va="bottom", fontsize=S["sm"] - 1, color=S["gray"])
+                ax.text(i + 0.18, 0.012, "n.t.", ha="center", va="bottom", fontsize=S["sm"] - 1, color=S["gray"])
     ax.axhline(0, color=S["gray"], lw=S["ref"], ls=(0, (3, 2)), zorder=0)
-    npairs = [T[(T.bin == b) & (T.method == "LeafletFA")].pairs.iloc[0] for b in BINS]
-    ax.set_xticks(range(len(BINS))); ax.set_xticklabels([f"{l}\n({n:,})" for l, n in zip(BIN_LAB, npairs)])
+    def npairs(b):
+        a = T[(T.bin == b) & (T.method == "LeafletFA")].pairs.iloc[0]; c = T[(T.bin == b) & (T.method == "LeafCutter")]
+        return f"({a:,} / {c.pairs.iloc[0]})" if len(c) else f"({a:,})"
+    ax.set_xticks(range(len(BINS))); ax.set_xticklabels([f"{l}\n{npairs(b)}" for l, b in zip(BIN_LAB, BINS)])
     ax.set_xlim(-0.5, len(BINS) - 0.5)
     ax.set_ylim(0, max(T.hi.max() * 1.08, 0.3))
     ax.set_ylabel("Confirmed in held-out\nmice, above shuffled")
-    ax.set_xlabel("Reads at the event, less-covered type (pairs)", labelpad=1.5)
+    ax.set_xlabel("Reads at the event, less-covered type (pairs: all / subset)", labelpad=1.5)
     lx = axes_in(sub_slot(fig, 0, h - leg_h, w, leg_h), (13.0, 0.2, 0.5, 0.2)); lx.axis("off")
     hs = [Line2D([], [], ls="none", marker="o", ms=MS, mfc=S["lfa"], mec=S["lfa"], label="LeafletFA"),
           Line2D([], [], ls="none", marker="s", ms=MS, mfc=S["raw"], mec=S["raw"], label="Raw pseudobulk"),
-          Line2D([], [], ls="none", marker="D", ms=MS, mfc=S["lc"], mec=S["lc"], label="LeafCutter (50-pair subset)")]
-    lx.legend(handles=hs, loc="upper left", ncol=3, frameon=False, fontsize=S["sm"], handlelength=1.0, columnspacing=0.7,
+          Line2D([], [], ls="none", marker="o", ms=MS, mfc="white", mec=S["lfa"], mew=0.7, label="LeafletFA, same 50-pair subset"),
+          Line2D([], [], ls="none", marker="D", ms=MS, mfc=S["lc"], mec=S["lc"], label="LeafCutter, 50-pair subset")]
+    lx.legend(handles=hs, loc="upper left", ncol=2, frameon=False, fontsize=S["sm"], handlelength=1.0, columnspacing=0.7,
               borderpad=0.0, borderaxespad=0)
-    lx.text(0.0, 0.0, "n.t. = no pair with 5 events LeafCutter could test", transform=lx.transAxes, ha="left", va="bottom",
+    lx.text(1.0, 0.0, "n.t. = no pair with 5 events LeafCutter could test", transform=lx.transAxes, ha="right", va="bottom",
             fontsize=S["sm"] - 1, color=S["gray"])
 
 
