@@ -93,7 +93,7 @@ dir). Older detail stays in sections 0a–7 below; this skeleton supersedes thei
 - Portal: pages gene / event / compare / one-vs-rest; raw ψ, reads, cells, mice beside every estimate; check 12 interval only where validated; comparison notes now state checks 16, 16b, 17 (portal `web/config.js`); not published.
 
 ### Results: scale — 60 (now 77; numbers wrong in `:299-302`)
-- Production fits, one RTX PRO 6000 Blackwell (b6k), 16,200 steps, **seed 0 (Karin, 26 Nov; ledger `\FitMinutesTMS` 13.2 min, `\FitMinutesAllen` 38.5 min)**: from the seed-0 fit logs (counts loaded to step 16,199; jobs 22400619, 22400622), 54,694 / 38,199 TRAIN cells, 0.05 / 0.14 s/step, host 9.2 / 21.3 GB. Seeds 1–2 run records give 12.9 / 37.7 min (RUNTIME_TABLE rows 26, 28); not quoted. Check 18 refit: `\RefitHalfMinutes` 12.9 min, `\RefitHalfPeakGPU` 6.6 GB at `\RefitHalfCells` 46,479 cells. Validation numbers for checks 10.1, 12, 17, 18a, 18b, 19, the Allen sense checks and scaling are now ledger macros (`paper/ledger/results_ledger.tsv`, 67 rows added 26 Nov).
+- Production fits, one RTX PRO 6000 Blackwell (b6k), 16,200 steps, batch 8,192: **fit 12.9 min TMS, 37.7 min Allen (seeds 1–2; Karin, 25 Nov; ledger `\FitMinutesTMS`, `\FitMinutesAllen`; source `SpliceVI-utils/manuscript/age_analysis/audit_2026_09/RUNTIME_TABLE.md` rows 26, 28; jobs 22402842 / 22402845, 22402848 / 22402851)**, 54,694 / 38,199 TRAIN cells, 0.05 / 0.14 s/step, host 9.2 / 21.3 GB. Seed 0 has no measured fit time: jobs 22400619 and 22400622 failed while saving (their log spans, 13.2 / 38.5 min, are not quoted). Check 18 refit: `\RefitHalfMinutes` 12.9 min, `\RefitHalfPeakGPU` 6.6 GB at `\RefitHalfCells` 46,479 cells. Validation numbers for checks 10.1, 12, 17, 18a, 18b, 19, the Allen sense checks and scaling are ledger macros (`paper/ledger/results_ledger.tsv`, 67 rows added 25 Nov), plus rank-band rates for the browser (`\RankBand<atlas><band><bin><Confirmed|Excess>`, 48 rows: TMS from 18a, Allen from 19).
 - 10.6 / 31.6 min (old text) are projection times, not fit times.
 - Peak GPU memory of the production fits: **not recorded**. METHODS 9.0 / 29.7 GB: no source, remove or replace (controlled runs: 2.5–7.0 GB GPU at 5,000–54,694 cells; atlas-size run 25.03 GB GPU).
 - Controlled runs (2,000 steps): GPU 0.032–0.046 s/step, flat from 10,000 cells; CPU (16 cores) 3.27 s/step at 5,000 cells = **102×** slower. `$V/scaling/scaling.tsv` (0b355f1).
@@ -339,8 +339,8 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
 
   | Tool | Job | Data | Hardware | Time | Peak memory |
   |---|---|---|---|---|---|
-  | LeafletFA, TMS seed 0 | (manifest) | 54,694 TRAIN cells | GPU (RTX PRO 6000) | **10.6 min** | — |
-  | LeafletFA, Allen seed 0 | (manifest) | 38,199 TRAIN cells | GPU | **31.6 min** | — |
+  | LeafletFA, TMS seeds 1–2 | 22402842, 22402845 | 54,694 TRAIN cells | GPU (RTX PRO 6000) | fit **12.9 min** (`\FitMinutesTMS`; RUNTIME_TABLE) | — |
+  | LeafletFA, Allen seeds 1–2 | 22402848, 22402851 | 38,199 TRAIN cells | GPU | fit **37.7 min** (`\FitMinutesAllen`; RUNTIME_TABLE) | — |
   | LeafletFA, atlas size | 22597359 | 132,706 cells | GPU (b6k) | fit **73.2 min** (0.27 s/step); whole job 119.4 min | 40.7 GB host |
   | scQuint | 22725257 | TMS TRAIN, 54,694 cells; 51,119 introns, 21,742 groups | 16 CPUs | training **86.0 min** (early stop); job 1 h 27 min | 1.7 GB |
   | LeafCutter cell type × event catalog | 22780123 | TMS, 128 tasks | 4 CPUs per task | **19.2 task-h** (77.0 core-h allocated); longest task 48 min | 1.28 GB per task |
@@ -348,7 +348,7 @@ Back matter (not in the budget): Availability `:356-362`, Data availability `:36
   - Sources: sacct; logs `lfa_c10_scquint_22725257.log`, `lfa_c10_atlasfull_c1_22597359.log`; `run_record.json`; `RELEASE_MANIFEST.md` fits table.
 - **Numbers to fix in `:299-302` (not wrapped; not on the stale list):**
   - "the full 16,200-step fit took 119 min": the fit took 73.2 min; 119.4 min is the whole job.
-  - "15–40 min per fit" vs the 10.6 / 31.6 min primary fits.
+  - "15–40 min per fit" vs the 12.9 / 37.7 min production fits (seeds 1–2; 10.6 / 31.6 min are the seed-0 projection jobs).
   - CPU "about 10× slower (6 s/step)" vs 0.05 s/step GPU is 120×: VERIFY ([M] section 4).
 - **Cut:** about 17 words.
 

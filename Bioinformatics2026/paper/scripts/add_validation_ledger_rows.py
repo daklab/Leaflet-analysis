@@ -4,6 +4,8 @@
 Reads only existing output files of the validation checks (no recomputation): checks 10.1, 12, 17, 18a, 18b, 19, the Allen
 sense checks, and the scaling and runtime record (seed-0 production fit times from their logs; the check 18 refit's run
 record). Each row carries the source file and its md5. Refuses to add a macro that already exists.
+FitMinutesTMS / FitMinutesAllen were revised in place on 2026-11-25 by revise_fit_times_add_rank_bands.py (seeds 1-2 from
+RUNTIME_TABLE.md; the seed-0 jobs failed while saving).
 
 Usage:  python scripts/add_validation_ledger_rows.py [--dry-run]
 """
