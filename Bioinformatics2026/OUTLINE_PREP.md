@@ -11,7 +11,7 @@ dir). Older detail stays in sections 0a–7 below; this skeleton supersedes thei
 - Results, candidate facts (choose ≤ 3):
   - Accuracy 10.1: LeafletFA closer to held-out pseudobulk than raw, largest gain at 1–19 TRAIN reads (TMS −0.0625, Allen −0.0543). VR "Check 10".
   - Interval: check 12 (a)+(b) coverage 0.950–0.963 where validated (28 % TMS / 35 % Allen rows). VR "Check 12 — result".
-  - DS between cell types (TMS pairs): check 17 BETTER vs raw and LeafCutter at equal calls per pair. VR "Check 17" (26da281). Check 18 pending.
+  - DS between cell types (TMS pairs): check 18a BETTER in mice the fit never saw (VR "Check 18", 6fbc7e9); check 17 BETTER with the full-data fit (VR "Check 17", 26da281). Allen pairs with ≥ 4 shared donors: check 19 BETTER (VR "Check 19", 713883d).
   - Scale: TMS fit about 13 min, Allen about 38 min on one GPU. VR "Scaling and runtime record".
 - Availability: repo URLs, Zenodo DOI, browser URL — all missing (browser: separate `daklab/leafletfa-browser` repo, not created; nothing public before the paper, Karin 2026-11-15).
 - Contact: missing.
@@ -68,8 +68,15 @@ dir). Older detail stays in sections 0a–7 below; this skeleton supersedes thei
   - LeafCutter testable: 0 pairs with ≥ 5 scorable units below 100 reads.
   - Same cell type across tissues: no gain over raw below 500 reads (CIs include 0); gain only at ≥ 500 (+0.091).
   - Rank bands, LeafletFA excess: ranks 1–5 0.27–0.29, 6–20 0.22–0.26, 21–100 0.13–0.15 (`$V/c17/rank_bands.tsv`).
-- Limit: the model saw TRAIN cells of the confirming mice (fit on all 18 mice). check 18: pending, see VALIDATION_REPORT.
-- Allen coverage: 1,094 of 2,278 pairs (48 %) have no donor contributing both groups; median 1 (TRAIN). `$V/c17/allen_donors_summary.tsv`. Allen DS not validated.
+- Check 18 (refit on half-A mice, 16,200 steps, 12.9 min GPU; confirmation only in half-B mice; PR amendment 14 + note 1; VR "Check 18", 6fbc7e9): **18a pairs BETTER**, **18b type vs rest BETTER**.
+  - 18a LeafletFA − raw: +0.088 / +0.068 / +0.094 / +0.061 (1–19 / 20–99 / 100–499 / ≥ 500), all lower bounds > 0. vs LeafCutter: +0.156 (lower bound +0.093, 49 pairs, 100–499), +0.059 (−0.0002, 50 pairs, ≥ 500).
+  - 18b LeafletFA − raw: +0.214 / +0.087 / +0.079 / +0.036 (≥ 500 lower bound −0.006).
+  - The limit "the model saw the confirming mice" no longer applies to 18a / 18b. Same cell type across tissues: still no gain below 100 reads (+0.025, +0.027; CIs include 0).
+  - Rank bands (18a), LeafletFA confirmed (excess): ranks 1–5 0.83–0.93 (0.27–0.39), 6–20 0.77–0.82 (0.23–0.27), 21–100 0.63–0.67 (0.16–0.17). `$V/c18/18a_rank_bands.tsv`.
+  - Composite mouse labels (3_10_M/3_11_M, 3_38_F/3_39_F) joined with their mice in the check 18 split; the 10.2a halves (checks 10.2–17) had 106 of about 78,000 cells on the wrong side (PR amendment 14 note 1).
+- Allen coverage: 1,094 of 2,278 pairs (48 %) have no donor contributing both groups (flag "cell type and donor not separable; differences may reflect donor or batch"); 642 have ≥ 4. `$V/c19/allen_pairs_index.tsv`.
+- Check 19 (Allen pairs with ≥ 4 shared donors, within donors; PR amendment 15; VR "Check 19"): **BETTER**. LeafletFA − raw +0.029 / +0.091 / +0.060 / +0.064, all lower bounds > 0 (564 pairs). Same class at 1–19 reads +0.011 (CI includes 0). Limit: the Allen fit saw all TRAIN cells; confirming TEST cells come from the same donors.
+- Allen sense checks (descriptive; VR "Allen sense checks", 9c15ab1). Claimable: *Nrxn1/2/3* SS4 expected direction in 97 / 100 / 99 % of excitatory × inhibitory pairs (median rank 16 / 94.5 / 152); Irimia 2014 microexons 48× enriched, 98 % neuronal direction; hierarchy 0.259 (neuron vs glia) → 0.079 → 0.024 → 0.004 (same subclass), cophenetic Spearman 0.81; skipped-exon frame 0.816 vs 0.478. **Not claimable:** *Grin1* exon 5 and *Gria2* flip/flop direction (UNSOURCED); frame for alt 5′ / 3′ (no enrichment).
 - Earlier fails stay reported: 10.2, 10.7 (rule ≥ 0.5 and ≥ 5× null), 10.2 LeafCutter control (descriptive). VR "Check 10", "LeafCutter descriptive control".
 
 ### Results: limits of calls and intervals — 170 (now 31)
@@ -79,14 +86,14 @@ dir). Older detail stays in sections 0a–7 below; this skeleton supersedes thei
 - Stale: `:236`, `:279`.
 
 ### Results: known biology and the portal — 120 (now 129)
-- *Gria2* flip/flop (Allen, descriptive): medians in section 3 table. Citation Sommer 1990 VERIFY.
+- *Gria2* flip/flop (Allen, descriptive): medians in section 3 table. Citation Sommer 1990 VERIFY. Expected excitatory vs inhibitory direction UNSOURCED (Allen sense check: rank 688): not claimable as a positive control.
 - *Fgfr2* IIIb (TMS, 10.4 PASS): epithelial min 0.704 > mesenchymal max 0.649. Cite Warzecha 2009 and **Bebee2015** (now in `manuscript/references.bib`, PMID 26371508).
 - *Nrxn1* SS4 (Allen, 10.4 note 6 PASS): 1,256 of 1,891 pairs; SS4 inclusion excitatory 0.153 vs PV 0.367, SST 0.405 (Nguyen 2016 direction).
 - *Ptprc* (TMS, 10.4 PASS): 25 of 27 B/T calls confirmed in TEST.
 - Portal: pages gene / event / compare / one-vs-rest; raw ψ, reads, cells, mice beside every estimate; check 12 interval only where validated; comparison notes now state checks 16, 16b, 17 (portal `web/config.js`); not published.
 
 ### Results: scale — 60 (now 77; numbers wrong in `:299-302`)
-- Production fits, one RTX PRO 6000 Blackwell (b6k), 16,200 steps: **TMS about 13.2 min** (54,694 cells, 0.05 s/step, 9.2 GB host); **Allen about 38.5 min** (38,199 cells, 0.14 s/step, 21.3 GB host). VR "Scaling and runtime record" item 1 (ceb5048); RUNTIME_TABLE.md rows 26–29 give fit 12.9 min (TMS seeds 1–2) and 37.7 min (Allen seeds 1–2): consistent; VERIFY which seed the text quotes.
+- Production fits, one RTX PRO 6000 Blackwell (b6k), 16,200 steps, **source chosen 25 Nov: RUNTIME_TABLE.md rows 26 and 28 (run records of seeds 1–2): TMS 12.9 min fit (54,694 cells, 0.048 s/step), Allen 37.7 min fit (38,199 cells, 0.139 s/step).** Reason: the seed-0 fits failed while saving and were resumed, so their fit times (≈ 13.2 / 38.5 min, VR "Scaling and runtime record" item 1) are read from logs, not run records. Host memory 9.2 GB (TMS), 21.3 GB (Allen). The check 18 half-A refit (46,479 cells) took 12.9 min with 6.6 GB peak GPU.
 - 10.6 / 31.6 min (old text) are projection times, not fit times.
 - Peak GPU memory of the production fits: **not recorded**. METHODS 9.0 / 29.7 GB: no source, remove or replace (controlled runs: 2.5–7.0 GB GPU at 5,000–54,694 cells; atlas-size run 25.03 GB GPU).
 - Controlled runs (2,000 steps): GPU 0.032–0.046 s/step, flat from 10,000 cells; CPU (16 cores) 3.27 s/step at 5,000 cells = **102×** slower. `$V/scaling/scaling.tsv` (0b355f1).
@@ -95,7 +102,7 @@ dir). Older detail stays in sections 0a–7 below; this skeleton supersedes thei
 - LeafCutter catalog benchmark: 19.2 task-h (77 core-h).
 
 ### Figure
-- figAN a–f (183 × 164 mm): a catalog/model (schematic placeholder), b accuracy 10.1, c *Gria2*, d *Fgfr2*, e *Nrxn1* SS4, f *Ptprc*. Candidate b showing check 17: in progress (overnight task 3).
+- figAN a–f (183 × 164 mm): a catalog/model (schematic placeholder), b accuracy 10.1, c *Gria2*, d *Fgfr2*, e *Nrxn1* SS4, f *Ptprc*. Candidate panel b built for check 17 and for check 18a (`paper_figures/figAN/figAN_b_candidate_check1{7,8}.pdf`; c1a23ac).
 - Caption limits: per-cell split; interval 28 % / 35 % of rows; seed 0; no programs; no significance flags.
 
 ### Discussion — 250 (now 230)
